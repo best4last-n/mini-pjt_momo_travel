@@ -1,0 +1,26 @@
+{
+  "_note": "수집 설정. 지역 코드는 KorService2 법정동 코드(lDongRegnCd/lDongSignguCd), 2026-11-25 API로 확인. share는 권역 안 시군별 배분 비율.",
+  "festival_window": {"start": "20261201", "end": "20270228"},
+  "content_types": {
+    "attraction": ["12", "14"],
+    "restaurant": ["39"],
+    "lodging": ["32"]
+  },
+  "regions": {
+    "suncheon_gurye": {
+      "label": "순천/구례",
+      "sigungu": [
+        {"name": "순천", "regn": "12", "signgu": "150", "share": 0.6},
+        {"name": "구례", "regn": "12", "signgu": "730", "share": 0.4}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "순천만국가정원", "type": "attraction"},
+        {"keyword": "순천만습지", "type": "attraction"},
+        {"keyword": "낙안읍성", "type": "attraction"},
+        {"keyword": "화엄사", "type": "attraction"},
+        {"keyword": "꼬막", "type": "restaurant"}
+      ]
+    }
+  }
+}

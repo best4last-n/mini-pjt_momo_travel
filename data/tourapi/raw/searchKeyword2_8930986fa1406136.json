@@ -1,0 +1,1 @@
+{"endpoint": "searchKeyword2", "params": {"keyword": "화엄사", "lDongRegnCd": "12", "lDongSignguCd": "150", "numOfRows": 5, "pageNo": 1}, "data": {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"}, "body": {"items": "", "numOfRows": 0, "pageNo": 1, "totalCount": 0}}}}
