@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "8411c528-28fa-4da0-835c-c8fa634edb02",
+  "status": "current",
+  "command": "deliver",
+  "type": "explainer",
+  "input": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\explainer-momo-plan-20261125-162058\\candidate.archify.md",
+  "output": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\explainer-momo-plan-20261125-162058\\momo-plan.html",
+  "specification": {
+    "sha256": "2aaec3b98d465d49eba9eeba23642665c5875f7b586594b5bd087154e7891136",
+    "bytes": 5923
+  },
+  "artifact": {
+    "sha256": "0b9c4994024e9e5456e970f36c19c2eebae1080a14bb924ef17fc3707d7fa4cd",
+    "bytes": 1116003
+  },
+  "explainer": {
+    "preparedSha256": "a71dbccc2bec2c2d253efab841df62bd73e454e242268fd8b13cca29aa8f568e",
+    "dependencies": [
+      {
+        "kind": "diagram-spec",
+        "id": "momo-system",
+        "inline": true,
+        "sha256": "83d2354e4db2e8d1f6cd41b965474975d039245454da5c01e834cb40c2b36b68",
+        "bytes": 2009
+      },
+      {
+        "kind": "diagram-spec",
+        "id": "momo-flow",
+        "inline": true,
+        "sha256": "847819205b073c0f0223be4f824163ef8ca68e9d0c56034b015521c4bf61f1fd",
+        "bytes": 2110
+      }
+    ]
+  }
+}

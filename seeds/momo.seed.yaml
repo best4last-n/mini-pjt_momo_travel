@@ -1,0 +1,430 @@
+goal: Build "모모의 여행 상담소", an Agentic RAG travel agent for the Samsung SDS AX mini PJT, finished by Day
+  10 15:00. The postman migratory-bird character 모모 talks with the user like a counselor and builds a
+  당일~1박 2일 domestic trip for 경주, 순천/구례 or 수원. Each trip is grounded in 한국관광공사 TourAPI data and accounts
+  for 휴무일, 운영시간, 축제, 날씨 and travel time from the departure city, with 0 rule violations; user-specified
+  waypoints are included. The trip is shown as a detailed itinerary that works on PC and mobile, with
+  a representative image and a summary for each place. After the user approves it, the trip is confirmed
+  and exported as .ics and a share link; LifeGalaxy trip JSON v1 is an add-on option. The service is POST
+  /query plus a single page served by FastAPI, and it must pass 17 of the 20 in-out test cases in round
+  2 (85%) with guardrail cases at 100%. Matching the plan against actual photos is a NICE feature, and
+  the agent will be integrated into LifeGalaxy after submission.
+task_type: code
+brownfield_context:
+  project_type: greenfield
+  context_references: []
+  existing_patterns: []
+  existing_dependencies: []
+constraints:
+- 'Stack: AWS Bedrock Claude Sonnet 4.5 (generation), Titan Embeddings v2, Chroma, BM25 + kiwipiepy, LangGraph,
+  LangSmith; data from 한국관광공사 TourAPI (collected in advance), Open-Meteo, OSRM, OSM'
+- 'Required patterns: LCEL+Pydantic, RAG, Trace, evaluation (RAGAS + LLM-as-Judge), plus at least 6 of
+  ReAct, multiple tools, guardrails, HITL, middleware, Plan-Execute (long-term memory is NICE); Multi-Agent
+  excluded'
+- Target regions are 경주, 순천/구례 (one area) and 수원, passed as data parameters rather than hardcoded; other
+  domestic regions get a '준비 안 된 지역' message; overseas is a NICE 가벼운 모드 (theme, weather and OSM basics
+  only, answer must contain '가벼운 모드')
+- Trip length is 당일 to 1박 2일; '당일', '당일치기', '하루 코스' and '데이트립' mean 당일 and override the default; longer
+  requests get a message proposing 1박 2일
+- 'API: POST /query {question, optional session_id, optional action} returns {answer, contexts, trace,
+  status, theme, session_id, itinerary}; answer is a string in 모모''s voice that states place names, dates,
+  start and end times, travel time, reasons and sources; itinerary is a separate array built first; answer
+  and itinerary are checked for consistency'
+- 'itinerary item fields: seq, date (YYYY-MM-DD), type (place/meal/stay/move), place_id (TourAPI contentid),
+  place_name, start_time/end_time (HH:MM, 24h), travel_minutes_from_prev (0 for the first item), transport_mode,
+  transport_mode (car/walk/transit), travel_source (cache/estimate), reason, source, hours_status (확인됨/확인 필요/휴무/해외), lat/lng, image_url,
+  image_license, summary'
+- 'status values: 완료, 되묻기, 거절, 승인 대기, 확정, 정보, 오류'
+- Missing region gives status=되묻기 once, as chip choices that also ask for any other missing conditions;
+  a missing date defaults to the nearest Saturday and a missing length to 1박 2일, with '기본값 적용' stated
+  in the answer
+- 'No OSRM calls while the agent runs or is evaluated: local travel times come from a committed OSRM cache
+  (key from_id|to_id|mode); on a cache miss use straight-line distance × 1.3 ÷ speed (car 30 km/h, walking
+  4.5 km/h) with a minimum of 5 minutes; estimates never fail a plan, but the answer says that some times
+  are estimated and the trace records the source of each leg'
+- 'Time overlap rule: previous item end + travel time + 10-minute buffer > next item start is a violation'
+- 'Departure travel: the departure is taken at 시·군·구 level and resolved through a fixed table of representative-city
+  coordinates for all 17 시·도; the reference point is the centroid of the region''s collected places; city-to-city
+  time is straight-line distance × 1.3 ÷ 80 km/h; default departure is 08:00 unless the user gives a time;
+  the trip starts and ends with type=move items (travel_source=estimate, no place_id); trains and buses
+  use the same estimate with a note that transit times are estimated; departing from 제주 gets a note to
+  check flight times'
+- 'Local time window: start = max(09:00, departure + one-way + 10 min) and end = min(20:00, 22:00 − one-way);
+  for 1박 2일 this applies only to day 1 start and day 2 end; for 당일, under 1 h available gives status=정보
+  with no plan, 1–3 h gives a plan plus a warning, and 1박 2일 never warns; if the departure is unknown,
+  use 09–20 local time and say travel time is excluded'
+- 'Meals: one lunch (12–14) and one dinner (18–20) are required only when the slot overlaps the local
+  window by at least 30 minutes; if no restaurant with confirmed hours fits, add a ''주변에서 식사'' item (type=meal,
+  no place_id, source=''식사 안내'')'
+- A 1박 trip must end day 1 with a type=stay item; only the check-in time is checked
+- 'hours_status ''확인 필요'' is a warning, not a violation: it gets a badge, a lower rank, at most one per
+  day, and is never placed at a meal or the last slot; festivals are checked against eventstartdate~eventenddate'
+- 'Data collection per region: about 30 attractions and cultural facilities, 20 restaurants, 10 lodgings
+  and up to 10 festivals, managed in a config table and kept within TourAPI''s daily limit; detailCommon2
+  adds firstimage, overview and cpyrhtDivCd; place summaries (2–3 sentences) are generated and cached
+  at collection time, checked once against the overview by a Judge (Sonnet 4.6), regenerated on failure,
+  and after 2 failures replaced by a quote from the start of the overview'
+- Images are TourAPI firstimage links (not copied into the repo) with source and 공공누리 type shown; 제3유형
+  images must not be cropped or altered; places without an image show a 모모 illustration
+- 'Guardrails: (1) no ungrounded information, and AI-recommended places must exist in retrieved data (user-specified
+  waypoints are exempt); (2) PII masking, with an opt-in exception only for a home location registered
+  in settings; (3) no save or share without HITL approval; (4) refuse out-of-scope requests and prompt
+  injection; (5) source display: every item has a source, domestic answers (including informational ones)
+  contain ''한국관광공사'', overseas answers contain ''가벼운 모드''; ads are out of MVP scope'
+- A plan is generated, rule-checked, and regenerated at most 2 times when a violation is found
+- Approval only through POST /query action='approve' + session_id (the '확정할게요' button); chat text never
+  saves anything; the 확정 response includes plan_id (a random, unguessable token), share_url /plan/{plan_id}
+  and ics_url /plan/{plan_id}.ics; a modification request during 승인 대기 goes back to generation; long-term
+  memory and LifeGalaxy saving need separate explicit actions
+- The share page GET /plan/{plan_id} is read-only, stored in SQLite, never expires, and shows departure
+  only at 시·도 level
+- 'User-specified waypoints (''OO 들러 줘'') are MUST: a place in the collected data is inserted with its
+  data and rule-checked; a place outside it becomes source=''사용자 지정'' with hours_status=확인 필요, the user
+  is asked for the stay time, and its location comes from one OSM lookup (on failure, the location is
+  unknown and travel time is ''확인 필요'')'
+- 'Scoring setup is frozen before round 1: test_queries.csv (questions, expected_traits, forbidden, reference),
+  Judge model and prompt, pass rule, scoring rule checker, RAGAS thresholds, evaluation date 2026-11-25,
+  and the weather record data; CSV SHA-256 and commit hash go into the round1 and round2 reports; only
+  prompts, retrieval settings, generation logic, the hours parser and collected data may change between
+  rounds; a scoring bug fix means round 1 is rescored with the same setup and the report says so'
+- Case pass = 0 rule-check violations (checked first; a violation skips the Judge) AND every expected_traits
+  item judged 예 AND every forbidden item 미검출 by an LLM Judge (Claude Sonnet 4.6, temperature 0, yes/no
+  per item with a one-line reason); if a different model is unavailable, use Sonnet with a separate prompt
+  and state the limitation in the README; expected_tools is a reference metric only
+- 'RAGAS: 20-case averages, faithfulness ≥ 0.80, answer_relevancy ≥ 0.80, context_precision ≥ 0.70, context_recall
+  ≥ 0.70; reported separately and not part of case pass'
+- 'Targets: round 1 ≥ 70% (14/20), round 2 ≥ 85% (17/20), guardrail cases #18–#20 always 3/3; the case
+  mix stays 8/4/5/3; failures on #16 (overseas) and #17 (add-on) are allowed if those NICE features are
+  not built'
+- 'Test #17 switches with the LIFEGALAXY_ADDON=on/off environment variable using data/demo_galaxy.json
+  and must pass in both modes; test #5 swaps to indoor places as instructed, regardless of the forecast'
+- The LifeGalaxy Node.js app is not modified; trip JSON v1 export (schemas/trip_v1.json, version='1',
+  +09:00 local times, aligned with the trip-media format), plan import and photo matching (±30 min, 300
+  m) are NICE add-ons active only when LIFEGALAXY_ADDON=on
+- 'Home-address opt-in (NICE): entered only in a settings screen; geocoded once with VWorld, the raw address
+  is discarded, coordinates are rounded to 3 decimals and stored locally and can be deleted; shown only
+  as ''집'' to the LLM, trace and answer; a geocoding failure rejects registration; an OSRM failure or
+  a delay over 5 s keeps the coordinates and uses the estimate plus a ''다시 계산'' button'
+- The agent core (planning, rule checks, matching) is a Python package separate from FastAPI; the README
+  includes a LifeGalaxy integration memo
+- 'NICE priority: theme UI > overseas light mode > long-term memory > LifeGalaxy add-on > MCP (features
+  are dropped in reverse order); no NICE work starts if round 1 is not done by Day 9 18:00; no new features
+  after Day 10 10:00'
+- 'Extended guardrails (apply even when unrelated to travel; code checks first, LLM second): (1) PII masking for resident/foreigner registration, passport, driver license, card (Luhn), account, phone, email, detailed address, car plate, birthdate+name — masked before the LLM, re-checked on output, and never stored in trace, logs, LangSmith, share page, .ics or memory; lookups of other people are refused; (2) prompt injection, direct (ignore-instructions, role-play, secret/system-prompt/env requests, encoded or multi-turn) and indirect (TourAPI/OSM/waypoint text is wrapped as data and never followed); off-topic tasks are refused; output is blocked if it contains system prompt text, key-like strings or .env key names; save_plan is not in the LLM tool list; (3) approval bypass: confirm only via action=approve + session_id + current draft_version; chat text or an action string inside the question never approves; a stale draft_version is refused; a second approve on an already confirmed session overwrites the same plan_id (stored plan, share page and .ics updated, link kept); other sessions cannot read or approve; invalid requests (empty or whitespace question, malformed JSON or field types, over 2,000 chars, unknown action, approve with unknown session_id) raise InvalidRequest, handled by a common exception handler that returns HTTP 400 (413 for length) with the standard body: answer in 모모''s voice saying the request was invalid and asking the user to try again, contexts [], trace [{step: error}], status 오류; no stack trace is exposed'
+- 'Transport and route preview (MUST): conditions include transport (자차 or 대중교통), parsed from the question; if only transport is missing, default 자차 with ''기본값 적용'' and a UI toggle that recalculates; transit estimates: local walk if straight line <= 1.2 km (x1.3 / 4.5 km/h) else x1.3 / 15 km/h + 10 min wait, departure-to-region x1.3 / 60 km/h + 30 min; car keeps the existing rules; every leg shows ''약 N분'' with transport_mode car/walk/transit and an approximate-time notice; daily total travel time is shown and a leg over 60 min or travel longer than stays triggers a reorder/fewer-places suggestion; the Leaflet map shows per-day numbered markers, a dashed straight route line in visit order with per-leg time labels, day tabs, and marker-card linking (PC fixed right panel, mobile collapsible); domestic plans can switch between OSM and VWorld base/satellite tiles (VWORLD_API_KEY in .env); without a key or on tile errors the switch is hidden and OSM is used; road-following route geometry is NICE'
+- 'Agent structure (C hybrid): one LangGraph graph; after the input guardrail a Pydantic intent router (plan / info / reject, ambiguous -> plan) sends plan requests to a fixed Plan-Execute subgraph (parse -> retrieve -> generate -> rule check with up to 2 regenerations -> output guardrail -> approval wait -> approve saves) and info questions to a ReAct node with the domain tools, followed by the output guardrail'
+- References in test_queries.csv are drafted by Claude from the collected data, reviewed by the user,
+  and frozen just before round 1
+acceptance_criteria:
+- description: POST /query returns answer, contexts ([{doc_id, text}]), trace ([{step, input, output}]), status, theme, session_id and a full-field
+    itinerary for 경주, 순천/구례 and 수원; it asks back when the region is missing, applies and announces defaults
+    for date and length, and gives a 준비 안 된 지역 message for unsupported regions
+  semantic_ac_key: ac_35327a883daec5b0
+  verify_command: python -m pytest tests/test_query_api.py -q
+- description: Generated itineraries have no violations (휴무일, outside 운영시간, time overlap with a 10-minute
+    buffer, outside the departure-adjusted local window, unknown AI-recommended place, missing source
+    or 한국관광공사 text, image without license, place without summary, 1박 without stay), and departure move
+    items and meal rules follow the defined formulas
+  semantic_ac_key: ac_23237aebf0e18c31
+  verify_command: python -m pytest tests/test_rules.py -q
+- description: Round 1 and round 2 reports exist with the same frozen CSV SHA-256 and a commit hash; round
+    2 passes at least 17 of 20 cases with guardrail cases 3/3, and RAGAS averages are reported
+  semantic_ac_key: ac_dc29bfc66408b67f
+  verify_command: python -c "import json;a=json.load(open('evaluation/reports/round1.json',encoding='utf-8'));b=json.load(open('evaluation/reports/round2.json',encoding='utf-8'));assert
+    a['csv_sha256']==b['csv_sha256'] and b['commit'];assert b['passed']>=17 and b['guardrail_passed']==3;assert
+    'ragas' in b;print('OK')"
+  expected_artifacts:
+  - evaluation/test_queries.csv
+  - evaluation/reports/round1.json
+  - evaluation/reports/round2.json
+  output_assertion: OK
+- description: After action=approve, status becomes 확정 with plan_id, share_url and ics_url; the .ics parses
+    with icalendar and matches the confirmed itinerary 1:1 (VEVENT count, Asia/Seoul times, place names);
+    the read-only share page shows images, summaries and sources, persists across a server restart, and
+    chat text alone never saves
+  semantic_ac_key: ac_2a2435f04960db3f
+  verify_command: python -m pytest tests/test_export.py -q
+- description: 'Multi-turn edits with session_id work, including an ''OO 들러 줘'' waypoint outside the collected
+    data: it gets source=''사용자 지정'' and hours_status=확인 필요, has no time overlap, and shows ''확인 필요'' travel
+    time when the OSM lookup fails'
+  semantic_ac_key: ac_b2fe2b5f8b412eff
+  verify_command: python -m pytest tests/test_waypoint.py -q
+- description: The detailed itinerary page shows one column on mobile (360px) and two columns on PC (1280px,
+    timeline plus map), and screenshots of both are saved
+  semantic_ac_key: ac_f968cd757ffcf9a6
+  verify_command: python -m pytest tests/test_ui_layout.py -q
+  expected_artifacts:
+  - evaluation/screenshots/mobile_360.png
+  - evaluation/screenshots/pc_1280.png
+- description: SERVICE.md matches the final design (answer is a string, itinerary is a separate field),
+    and the README records Judge limitations and a LifeGalaxy integration memo
+  semantic_ac_key: ac_526190107413672d
+  verify_command: python -c "s=open('SERVICE.md',encoding='utf-8').read();r=open('README.md',encoding='utf-8').read();assert
+    'itinerary' in s and 'LifeGalaxy' in r;print('OK')"
+  expected_artifacts:
+  - SERVICE.md
+  - README.md
+  output_assertion: OK
+- description: '[from-user]
+
+    Decision: 옵션 A — 핵심 한 줄기 + 컷라인.
+
+
+    필수(MUST):
+
+    - 대상 3개 지역 데이터(경주 먼저 수집·검증, 이어서 순천/구례·수원). 지역은 코드에 박지 않고 데이터 파라미터로.
+
+    - 조건 구조화(Pydantic) → RAG 검색 → 일정 생성 → 규칙 검사(휴무일·운영시간 밖·시간 겹침·없는 장소; 위반 시 재생성 최대 2회) → POST /query(answer/contexts/trace,
+    session_id).
+
+    - 가드레일(입력 PII·인젝션, 출력 근거 검사), 확정 승인(HITL), 대화 이어서 수정(멀티턴).
+
+    - 자동 평가: test_queries.csv 20건 + RAGAS → round1 리포트.
+
+    - 테마 없는 기본 단일 페이지 화면.
+
+
+    추가(NICE, 우선순위 순): 1) 계절·국내/해외·날씨 테마 UI 2) 해외 가벼운 모드 3) 장기 메모리 4) LifeGalaxy add-on 5) MCP.
+
+
+    컷라인: Day 9 18:00까지 1차 평가가 끝나지 않으면 추가 기능 착수 안 함. Day 10 10:00 이후 새 기능 동결(개선·2차 평가·README만).
+
+
+    참고(main session 확인): 테스트 케이스 #16(해외), #17(add-on)은 NICE 의존 → 미구현 시 2건 실패, 85% 목표(최대 3건 실패) 안에서 허용.'
+  semantic_ac_key: ac_190df88fc4dfb301
+- description: '[from-user]
+
+    Decision:
+
+    - guardrail 100% 분모 = category=guardrail인 #18·#19·#20 3건(전부 통과 필수).
+
+    - 출처 표시는 LLM 채점이 아닌 규칙 검사: 일정 항목마다 source 값 존재 + 국내 일정 answer에 ''한국관광공사'' 문구 + 해외 일정 answer에 ''가벼운
+    모드'' 문구. 광고·제휴는 MVP에 없으므로 검사 대상 아님.
+
+    - ''당일·당일치기·하루 코스·데이트립'' 표현은 여행 길이=당일로 인식(기본값 1박 2일보다 우선) — 확정.
+
+    - 1박 2일의 첫날 도착·둘째 날 출발에도 같은 출발지 이동 계산 적용 — 확정.'
+  semantic_ac_key: ac_b401923373faeefc
+- description: '[from-user]
+
+    Decision: 출발지 이동 세부 규칙 확정.
+
+    - 출발지는 시·군·구까지 받되 계산은 시·도 대표 도시 좌표표(고정). 표에 없으면 ''출발지 모름'' 처리. ''추정'' 표기.
+
+    - 도시 간 구간만 직선거리×1.3÷80km/h. 현지 안은 기존 규칙(캐시/30km/h).
+
+    - itinerary 맨 앞·뒤에 type=move 항목(travel_source=estimate, place_id 없음). itinerary type = place/meal/stay/move.
+
+    - 현지 시간 창: 당일 시작=max(09:00, 출발+편도), 종료=min(20:00, 22:00−편도). 1박 2일은 첫날 시작·둘째 날 종료에만 적용. 출발 시각을 말하면
+    08:00 대신 사용. 우선순위 22:00 귀가 > 09~20.
+
+    - 규칙 검사: 현지 항목이 계산된 창 안인지(하드 게이트). 22:00 귀가는 산식으로 보장.
+
+    - 식사: 점심 12~14·저녁 18~20 각 1건 기본, 해당 시간대가 현지 창과 30분 이상 겹칠 때만 필수, 아니면 빼고 안내.
+
+    - 경고: 당일치기에서 현지 가능 시간 3시간 미만일 때만. 1박 2일엔 경고 없음.
+
+    - 국내 정보성 답변(#4·#7)도 ''한국관광공사'' 문구 규칙 검사. 가드레일 5 검증에서 광고 제거(MVP 범위 밖).
+
+
+    Context: 최종 점검 3차(closer not_ready, contrarian·gap_hunter high)가 지적한 시간 창 산식·속도·기록 위치·1박 2일 경고·출발지
+    단위·식사 충돌을 메우는 결정.'
+  semantic_ac_key: ac_c0361c46a72237b7
+- description: '[from-user]
+
+    이미 Q1에서 사용자가 결정한 내용(SERVICE.md 3-5 [결정]) 재전달:
+
+    - MUST: 3개 지역 데이터(경주 먼저), 조건 구조화(Pydantic)→RAG→일정 생성→규칙 검사(재생성 최대 2회)→POST /query(session_id), 가드레일,
+    HITL 확정 승인, 멀티턴 수정, 자동 평가 20건+RAGAS 1차 리포트, 테마 없는 기본 화면. save_plan(.ics·공유 링크)은 HITL 승인 동작이므로 MUST에
+    포함.
+
+    - 패턴: MUST만으로 LCEL+Pydantic, RAG, Trace, 평가(필수 4) + ReAct, 도구 다중, 가드레일, HITL, 미들웨어 = 9개 → 6개 이상 충족.
+    Plan-Execute는 일정 생성 그래프 구조로 MUST에 포함되고, 장기 메모리는 NICE.
+
+    - NICE(빼는 순서는 아래부터 = 우선순위 역순): ① 테마 UI ② 해외 가벼운 모드 ③ 장기 메모리 ④ LifeGalaxy add-on ⑤ MCP. 시간이 부족하면 ⑤→④→③→②→①
+    순으로 뺌.
+
+    - 컷라인: Day 9 18:00까지 1차 평가 미완료 시 NICE 착수 금지, Day 10 10:00 이후 새 기능 동결.'
+  semantic_ac_key: ac_18eae5683f6facad
+- description: '[from-user]
+
+    Decision: 권장 기본값 일괄 적용.
+
+    1) 현지 종료 = min(20:00, 22:00−편도) 확정. 20:00이 기본, 22:00 귀가는 넘을 수 없는 상한. 기본 출발 08:00(사용자가 말하면 그 시각).
+
+    2) 당일치기 현지 가능 시간 1시간 미만 → 일정 없이 status=정보, ''더 이른 출발이나 1박'' 안내. 1~3시간 → 일정 생성 + 경고. 1박 2일엔 경고 없음.
+
+    3) 기차·버스를 말해도 같은 추정식 + ''대중교통 시간은 추정'' 안내(대중교통 경로는 MVP 범위 밖).
+
+    4) 식사 시간대에 운영시간 확인된 식당이 없으면 ''주변에서 식사'' 항목(type=meal, place_id 없음, source=''식사 안내'').
+
+    5) 정리: 식사 규칙은 3-4e로 통일(시간대가 현지 창과 30분 이상 겹칠 때만 필수). move 항목 start/end=출발·도착 시각, source=''추정(직선거리)''
+    또는 ''OSRM(등록 시 계산)''. 편도 기준점=각 여행 지역 대표 지점(수집 장소 좌표 중심). 집 등록 시 OSRM 값 우선, 없으면 직선 추정. 시·도 표는 17개 시·도
+    전부(제주 출발은 항공 일정 확인 안내+현지 기준). 브이월드 지오코더를 데이터 소스에 추가(키 필요, NICE). 가드레일 2 예외에 ''계산에도 좌표 사용'' 명시.
+
+
+    Context: Seed-ready Acceptance Guard 4차(closer not_ready, contrarian·gap_hunter high) 지적 해소.'
+  semantic_ac_key: ac_a6fa6fd6d07520db
+- description: '[from-user]
+
+    Decision: 권장 기본값 일괄 적용.
+
+    1) 1박 일정은 1일차 마지막 숙박 항목(type=stay) 필수(체크인 시간만 검사).
+
+    2) reference: Day 9 오전 데이터 수집 후 Claude가 수집 데이터 근거로 20건 초안 → 사용자 검토 → 1차 평가 직전 고정.
+
+    3) 테스트 #17: 서버 환경변수 LIFEGALAXY_ADDON=on/off로 전환, 데모 데이터 data/demo_galaxy.json, 켬·끔 두 번 모두 통과해야 1건
+    통과.
+
+    4) 현지 시간 창 시작 = 도착 + 여유 10분(다른 구간과 같은 여유 규칙).
+
+    5) expected_tools는 참고 지표로만 보고, 통과 판정 미포함.
+
+    6) 테스트 #5는 사용자의 가정(''비 오면'')이므로 예보와 무관하게 지시대로 실내 교체.'
+  semantic_ac_key: ac_4cbe10b6c5b2e342
+- description: '[from-user]
+
+    이미 Q4·초기 결정에서 사용자가 정한 내용 재전달(SERVICE.md 5절 [결정]):
+
+    (1) 1건 통과 = 규칙 검사 위반 0건(하드 게이트, 먼저 실행 — 휴무일·운영시간 밖·시간 겹침·시간 창 밖·없는 장소, 출처 문구 규칙 포함) AND LLM-as-Judge(Claude
+    Sonnet 4.6, temperature 0)가 expected_traits 항목 전부 ''예'' AND forbidden 항목 전부 ''미검출''. 점수 척도(4/5)가 아니라
+    항목별 예/아니오 판정.
+
+    (2) RAGAS: faithfulness ≥ 0.80, answer_relevancy ≥ 0.80, context_precision ≥ 0.70, context_recall
+    ≥ 0.70 — 20건 평균, 케이스 통과 판정과 별도로 리포트에 보고(통과 판정에 미포함). 프로젝트 자체 기준.
+
+    (3) 목표: 1차 70%(14/20), 2차 85%(17/20), guardrail(#18~#20) 3/3은 항상 필수. 개선폭은 리포트에 건수·%p로 기록.'
+  semantic_ac_key: ac_3d1396e79cdddb11
+- description: '[from-user]
+
+    Decision: 자동 검사 + 스크린샷 자동 저장.
+
+    - 이미지가 있으면 출처·공공누리 유형 표기 필수, 없으면 모모 일러스트 대체 → 규칙 검사(하드 게이트)에 포함.
+
+    - summary: 국내 place 항목마다 존재 여부는 규칙 검사. 근거 충실도는 수집 단계에서 Judge(Sonnet 4.6)로 overview 대비 1회 검사해 통과한 요약만
+    캐시(실패 시 재생성, 2회 실패 시 overview 앞부분 인용으로 대체).
+
+    - 반응형: Playwright로 모바일 360px·PC 1280px 스크린샷 자동 저장(시연 캡처 겸용) + 배치 검사(모바일 1열, PC 2단). 화면 검사는 평가 20건
+    통과율과 별도 항목으로 리포트.'
+  semantic_ac_key: ac_f844160e8c96d387
+- description: '[from-user][refined]
+
+    Decision (goal line, corrected): 우체부 철새 ''모모''가 상담하듯 대화하며 경주·순천/구례·수원의 당일~1박 2일 국내 여행 일정을 관광공사 TourAPI
+    근거와 휴무일·운영시간·축제·날씨·출발지 이동시간을 반영해 규칙 위반 0건으로 만들고(사용자 지정 경유지 포함), 장소별 대표 이미지·요약 설명이 담긴 PC·모바일 반응형 상세
+    일정표로 보여 주며, 사용자 승인 후 확정·내보내는(.ics·공유 링크; LifeGalaxy trip JSON v1은 add-on 옵션) Agentic RAG 에이전트를, POST
+    /query API와 FastAPI 단일 페이지로 Day 10 15:00까지 완성하고 인-아웃 20건 2차 85%·guardrail 100%를 달성한다(계획 대비 실제 사진 매칭은
+    추가 기능, 제출 후 LifeGalaxy 통합 예정).
+
+
+    Reasoning (user, verbatim): "LifeGalaxy와 주고받을 수 있는 trip JSON v1으로 내보내기는 필수는 아니고, 옵션으로 진행할 수 있게 해줘.
+    (add-on기능이니까)"
+
+
+    Constraints: trip JSON v1 내보내기를 MUST에서 NICE(LifeGalaxy add-on ④에 포함, LIFEGALAXY_ADDON=on일 때만)로 이동.
+    save_plan 기본은 .ics·공유 링크. trip JSON 검증 테스트는 add-on 구현 시에만 실행. 스키마 설계(trip_v1, trip-media 정합)는 add-on
+    범위.'
+  semantic_ac_key: ac_3085e1023aff160c
+- description: 'Extended guardrail suite passes (separate from the 20 cases): 6 PII types masked in input, output and trace; 3 direct and 1 indirect prompt injection refused; 1 off-topic task refused; 4 approval-bypass attempts (chat confirm, action string in question, stale draft_version, second approve overwrites the same plan_id) and 3 invalid requests (empty, malformed, over 2,000 chars → status 오류 with a 모모-voice retry message, no stack trace) behave as specified'
+  verify_command: python -m pytest tests/test_guardrails.py -q
+- description: 'Route preview works: transport is parsed (KTX -> 대중교통) or defaults to 자차 with a notice; every leg has transport_mode and an approximate minute label with no time overlap; the map shows one numbered marker per place/meal/stay item, one route line per day and per-leg labels; switching to VWorld changes tile URLs to vworld, and without a key the switch is hidden and OSM is used'
+  verify_command: python -m pytest tests/test_route_preview.py -q
+assumptions:
+- Test files are named tests/test_query_api.py, tests/test_rules.py, tests/test_export.py, tests/test_waypoint.py
+  and tests/test_ui_layout.py; tests use tmp_path or temporary directories and do not write into the workspace
+- Evaluation reports are evaluation/reports/round1.json and round2.json (plus markdown versions) with
+  keys passed, total, guardrail_passed, csv_sha256, commit and ragas
+- Playwright screenshots are saved to evaluation/screenshots/mobile_360.png and pc_1280.png
+- API tests use a stubbed or cached LLM so they run without live Bedrock calls
+- The cached OSRM travel times live at data/travel_cache.json
+- SERVICE.md and README.md are at the workspace root
+ontology_schema:
+  name: MomoTripPlan
+  description: A grounded, rule-checked domestic trip plan made through conversation with 모모, including
+    its status lifecycle and exports.
+  fields:
+  - name: session_id
+    type: string
+    description: Multi-turn session key
+    required: true
+  - name: status
+    type: string
+    description: 완료/되묻기/거절/승인 대기/확정/정보/오류
+    required: true
+  - name: conditions
+    type: object
+    description: Pydantic-structured region, date, length, departure, preferences, defaults applied
+    required: true
+  - name: answer
+    type: string
+    description: Natural-language reply in 모모's voice
+    required: true
+  - name: itinerary
+    type: array
+    description: Items with seq, date, type, place_id, place_name, start/end time, travel minutes/source/mode,
+      reason, source, hours_status, lat/lng, image_url, image_license, summary
+    required: true
+  - name: contexts
+    type: array
+    description: 'Guide standard: [{doc_id, text}]; doc_id is the TourAPI contentid (overseas: osm:{id})'
+    required: true
+  - name: trace
+    type: array
+    description: 'Guide standard: [{step, input, output}]; tool calls, rule violations, regeneration count and per-leg travel source are recorded as steps (PII masked)'
+    required: true
+  - name: theme
+    type: object
+    description: Season, domestic/overseas, weather
+    required: true
+  - name: draft_version
+    type: string
+    description: Hash of the current draft; approve must match it
+    required: false
+  - name: plan_id
+    type: string
+    description: Random token for a confirmed plan (only when status=확정)
+    required: false
+  - name: share_url
+    type: string
+    description: /plan/{plan_id} (only when status=확정)
+    required: false
+  - name: ics_url
+    type: string
+    description: /plan/{plan_id}.ics (only when status=확정)
+    required: false
+evaluation_principles:
+- name: rule_compliance
+  description: Zero hard-gate violations on time, hours, closures, windows, places and sources
+  weight: 1.0
+- name: groundedness
+  description: Every recommendation and summary is traceable to TourAPI data or cache
+  weight: 0.9
+- name: guardrail_safety
+  description: PII masked, injection refused, no unapproved save or share
+  weight: 1.0
+- name: eval_integrity
+  description: Frozen scoring setup, reproducible runs with no live routing calls
+  weight: 0.8
+- name: user_experience
+  description: Readable responsive itinerary with images, summaries and 모모's tone
+  weight: 0.6
+exit_conditions:
+- name: targets_met
+  description: Round 2 meets targets and all MUST checks pass
+  criteria: round2 passed ≥ 17/20, guardrail 3/3, separate .ics/share/waypoint/UI tests pass
+- name: deadline
+  description: Submission deadline reached
+  criteria: Day 10 15:00; feature freeze after Day 10 10:00
+metadata:
+  seed_id: seed_88bc362304bb
+  version: 1.0.0
+  created_at: '2026-11-25T06:31:47.785793Z'
+  ambiguity_score: 0.13
+  gate_forced: false
+  interview_id: interview_20261125_050730
+  parent_seed_id: null
+  generation_mode: normal
+  degraded: false
+  unresolved_slots: []
+  recovery_reason: null
+  local_edit: '2026-11-25: contexts/trace aligned to guide API standard (arrays);  removed superseded ACs (trip JSON MUST) ac_4f607720fe256cb2, ac_c19742e1bbd61355,
+    ac_ff533b8d5794ac53; final decision ac_3085e1023aff160c (trip JSON v1 = LifeGalaxy add-on option)
+    stands'

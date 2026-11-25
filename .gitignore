@@ -1,0 +1,11 @@
+.env
+.venv/
+__pycache__/
+*.sqlite
+*.sqlite-*
+chroma_db/
+
+# 교육 자료(공개 저장소 제외)
+guide/
+# 로컬 도구 산출물 영수증
+.archify/**/*.finalize*.json

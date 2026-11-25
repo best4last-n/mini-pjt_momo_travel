@@ -1,0 +1,36 @@
+{
+ "response": {
+  "header": {
+   "resultCode": "0000",
+   "resultMsg": "OK"
+  },
+  "body": {
+   "items": {
+    "item": [
+     {
+      "contentid": "1492402",
+      "contenttypeid": "12",
+      "heritage1": "0",
+      "heritage2": "0",
+      "heritage3": "0",
+      "infocenter": "054-771-8650",
+      "opendate": "",
+      "restdate": "연중무휴",
+      "expguide": "",
+      "expagerange": "",
+      "accomcount": "",
+      "useseason": "",
+      "usetime": "- 정문 09:00~22:00 (입장 마감 21:30)  - 후문·천마총 09:00~21:30",
+      "parking": "가능",
+      "chkbabycarriage": "",
+      "chkpet": "",
+      "chkcreditcard": ""
+     }
+    ]
+   },
+   "numOfRows": 1,
+   "pageNo": 1,
+   "totalCount": 1
+  }
+ }
+}
