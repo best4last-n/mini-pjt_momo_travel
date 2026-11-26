@@ -1358,6 +1358,11 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
         pass  # approve_node가 '초안 없음'으로 응답
     if set_req and isinstance(set_req.get("value"), str):
         set_req = {**set_req, "value": guardrails.mask_pii(set_req["value"])[0]}
+    snap = None
+    if action in ("edit", "set"):        # 되돌리기용: 편집 직전 상태
+        cur = graph().get_state(cfg).values or {}
+        if cur.get("itinerary"):
+            snap = {k: cur.get(k) for k in UNDO_KEYS}
     out = graph().invoke({"question": masked, "action": action, "draft_version_in": draft_version,
                           "session_id": sid, "edit": edit, "set_req": set_req, "start_req": start_req,
                           "cost_req": cost_req, "pack_req": pack_req}, cfg)
@@ -1371,6 +1376,9 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
             "plan": out.get("plan_out"), "conditions": out.get("conditions"), "changes": out.get("changes") or [],
             "progress": brochure.progress(out["conditions"]) if out.get("conditions") else None}
     resp.update(out.get("extra") or {})
+    if snap and out.get("draft_version") and out.get("draft_version") != snap.get("draft_version"):
+        store.push_snapshot(sid, snap)          # 실제로 바뀐 편집만 되돌리기 목록에
+    resp.update(_edit_meta(sid, out))
     resp["quick_replies"] = resp.get("quick_replies") or resp.get("chips") or []
     from . import richtext
     if out.get("plan_out"):
@@ -1385,6 +1393,35 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     return resp
 
 
+UNDO_KEYS = ("itinerary", "spec", "plan", "draft_version", "violations", "ranked", "allowed", "answer")
+
+
+def _edit_meta(sid: str, st: dict) -> dict:
+    """확정 후 수정 여부·되돌리기 개수(계획서 편집 모드 표시용)."""
+    pid = st.get("plan_id")
+    cv = store.confirmed_version(sid) if pid else None
+    return {"plan_id": pid, "confirmed_version": cv,
+            "needs_reconfirm": bool(pid and cv and st.get("draft_version") and cv != st.get("draft_version")),
+            "undo_count": store.undo_count(sid)}
+
+
+def undo(session_id: str) -> dict | None:
+    """직전 편집 되돌리기: 편집 직전 상태를 그대로 복원(LLM 없음)."""
+    snap = store.pop_snapshot(session_id)
+    if not snap:
+        return None
+    vals = {k: snap.get(k) for k in UNDO_KEYS}
+    vals["status"] = "승인 대기"
+    if not vals.get("plan") and vals.get("itinerary") and vals.get("spec"):
+        vals["plan"] = brochure.build(spec_from_dict(vals["spec"]), vals["itinerary"], vals.get("ranked") or [],
+                                      vals.get("violations") or [], [])
+    graph().update_state({"configurable": {"thread_id": session_id}}, vals, as_node="guard_out")
+    out = load_trip(session_id) or {}
+    out["changes"] = ["직전 수정을 되돌렸어요"]
+    out["status"] = "승인 대기"
+    return out
+
+
 def load_trip(session_id: str) -> dict | None:
     """저장된 계획을 이어서 작업할 상태로 돌려준다(GET /trips/{session_id})."""
     st = graph().get_state({"configurable": {"thread_id": session_id}}).values
@@ -1395,6 +1432,7 @@ def load_trip(session_id: str) -> dict | None:
     out = {"session_id": session_id, "status": "확정" if st.get("plan_id") and st.get("status") == "확정" else "승인 대기",
            "stage": "refine", "answer": st.get("answer") or "", "plan": plan, "conditions": conds,
            "progress": brochure.progress(conds), "draft_version": st.get("draft_version"), "plan_id": st.get("plan_id")}
+    out.update(_edit_meta(session_id, st))
     if st.get("plan_id"):
         pid = st["plan_id"]
         out.update(share_url=f"/plan/{pid}", ics_url=f"/plan/{pid}.ics", html_url=f"/plan/{pid}.html",

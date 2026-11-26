@@ -88,3 +88,17 @@ def test_car_guide_uses_road_not_rail(monkeypatch):
     assert all(o.get("best") is False for o in g.get("alternatives") or [])     # 열차는 참고로만
     dr = roads.drive((37.39, 127.11), (35.2, 127.46), SAT, 8 * 60, True)       # 토요일 오전 하행
     assert dr["factor"] == 1.25 and dr["total_min"] >= 215 * 1.25
+
+
+def test_undo_restores_previous_order_and_reconfirm_flag(seeded):
+    a = agent.handle_query("", "sw", "approve", draft_version="v1")
+    assert a["status"] == "확정" and a["needs_reconfirm"] is False
+    before = [it["place_name"] for it in seeded if it["type"] != "move"]
+    r = agent.handle_query("순서", "sw", "edit", edit={"op": "order", "days": [{"day": 1, "place_ids": [
+        _id("천마총"), _id("교동집밥"), _id("경주 첨성대")]}]})
+    assert [it["place_name"] for it in r["itinerary"] if it["type"] != "move"][0].startswith("천마총")
+    assert r["needs_reconfirm"] is True and r["plan_id"] == a["plan_id"] and r["undo_count"] == 1
+    u = c.post("/trips/sw/undo").json()
+    names = [s["name"] for d in u["plan"]["itinerary"] for s in d["stops"]]
+    assert names == before and u["undo_count"] == 0
+    assert c.post("/trips/sw/undo").status_code == 404

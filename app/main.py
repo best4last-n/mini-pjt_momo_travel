@@ -202,6 +202,18 @@ async def places_alternatives(session_id: str = "", place_id: str = "", q: str =
     return out
 
 
+@app.post("/trips/{session_id}/undo")
+async def trip_undo(session_id: str):
+    """직전 편집 되돌리기(초안·계획서 편집 모드 공용)."""
+    running = _RUNNING.get(session_id)
+    if running and _JOBS.get(running, {}).get("state") == "running":
+        return JSONResponse(status_code=409, content={"error": "다른 작업이 진행 중이에요. 끝난 뒤 다시 눌러 주세요."})
+    out = await run_in_threadpool(agent.undo, session_id)
+    if not out:
+        return JSONResponse(status_code=404, content={"error": "되돌릴 수정이 없어요."})
+    return out
+
+
 @app.get("/route/optimize")
 async def route_optimize(session_id: str = ""):
     """동선 최적화 미리 보기(저장 안 함). 적용은 edit op=optimize(제안대로) 또는 op=order(직접 끌어 정한 순서)."""

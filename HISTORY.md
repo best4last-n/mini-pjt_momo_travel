@@ -490,3 +490,8 @@
 - **Claude 작업**: 원인 — 출발·귀가 이동 이름이 시·도('경기')만 쓰고 plan에 출발지 점·좌표가 없었음. planner.short_label/origin_point/end_point, 이동 이름 '판교동 → 순천/구례', plan.itinerary[0].start_point·[마지막].end_point·trip.origin_point/end_point. edit add `after`(그 관광지 바로 다음), `op=order`(끌어서 정한 전체 순서, 날짜 사이 이동), `op=optimize`(제안대로 적용, 해당 날 사용자 순서 해제), agent.route_proposal + `GET /route/optimize`(지금 vs 제안: 분·km·순서). 실서버 확인: 출발 판교동 07:00·도착 판교동 23:25, 국가정원 다음에 남녘들밥상 삽입, 1일차 순천만습지를 2일차 맨 앞으로 이동 반영. 테스트 54건 통과.
 - **서브에이전트**: 화면 에이전트 7차(출발·도착 카드와 지도 집 표시·근처 먹거리 '+ 이 다음에 들르기'·동선 편집 패널(끌어 놓기·날짜 간 이동·최적화 미리 보기/적용)) 진행 중.
 - **다음 할 일**: 계획서(확정 후)에서의 수정 방안 사용자 결정 후 반영.
+
+### [2026-11-26 20:00] 계획서 수정·보기/수정 모드·드래그 순서 변경·되돌리기 결정 및 백엔드
+- **사용자 요청**: 제안(계획서에서도 수정, 만든 사람만 편집, 확정 후 수정 시 재확정·링크 유지, 되돌리기)대로 진행 + 관광지 드래그앤드롭 순서 변경, 보기/수정 모드.
+- **Claude 작업**: store undo 테이블(세션별 최근 20개)·confirmed_version, handle_query가 edit/set 직전 상태를 저장(실제로 초안이 바뀐 경우만), 응답·/trips에 plan_id·confirmed_version·needs_reconfirm·undo_count, agent.undo + `POST /trips/{sid}/undo`(작업 중 409, 없으면 404). 테스트 1건(확정 → 순서 변경 시 needs_reconfirm·같은 plan_id → 되돌리기로 원래 순서 → 더 없으면 404), 55건 통과. SERVICE.md 3-6 (24) 추가.
+- **서브에이전트**: 화면 에이전트 7차에 추가 지시 — 보기/수정 토글, 일정표 직접 끌어 놓기(놓는 즉시 적용·되돌리기 알림), 되돌리기 버튼, /view 편집(만든 브라우저만), 재확정 배너.

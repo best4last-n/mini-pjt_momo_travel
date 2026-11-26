@@ -35,6 +35,45 @@ def save_plan(session_id: str, draft_version: str, payload: dict) -> str:
         return pid
 
 
+def confirmed_version(session_id: str) -> str | None:
+    """확정(저장)된 초안 버전 — 지금 초안과 다르면 '확정 후 수정됨'."""
+    with _conn() as c:
+        row = c.execute("SELECT draft_version FROM plans WHERE session_id=?", (session_id,)).fetchone()
+    return row[0] if row else None
+
+
+UNDO_MAX = 20
+
+
+def _uconn() -> sqlite3.Connection:
+    c = _conn()
+    c.execute("CREATE TABLE IF NOT EXISTS undo (id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, blob TEXT, created TEXT)")
+    return c
+
+
+def push_snapshot(session_id: str, values: dict) -> None:
+    """편집 직전 상태(되돌리기용). 세션마다 최근 UNDO_MAX개만."""
+    with _uconn() as c:
+        c.execute("INSERT INTO undo (session_id, blob, created) VALUES (?,?,?)",
+                  (session_id, json.dumps(values, ensure_ascii=False, default=str), datetime.now(KST).isoformat(timespec="seconds")))
+        c.execute("DELETE FROM undo WHERE session_id=? AND id NOT IN (SELECT id FROM undo WHERE session_id=? ORDER BY id DESC LIMIT ?)",
+                  (session_id, session_id, UNDO_MAX))
+
+
+def pop_snapshot(session_id: str) -> dict | None:
+    with _uconn() as c:
+        row = c.execute("SELECT id, blob FROM undo WHERE session_id=? ORDER BY id DESC LIMIT 1", (session_id,)).fetchone()
+        if not row:
+            return None
+        c.execute("DELETE FROM undo WHERE id=?", (row[0],))
+    return json.loads(row[1])
+
+
+def undo_count(session_id: str) -> int:
+    with _uconn() as c:
+        return c.execute("SELECT COUNT(*) FROM undo WHERE session_id=?", (session_id,)).fetchone()[0]
+
+
 def _econn() -> sqlite3.Connection:
     c = _conn()
     c.execute("""CREATE TABLE IF NOT EXISTS expenses (
