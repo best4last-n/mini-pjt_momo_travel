@@ -21,6 +21,22 @@
         {"keyword": "화엄사", "type": "attraction"},
         {"keyword": "꼬막", "type": "restaurant"}
       ]
+    },
+    "gyeongju": {
+      "label": "경주",
+      "sigungu": [
+        {"name": "경주", "regn": "47", "signgu": "130", "share": 1.0}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "대릉원", "type": "attraction"},
+        {"keyword": "불국사", "type": "attraction"},
+        {"keyword": "석굴암", "type": "attraction"},
+        {"keyword": "첨성대", "type": "attraction"},
+        {"keyword": "동궁과 월지", "type": "attraction"},
+        {"keyword": "국립경주박물관", "type": "attraction"},
+        {"keyword": "황리단길", "type": "attraction"}
+      ]
     }
   }
 }
