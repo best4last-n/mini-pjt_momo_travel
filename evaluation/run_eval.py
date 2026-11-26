@@ -313,6 +313,13 @@ def _f(x):
 
 # ---------------- 5) 리포트 ----------------
 
+def data_line(rnd: int) -> str:
+    if rnd == 1:     # 1차 응답 수집 시점(c4472f5)의 데이터
+        return "경주 60곳 + 순천/구례 60곳 (수원은 1차 후 보강)"
+    from momo import data
+    return " + ".join(f"{data.region_label(r)} {len(data.places(r))}곳" for r in data.available_regions())
+
+
 def report(rnd: int) -> None:
     resp = load(path(rnd, "responses"), {})
     jd = load(path(rnd, "judge"), {})
@@ -341,7 +348,7 @@ def report(rnd: int) -> None:
           f"- 실행: `python evaluation/run_eval.py --round {rnd}` · 평가 기준일 2026-11-25(MOMO_TODAY) · 채점 모델 {JUDGE_MODEL}(temperature 0)",
           f"- 채점 장치 고정 증거: test_queries.csv SHA-256 `{sha}` · 응답 수집 커밋 `{summary['responses_commit']}` · 채점 실행 커밋 `{summary['commit']}`",
           *[f"- 비고: {n}" for n in summary["notes"]],
-          f"- 수집 데이터: 경주 60곳 + 순천/구례 60곳 (수원은 2차 전 보강 예정)", "",
+          f"- 수집 데이터: {data_line(rnd)}", "",
           "## 결과 요약", "",
           f"| 항목 | 결과 | 목표 |", "|---|---|---|",
           f"| 인-아웃 통과 | **{passed} / {len(rows)} ({summary['rate'] * 100:.0f}%)** | {target} |",
