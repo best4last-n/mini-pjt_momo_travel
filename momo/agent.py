@@ -1639,7 +1639,10 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     if utext and action != "pack":
         store.log_message(sid, "user", kind, utext)
     if action != "pack":
-        store.log_message(sid, "momo", kind, answer, resp.get("status") or "", resp["answer_html"], resp.get("draft_version"))
+        bump = bool(out.get("draft_version")) and out.get("draft_version") != prev_dv and (
+            not prev_items or action == "start" or replan == "update" or bool((resp.get("plan_diff") or {}).get("big")))
+        store.log_message(sid, "momo", kind, answer, resp.get("status") or "", resp["answer_html"], resp.get("draft_version"),
+                          bump=bump)
     resp["plan_no"] = store.plan_no(sid)
     if out.get("plan") and (out.get("plan_out") or out.get("status") == "확정"):
         store.upsert_trip(sid, out["plan"], out.get("status") or "", out.get("plan_id") if out.get("status") == "확정" else None)
@@ -1666,14 +1669,17 @@ def backfill_messages(session_id: str) -> int:
             ts = None
         runs.append((ts, v))
     from . import richtext
+    seen_plan = False
     for ts, v in reversed(runs):
         kind = v.get("action") or "chat"
         q = (v.get("question") or "").strip() or _action_label(v.get("action"), v.get("edit"), v.get("set_req"),
                                                               v.get("start_req"), v.get("cost_req"), v.get("pack_req"))
         if q:
             store.log_message(session_id, "user", kind, q, created=ts)
+        bump = bool(v.get("draft_version")) and (kind == "start" or not seen_plan)
+        seen_plan = seen_plan or bool(v.get("draft_version"))
         store.log_message(session_id, "momo", kind, v.get("answer") or "", v.get("status") or "",
-                          richtext.md_to_html(v.get("answer") or ""), v.get("draft_version"), created=ts)
+                          richtext.md_to_html(v.get("answer") or ""), v.get("draft_version"), created=ts, bump=bump)
     return len(runs)
 
 

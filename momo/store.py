@@ -87,28 +87,41 @@ def _mconn() -> sqlite3.Connection:
         id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT, kind TEXT, text TEXT,
         status TEXT, html TEXT, draft_version TEXT, created TEXT)""")
     c.execute("CREATE INDEX IF NOT EXISTS idx_messages_sid ON messages(session_id, id)")
+    cols = {r[1] for r in c.execute("PRAGMA table_info(messages)")}
+    if "bump" not in cols:      # 새 계획 버전 시작 표시(여행 시작·재수립·크게 바뀜) — 작은 편집·되돌리기는 같은 버전
+        c.execute("ALTER TABLE messages ADD COLUMN bump INTEGER DEFAULT 0")
     return c
 
 
 def log_message(session_id: str, role: str, kind: str, text: str, status: str = "", html: str = "",
-                draft_version: str | None = None, created: str | None = None) -> None:
+                draft_version: str | None = None, created: str | None = None, bump: bool = False) -> None:
     """상담 기록 한 줄(사용자 요청·모모 답변). 개인정보는 호출 전에 가려 둔다."""
     with _mconn() as c:
-        c.execute("INSERT INTO messages (session_id, role, kind, text, status, html, draft_version, created) VALUES (?,?,?,?,?,?,?,?)",
+        c.execute("INSERT INTO messages (session_id, role, kind, text, status, html, draft_version, created, bump) VALUES (?,?,?,?,?,?,?,?,?)",
                   (session_id, role, kind, (text or "")[:4000], status or "", (html or "")[:200000], draft_version,
-                   created or datetime.now(KST).isoformat(timespec="seconds")))
+                   created or datetime.now(KST).isoformat(timespec="seconds"), 1 if bump else 0))
 
 
 def list_messages(session_id: str, limit: int = 300) -> list[dict]:
     with _mconn() as c:
-        rows = c.execute("SELECT id, role, kind, text, status, html, draft_version, created FROM messages "
+        base = c.execute("SELECT COUNT(*) FROM messages WHERE session_id=? AND bump=1 AND id < COALESCE("
+                         "(SELECT MIN(id) FROM (SELECT id FROM messages WHERE session_id=? ORDER BY id DESC LIMIT ?)), 0)",
+                         (session_id, session_id, limit)).fetchone()[0]
+        rows = c.execute("SELECT id, role, kind, text, status, html, draft_version, created, bump FROM messages "
                          "WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
-    out, vers = [], {}
+    out, no = [], base
+    pending = []          # 새 버전 답변 앞의 사용자 요청도 그 버전에 속함
     for r in reversed(rows):
-        if r[1] == "momo" and r[6] and r[6] not in vers:
-            vers[r[6]] = len(vers) + 1
-        out.append({"id": r[0], "role": r[1], "kind": r[2], "text": r[3], "status": r[4], "html": r[5],
-                    "draft_version": r[6], "plan_no": vers.get(r[6]) if r[6] else None, "created": r[7]})
+        if r[1] == "momo" and r[8]:
+            no += 1
+            for x in pending:
+                x["plan_no"] = no
+            pending = []
+        row = {"id": r[0], "role": r[1], "kind": r[2], "text": r[3], "status": r[4], "html": r[5],
+               "draft_version": r[6], "plan_no": max(1, no), "created": r[7], "new_version": bool(r[8])}
+        if r[1] == "user":
+            pending = [row]
+        out.append(row)
     return out
 
 
@@ -130,13 +143,8 @@ def get_diff(session_id: str, draft_version: str | None) -> dict | None:
 def plan_no(session_id: str) -> int:
     """지금까지 나온 계획 버전 수(v1, v2…) — 모모 답변 기록의 서로 다른 draft_version 수."""
     with _mconn() as c:
-        rows = c.execute("SELECT draft_version FROM messages WHERE session_id=? AND role='momo' AND draft_version IS NOT NULL "
-                         "ORDER BY id", (session_id,)).fetchall()
-    seen = []
-    for (dv,) in rows:
-        if dv and (not seen or seen[-1] != dv):
-            seen.append(dv)
-    return len(dict.fromkeys(seen))
+        return max(1, c.execute("SELECT COUNT(*) FROM messages WHERE session_id=? AND role='momo' AND bump=1",
+                                (session_id,)).fetchone()[0])
 
 
 def save_answer(session_id: str, html_frag: str, title: str) -> None:

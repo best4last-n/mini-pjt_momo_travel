@@ -309,11 +309,12 @@
   }
 
   /** kind: chat | edit | set | cost | approve — edit·set·cost는 브로셔를 제자리에서 갱신 */
-  const IN_PLACE = { edit: 1, set: 1, cost: 1, undo: 1 };
+  const IN_PLACE = { edit: 1, set: 1, cost: 1, undo: 1, restore: 1 };
   async function send(body, kind, userText) {
     if (state.busy) { toast("모모가 아직 날아가는 중이에요. 잠시만 기다려 주세요."); return; }
     if (DEMO && kind !== "chat") { toast("데모 모드에서는 바뀌지 않아요"); return; }
-    if (userText) bubble("me", userText);
+    if (userText) bubble("me", userText, { time: new Date().toISOString() });
+    if (kind === "chat" && body.question) state.lastQuestion = body.question;
     const wait = (kind === "chat" || kind === "approve") ? loadingBubble() : null;
     const useAsync = !DEMO && (body.action === "start" || !!IN_PLACE[kind]);
     setBusy(true, kind);
@@ -323,6 +324,7 @@
     if (DEMO) {
       await new Promise((r) => setTimeout(r, 900));
       j = body.action === "start" ? await demoPlanResponse(false)
+        : (!body.replan && /경주|수원|날짜|박|일정을 다시/.test(body.question || "")) ? await fetch("/static/sample_replan.json").then((r) => r.json()).catch(() => ({ answer: "데모", status: "정보" }))
         : { answer: "데모 모드에서는 모모가 실제로 날아가지 않아요. 브로셔와 지도, 버튼 모양을 둘러봐 주세요!", status: "정보", stage: state.stage, quick_replies: ["알아서 짜 줘"] };
     } else if (useAsync) {
       try { j = await callAsync(body); } finally { jobLine(null); }
@@ -384,11 +386,22 @@
       state.exports = { share_url: j.share_url, html_url: j.html_url, docx_url: j.docx_url, print_url: j.print_url, ics_url: j.ics_url, report_url: j.report_url };
     }
     const changes = Array.isArray(j.changes) ? j.changes.filter(Boolean) : [];
-    const quiet = VIEW || kind === "undo";
-    const b = quiet ? null : bubble("momo", j.answer || "", { replies: j.quick_replies || j.chips || [], changes, status: j.status, html: j.answer_html || "", longPlan: !!j.plan && (j.stage === "plan" || j.stage === "refine") });
+    const quiet = VIEW || kind === "undo" || kind === "restore";
+    const prevNo = state.planNo;
+    if (j.plan_no != null) state.planNo = Number(j.plan_no);
+    const diff = j.plan_diff || (j.plan && j.plan.diff) || null;
+    if (j.plan) { if (diff && JSON.stringify(diff) !== JSON.stringify(state.planDiff)) state.diffHidden = false; state.planDiff = diff; }
+    if (kind === "chat" && j.plan && state.replanUpdate) { state.diffForce = true; state.replanUpdate = false; } else if (j.plan && kind !== "restore") state.diffForce = false;
+    const b = quiet ? null : bubble("momo", j.answer || "", { plan: state.planNo || 1, replan: j.replan_choice || null, time: new Date().toISOString(), replies: j.quick_replies || j.chips || [], changes, status: j.status, html: j.answer_html || "", longPlan: !!j.plan && (j.stage === "plan" || j.stage === "refine") });
     if (changes.length) toast(changes, 5200);
+    if (b) {
+      const me = $$("#thread > .msg.me").filter((x) => !x.dataset.plan);
+      me.forEach((x) => { x.dataset.plan = b.dataset.plan; });
+      if (j.replan_choice) state.replanQ = state.lastQuestion || "";
+    }
     if (j.plan) {
       state.plan = j.plan;
+      if (j.plan.trip && j.plan.trip.title && !READ_ONLY) document.title = `${j.plan.trip.title} · 모모의 여행 상담소`;
       if (j.plan.trip && j.plan.trip.checklist) state.conditions = j.plan.trip.checklist;
       if (j.plan.trip && j.plan.trip.start_date) document.documentElement.dataset.season = seasonOf(j.plan.trip.start_date);
       const inPlace = !!IN_PLACE[kind];
@@ -404,6 +417,7 @@
     setMood(moodFor(j.status));
     renderSide();
     renderStarter();
+    if (!quiet && prevNo != null && state.planNo != null && state.planNo !== prevNo) foldThread();
     if (!j.plan && b && !IN_PLACE[kind]) b.scrollIntoView({ behavior: scrollBehavior(), block: "nearest" });
   }
 
@@ -454,14 +468,31 @@
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   }
 
+  function fmtMsgTime(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const now = new Date();
+    const hm = `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+    return d.toDateString() === now.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+  }
+  function replanCard(rc) {
+    return `<div class="replan" role="group" aria-label="다시 계획 방법 고르기">
+      ${rc.question ? `<p class="replan-q"><b>${esc(rc.question)}</b></p>` : ""}
+      ${(rc.diffs || []).length ? `<ul class="replan-d">${rc.diffs.map((x) => `<li>${esc(x)}</li>`).join("")}</ul>` : ""}
+      <div class="replan-b">${(rc.options || [{ key: "update", label: "이 계획을 새 버전으로 고치기" }, { key: "new", label: "새 여행으로 따로 시작하기" }]).map((o, i) =>
+        `<button type="button" class="btn ${i === 0 ? "primary" : "ghost"}" data-act="replan" data-k="${esc(o.key)}">${esc(o.label)}</button>`).join("")}</div></div>`;
+  }
   function bubble(who, text, opt = {}) {
     const thread = $("#thread");
     if (!thread) return null;
     $$(".replies", thread).forEach((r) => r.remove()); // 지난 빠른 답장은 치운다
     const wrap = document.createElement("div");
     wrap.className = "msg " + who + (opt.status === "오류" ? " is-error" : "");
+    const tm = opt.time ? `<time class="msg-t" datetime="${esc(opt.time)}">${esc(fmtMsgTime(opt.time))}</time>` : "";
+    if (opt.mid != null) wrap.dataset.mid = String(opt.mid);
+    if (opt.plan != null) wrap.dataset.plan = String(opt.plan);
     if (who === "me") {
-      wrap.innerHTML = `<div class="bub"><p class="txt">${esc(text)}</p></div>`;
+      wrap.innerHTML = `<div class="bub"><p class="txt">${esc(text)}</p>${tm}</div>`;
     } else {
       const { head, tail } = opt.longPlan ? splitAnswer(text) : { head: String(text || "").trim(), tail: "" };
       const changes = (opt.changes || []).length
@@ -474,12 +505,13 @@
       const pop = popHref && (DEMO || state.sessionId)
         ? `<a class="pop" href="${esc(popHref)}" target="_blank" rel="noopener"${DEMO ? ' data-act="pop-demo"' : ""}>${ico("ico-pop")}<span>새 창으로 보기</span></a>` : "";
       wrap.innerHTML = `<div class="avatar">${bird()}</div><div class="bub-col"><div class="bub${rich ? " rich" : ""}">
-        <span class="who">모모${opt.status && opt.status !== "오류" ? ` · <em>${esc(opt.status)}</em>` : ""}${pop}</span>
-        ${changes}${rich || `${head ? `<p class="txt">${richText(head)}</p>` : ""}${more}`}</div>${replies}</div>`;
+        <span class="who">모모${opt.status && opt.status !== "오류" ? ` · <em>${esc(opt.status)}</em>` : ""}${tm ? ` · ${tm}` : ""}${pop}</span>
+        ${changes}${rich || `${head ? `<p class="txt">${richText(head)}</p>` : ""}${more}`}${opt.replan ? replanCard(opt.replan) : ""}</div>${replies}</div>`;
       if (rich) wrap._html = opt.html;
     }
     thread.appendChild(wrap);
-    if (who === "me") wrap.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
+    if (who === "me" && !opt.time) wrap.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
+    else if (who === "me" && opt.mid == null) wrap.scrollIntoView({ behavior: scrollBehavior(), block: "end" });
     return wrap;
   }
 
@@ -1266,6 +1298,21 @@
   }
 
   let IN_PLAN = new Set();
+  function diffCard() {
+    const D = state.planDiff;
+    if (!D || state.diffHidden || !(D.big || state.diffForce)) return "";
+    const no = state.planNo;
+    const chips = [].concat(
+      (D.added || []).map((x) => `<span class="dchip add">＋ ${esc(x.name)}${x.day ? ` · ${esc(x.day)}일차` : ""}</span>`),
+      (D.moved || []).map((x) => `<span class="dchip mv">${esc(x.name)} ${esc(x.from_day)}→${esc(x.to_day)}일차</span>`)).join("");
+    const rm = D.removed || [];
+    return `<section class="diff-card" aria-label="바뀐 점">
+      <div class="diff-h"><b>${no ? `v${no - 1} → v${no}` : "바뀐 점"}</b><span>${esc(D.summary || "")}</span>
+        <button type="button" class="chip sm" data-act="diff-only" aria-pressed="${!!state.diffOnly}">바뀐 곳만 보기</button>
+        <button type="button" class="toast-x" data-act="diff-hide" aria-label="바뀐 점 숨기기">×</button></div>
+      ${chips ? `<div class="diff-chips">${chips}</div>` : ""}
+      ${rm.length ? `<details class="diff-rm"><summary>빠진 곳 ${rm.length}</summary><ul>${rm.map((x) => `<li>${esc(x.name)}${x.day ? ` · ${esc(x.day)}일차` : ""}</li>`).join("")}</ul></details>` : ""}</section>`;
+  }
   function statusPill() {
     if (state.needsReconfirm) return `<span class="st-pill edit">수정 중</span>`;
     return state.planStatus === "확정" || ((VIEW || state.planId) && (state.view ? state.view.plan_id : state.planId)) ? `<span class="st-pill ok">확정</span>` : `<span class="st-pill draft">초안</span>`;
@@ -1311,6 +1358,7 @@
     const html = [];
     html.push(tripHeader(plan));
     html.push(modeBar());
+    html.push(diffCard());
     html.push(`<div id="m-map-slot" class="m-map"><button type="button" class="m-toggle" data-act="m-map" aria-expanded="${state.mobileMapOpen}" aria-controls="m-map-body">
       ${ico("ico-pin")}<span>지도 보기</span><span class="m-sub">날짜별 동선과 순서</span>${ico("ico-chev", "ico chev")}</button><div id="m-map-body" class="m-body"${state.mobileMapOpen ? "" : " hidden"}></div></div>`);
     const hpts = homePoints(plan);
@@ -1340,6 +1388,11 @@
     if (READ_ONLY) renderExpenses();
   }
 
+  function titleSuggest(plan) {
+    const t = plan.trip || {};
+    const d = t.start_date ? new Date(t.start_date + "T00:00:00") : new Date();
+    return `${d.getFullYear()} ${SEASON_LABEL[seasonOf(t.start_date)]} ${(t.regions || []).join("·") || ""} 여행`.replace(/\s+/g, " ").trim();
+  }
   function tripHeader(plan) {
     const t = plan.trip || {};
     const days = plan.itinerary || [];
@@ -1367,7 +1420,11 @@
           <text x="35" y="33" text-anchor="middle" font-size="8.5" fill="currentColor" font-family="inherit">${esc(pm)}</text><text x="35" y="44" text-anchor="middle" font-size="6.5" fill="currentColor">MOMO POST</text>
           <path d="M68 22 q8 -5 16 0 t16 0 t16 0 M68 35 q8 -5 16 0 t16 0 t16 0 M68 48 q8 -5 16 0 t16 0 t16 0" fill="none" stroke="currentColor" stroke-width="1.3"/></svg>` : ""}
         <p class="eyebrow">${esc(statusTxt)}</p>
-        <h2 id="trip-h" class="display">${esc(t.title || "여행 계획서")}</h2>
+        ${state.titleEdit ? `<form class="title-ed noprint" data-form="title"><label class="sr" for="title-in">여행 제목</label>
+            <input id="title-in" type="text" maxlength="40" value="${esc(t.title_custom ? t.title : "")}" placeholder="${esc(titleSuggest(plan))}" autocomplete="off">
+            <button class="btn sm primary">저장</button><button type="button" class="btn sm ghost" data-act="title-cancel">취소</button>
+            ${t.title_custom ? `<button type="button" class="linkish" data-act="title-default">기본 제목으로${t.default_title ? `(${esc(t.default_title)})` : ""}</button>` : ""}</form>`
+          : `<h2 id="trip-h" class="display">${esc(t.title || "여행 계획서")}${editAllowed() ? ` <button type="button" class="title-pen noprint" data-act="title-edit" aria-label="여행 제목 바꾸기" title="여행 제목 바꾸기">✎</button>` : ""}</h2>`}
         <p class="trip-dates">${fmtDate(t.start_date, true)}${endIso && endIso !== t.start_date ? ` – ${fmtDate(endIso)}` : ""}</p>
         <dl class="facts">${facts.map((f) => `<div><dt>${f[0]}</dt><dd>${esc(f[1])}</dd></div>`).join("")}</dl>
         <p class="trip-stats"><span><b>${nStops}</b>곳 방문</span>${local.distance_km != null ? `<span>현지 이동 <b>${esc(km(local.distance_km))}</b></span><span>약 <b>${fmtMin(local.travel_min)}</b> (추정)</span>` : ""}</p>
@@ -1420,6 +1477,73 @@
     return `<li class="leg long${back ? " back" : ""}"><span class="leg-in">${via.length ? `<span class="leg-via">${esc(((homePoints(plan).en || {}).name) || "집")}으로 가는 길: ${via.map(esc).join(", ")} 들렀다가</span>` : ""}${ico(isDrive(g) || leg.mode === "자차" ? "ico-car" : "ico-pin")}<b>${esc(leg.label || "")}</b> · ${esc(leg.mode || "")} 약 ${fmtMin(leg.duration_min)}${dist}${leg.estimated !== false ? " (추정)" : ""}${leg.depart && leg.arrive ? ` <span class="muted">${esc(leg.depart)}→${esc(leg.arrive)}</span>` : ""}
       ${(hasRoute || (homePoints(plan).st || {}).lat != null) ? `<button type="button" class="linkish" data-act="route-fit">${back ? "오는 길 보기" : "가는 길 보기"}</button>` : ""}</span></li>`;
   }
+  /* 머무는 시간 · 개인 시간 */
+  const isFree = (s) => !!s && (s.free || s.source === "개인 시간" || String(s.place_id || "").indexOf("FREE:") === 0 || (Array.isArray(s.notes) && s.notes.indexOf("개인 시간") >= 0));
+  const hm2min = (t) => { const m = /(\d{1,2}):(\d{2})/.exec(String(t || "")); return m ? Number(m[1]) * 60 + Number(m[2]) : null; };
+  const min2hm = (n) => `${pad2(Math.floor(((n % 1440) + 1440) % 1440 / 60))}:${pad2(((n % 60) + 60) % 60)}`;
+  const stayMin = (s) => (s.stay_min != null ? Number(s.stay_min) : (hm2min(s.depart) != null && hm2min(s.arrive) != null ? hm2min(s.depart) - hm2min(s.arrive) : null));
+  function stayBtn(s, name) {
+    if (!canEdit() || s.place_id == null || s.type === "stay") return "";
+    const m = stayMin(s);
+    return `<button type="button" class="stay-ed" data-act="stay-open" data-pid="${esc(s.place_id)}" data-min="${esc(m == null ? 60 : m)}" data-arrive="${esc(s.arrive || "")}" data-name="${esc(name)}" aria-haspopup="dialog" title="머무는 시간 바꾸기">머무는 시간 ${m != null ? fmtMin(m) : "?"} ✎</button>`;
+  }
+  function freeCard(s, d, id, time) {
+    const label = s.name || "개인 시간";
+    const icon = /카페|커피/.test(label) ? "☕" : /쇼핑/.test(label) ? "🛍" : /산책/.test(label) ? "🚶" : "🧘";
+    const grip = canEdit() ? `<button type="button" class="tl-grip" aria-label="${esc(label)} 옮기기 — 스페이스로 들고 ↑↓로 옮긴 뒤 스페이스로 놓아요" title="끌어서 순서 바꾸기">${ico("ico-grip")}</button>` : "";
+    const ctl = canEdit() ? `<span class="free-ctl">${stayBtn(s, label)}<button type="button" class="btn xs danger" data-act="free-remove" data-pid="${esc(s.place_id)}" data-name="${esc(label)}">빼기</button></span>` : "";
+    return `<li class="stop slim free${grip ? " has-grip" : ""}" id="${id}" data-day="${esc(d.day)}" data-pid="${esc(s.place_id)}">
+      <span class="num" aria-hidden="true">${icon}</span>${grip}
+      <div class="card slim-card free-card"><span class="time">${time}</span><span class="tag">개인 시간</span><b>${esc(label)}</b>${ctl}</div></li>`;
+  }
+  /* 작은 팝오버(머무는 시간 · 개인 시간) */
+  const POP = { el: null, trigger: null, kind: null, data: null };
+  function popOpen(trigger, kind, data) {
+    popClose(false);
+    let el = $("#mini-pop");
+    if (!el) { el = document.createElement("div"); el.id = "mini-pop"; el.className = "tp-pop mini-pop"; el.setAttribute("role", "dialog"); document.body.appendChild(el); el.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); popClose(true); } }); el.addEventListener("input", popInput); }
+    Object.assign(POP, { el, trigger, kind, data });
+    el.hidden = false; trigger.setAttribute("aria-expanded", "true");
+    popRender(true);
+    const r = trigger.getBoundingClientRect(), w = Math.min(320, window.innerWidth - 16);
+    el.style.width = w + "px";
+    if (window.innerWidth < 640) { el.classList.add("sheet"); el.style.left = el.style.top = ""; }
+    else { el.classList.remove("sheet"); const h = el.offsetHeight; let top = r.bottom + 6; if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6); el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px"; el.style.top = top + "px"; }
+  }
+  function popClose(refocus) {
+    if (!POP.el || POP.el.hidden) return;
+    POP.el.hidden = true;
+    if (POP.trigger) { POP.trigger.setAttribute("aria-expanded", "false"); if (refocus && POP.trigger.isConnected) POP.trigger.focus(); }
+    POP.trigger = null;
+  }
+  function popRender(focus) {
+    const el = POP.el, D = POP.data;
+    if (POP.kind === "stay") {
+      const a = hm2min(D.arrive), end = a != null ? a + D.min : null, delta = D.min - D.orig;
+      el.setAttribute("aria-label", `${D.name} 머무는 시간`);
+      el.innerHTML = `<div class="tp-head"><p class="tp-title">머무는 시간 · ${esc(D.name)}</p><button type="button" class="x" data-act="pop-close" aria-label="닫기">×</button></div>
+        <div class="tp-g mp-chips">${[["-30", "−30분"], ["-15", "−15분"], ["+15", "+15분"], ["+30", "+30분"], ["=60", "1시간"], ["=120", "2시간"], ["=180", "3시간"]].map(([v, l]) => `<button type="button" class="tp-b" data-act="stay-chip" data-v="${v}">${l}</button>`).join("")}</div>
+        <label class="st-in"><span>분(15~360)</span><input id="mp-min" type="number" min="15" max="360" step="5" value="${D.min}"></label>
+        <p class="mp-prev" aria-live="polite">${fmtMin(D.min)}${end != null ? ` → <b>${min2hm(end)}</b> 종료` : ""}${delta ? `, 뒤 일정 ${Math.abs(delta)}분 ${delta > 0 ? "밀림" : "당겨짐"}` : ""}</p>
+        <div class="tp-foot"><button type="button" class="btn sm ghost" data-act="pop-close">취소</button><button type="button" class="btn sm primary" data-act="stay-apply"${D.min === D.orig || D.min < 15 || D.min > 360 ? " disabled" : ""}>적용</button></div>`;
+    } else {
+      el.setAttribute("aria-label", "개인 시간 넣기");
+      el.innerHTML = `<div class="tp-head"><p class="tp-title">개인 시간 넣기${D.afterName ? ` · ‘${esc(D.afterName)}’ 다음` : ` · ${esc(D.day)}일차`}</p><button type="button" class="x" data-act="pop-close" aria-label="닫기">×</button></div>
+        <div class="tp-g mp-chips">${["휴식", "카페에서 쉬기", "자유 시간", "산책", "쇼핑"].map((l) => `<button type="button" class="tp-b${D.label === l ? " on" : ""}" data-act="free-label" data-v="${l}" aria-pressed="${D.label === l}">${l}</button>`).join("")}</div>
+        <label class="st-in"><span>직접 적기(30자)</span><input id="mp-label" type="text" maxlength="30" value="${esc(D.label)}" autocomplete="off"></label>
+        <div class="tp-g mp-chips">${[30, 45, 60, 90, 120].map((m) => `<button type="button" class="tp-b${D.min === m ? " on" : ""}" data-act="free-min" data-v="${m}" aria-pressed="${D.min === m}">${fmtMin(m)}</button>`).join("")}</div>
+        <div class="tp-foot"><button type="button" class="btn sm ghost" data-act="pop-close">취소</button><button type="button" class="btn sm primary" data-act="free-apply"${D.label.trim() ? "" : " disabled"}>${fmtMin(D.min)} 넣기</button></div>`;
+    }
+    if (focus) { const f = el.querySelector(".tp-b, input"); if (f) f.focus(); }
+  }
+  function popInput(e) {
+    const D = POP.data;
+    if (e.target.id === "mp-min") { D.min = Math.round(Number(e.target.value) || 0); const pv = $(".mp-prev", POP.el); const a = hm2min(D.arrive); const delta = D.min - D.orig;
+      if (pv) pv.innerHTML = `${fmtMin(D.min)}${a != null ? ` → <b>${min2hm(a + D.min)}</b> 종료` : ""}${delta ? `, 뒤 일정 ${Math.abs(delta)}분 ${delta > 0 ? "밀림" : "당겨짐"}` : ""}`;
+      const ap = $('[data-act="stay-apply"]', POP.el); if (ap) ap.disabled = D.min === D.orig || D.min < 15 || D.min > 360; }
+    if (e.target.id === "mp-label") { D.label = e.target.value; const ap = $('[data-act="free-apply"]', POP.el); if (ap) ap.disabled = !D.label.trim(); }
+  }
+
   /* 아침 식사 · 숙소 안내 · 돌아오는 길 들를 곳 */
   const isBreakfast = (s) => s && s.type === "meal" && (/조식|아침/.test(s.name || "") || /조식|아침/.test(String(s.notes || "")));
   function prevStay(plan, d) {
@@ -1495,7 +1619,9 @@
       const leg = findLeg(d, s);
       const legHtml = leg ? `<li class="leg" aria-label="이동 ${esc(km(leg.distance_km))}, 약 ${fmtMin(leg.duration_min)}">
           <span class="leg-in">${i === 0 && leg.from_name ? `<span class="leg-from">${esc(leg.from_name)}에서</span>` : ""}▶ ${esc(km(leg.distance_km))} · 약 ${fmtMin(leg.duration_min)} · ${esc(leg.mode || "")}${leg.estimated !== false ? " (추정)" : ""}</span></li>` : "";
-      return legHtml + stopCard(s, i, stops.length, d, P, plan);
+      const ins = canEdit() && s.place_id != null && s.type !== "stay"
+        ? `<li class="free-ins"><button type="button" class="free-add" data-act="free-open" data-after="${esc(s.place_id)}" data-day="${esc(d.day)}" data-name="${esc(s.name)}" aria-haspopup="dialog">${ico("ico-plus")}개인 시간</button></li>` : "";
+      return legHtml + stopCard(s, i, stops.length, d, P, plan) + ins;
     }).join("");
     const nPlaces = stops.filter((s) => s.type === "place").length;
     const route = (plan.trip && plan.trip.route) || {};
@@ -1511,7 +1637,8 @@
         ${canEdit() ? `<button type="button" class="btn sm re-open-btn noprint" data-act="re-open" data-day="${esc(d.day)}" aria-haspopup="dialog">${ico("ico-route")}동선 편집</button>` : ""}
       </header>
       ${lodgingNotice(d)}
-      <ol class="stops">${headHome}${breakfastSkipped(d, plan)}${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}${tailHome}</ol></section>`;
+      <ol class="stops">${headHome}${breakfastSkipped(d, plan)}${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}${tailHome}</ol>
+      ${canEdit() ? `<div class="day-foot noprint"><button type="button" class="btn sm ghost" data-act="free-open" data-day="${esc(d.day)}" aria-haspopup="dialog">${ico("ico-plus")}개인 시간</button></div>` : ""}</section>`;
   }
 
   function licenseOf(img) { return LICENSE[img.license] || img.license || "공공누리"; }
@@ -1532,6 +1659,7 @@
     const time = s.arrive === s.depart || !s.depart ? `${esc(s.arrive || "")}${s.type === "stay" ? " 체크인" : ""}` : `${esc(s.arrive || "")}–${esc(s.depart || "")}`;
     const num = `<span class="num" aria-hidden="true">${s.type === "meal" ? ico("ico-fork") : s.type === "stay" ? "숙" : esc(s.order != null ? s.order : i + 1)}</span>`;
     if (!p && s.place_id == null && isBreakfast(s)) return breakfastCard(s, d, plan, id, time);
+    if (isFree(s)) return freeCard(s, d, id, time);
     if (!p && s.place_id == null) {
       return `<li class="stop slim t-${esc(s.type)}" id="${id}" data-day="${esc(d.day)}" data-pid="">${num}
         <div class="card slim-card"><span class="time">${time}</span><span class="tag">${esc(TYPE_LABEL[s.type] || "")}</span><b>${esc(s.name)}</b>${s.reason ? `<span class="muted">${esc(s.reason)}</span>` : ""}</div></li>`;
@@ -1591,11 +1719,11 @@
         <button type="button" class="btn xs danger" data-act="remove" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" data-name="${esc(name)}">빼기</button></div>` : "";
     const grip = canEdit() && s.place_id != null && s.type !== "stay"
       ? `<button type="button" class="tl-grip" aria-label="${esc(name)} 옮기기 — 스페이스로 들고 ↑↓로 옮긴 뒤 스페이스로 놓아요" title="끌어서 순서 바꾸기">${ico("ico-grip")}</button>` : "";
-    return `<li class="stop t-${esc(s.type)}${grip ? " has-grip" : ""}" id="${id}" data-day="${esc(d.day)}" data-pid="${esc(s.place_id)}">${num}${grip}
+    return `<li class="stop t-${esc(s.type)}${grip ? " has-grip" : ""}${s.diff ? " is-diff" : ""}" id="${id}" data-day="${esc(d.day)}" data-pid="${esc(s.place_id)}">${num}${grip}
       <article class="card" aria-labelledby="${id}-h">
         ${mediaHtml(p, name)}
         <div class="body">
-          <p class="meta"><span class="time">${time}</span><span class="tag">${esc(cat)}</span>${rank}${mine}${hoursBadge}${feeText}${feeBadge}</p>
+          <p class="meta"><span class="time">${time}</span>${stayBtn(s, name)}<span class="tag">${esc(cat)}</span>${s.diff === "new" ? `<span class="badge dnew">NEW</span>` : ""}${s.diff === "moved" ? `<span class="badge dmv">${esc(s.from_day)}→${esc(d.day)}일차</span>` : ""}${rank}${mine}${hoursBadge}${feeText}${feeBadge}</p>
           <h4 id="${id}-h">${esc(name)}</h4>
           ${reason ? `<p class="reason">${esc(reason)}</p>` : ""}
           ${place.summary ? `<p class="summary">${esc(place.summary)}</p>` : ""}
@@ -2124,6 +2252,30 @@
     const oldName = (D.target && D.target.name) || SW.name;
     closeSwap();
     send({ question: `${oldName} → ${x.name} 바꾸기`, action: "edit", edit: { op: "replace", target: SW.pid, choice: x.choice } }, "edit");
+  }
+
+  function sendTitle(title) {
+    if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); renderBrochure({}); return; }
+    send({ question: title ? `여행 제목을 ‘${title}’로` : "여행 제목을 기본으로", action: "edit", edit: { op: "title", title } }, "edit");
+  }
+  function renameTrip(btn) {
+    const li = btn.closest(".trip-item"), h = btn.closest("h3");
+    if (!li || !h) return;
+    h.outerHTML = `<form class="title-ed" data-form="trip-title" data-sid="${esc(btn.dataset.sid)}"><label class="sr" for="tt-${esc(btn.dataset.sid)}">여행 이름</label>
+      <input id="tt-${esc(btn.dataset.sid)}" type="text" maxlength="40" value="${esc(btn.dataset.title)}" autocomplete="off"><button class="btn xs primary">저장</button></form>`;
+    const i = li.querySelector("input"); if (i) { i.focus(); i.select(); i.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); openTrips(); } }); }
+  }
+  async function saveTripTitle(sid, title) {
+    if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
+    if (sid === state.sessionId) { closeTrips(); sendTitle(title); return; }
+    let dv = null;
+    try { const r = await fetch("/trips/" + encodeURIComponent(sid)); const j = await r.json(); dv = j && j.draft_version; } catch (e) { dv = null; }
+    const save = { sid: state.sessionId, dv: state.draftVersion };
+    state.sessionId = sid; state.draftVersion = dv;
+    const j = await callAsync({ question: `여행 제목을 ‘${title}’로`, action: "edit", edit: { op: "title", title } });
+    state.sessionId = save.sid; state.draftVersion = save.dv;
+    toast(j && j.status !== "오류" ? (j.changes && j.changes.length ? j.changes : ["여행 이름을 바꿨어요"]) : ((j && j.answer) || "이름을 바꾸지 못했어요"));
+    openTrips();
   }
 
   /* ───────── 되돌리기 (POST /trips/{sid}/undo) ───────── */
@@ -3237,7 +3389,7 @@
       const cur = t.session_id === state.sessionId;
       return `<li class="trip-item${cur ? " cur" : ""}">
         <div class="ti-top"><span class="badge ${done ? "ok" : "draft"}">${done ? "확정" : "초안"}</span>${cur ? `<span class="badge user">지금 보는 계획</span>` : ""}<span class="ti-time">${esc(fmtUpdated(t.updated))}</span></div>
-        <h3>${esc(t.title || t.region || "이름 없는 여행")}</h3>
+        <h3 class="ti-title"><span>${esc(t.title || t.region || "이름 없는 여행")}</span><button type="button" class="title-pen" data-act="trip-rename" data-sid="${esc(t.session_id)}" data-title="${esc(t.title || "")}" aria-label="${esc(t.title || "이 여행")} 이름 바꾸기">✎</button></h3>
         <p class="muted">${t.start_date ? fmtDate(t.start_date, true) : "날짜 미정"}${t.nights != null ? ` · ${t.nights ? `${esc(t.nights)}박 ${Number(t.nights) + 1}일` : "당일치기"}` : ""}</p>
         ${t.progress != null ? `<div class="mini-prog${pct >= 100 ? " done" : ""}" aria-label="조건 확정 ${pct}%"><span style="width:${pct}%"></span></div><p class="small muted">조건 확정 ${pct}%</p>` : ""}
         <div class="ti-act"><button type="button" class="btn sm primary" data-act="trip-load" data-sid="${esc(t.session_id)}">불러오기</button>
@@ -3249,7 +3401,7 @@
 
   function resetSession() {
     const thread = $("#thread"), br = $("#brochure");
-    Object.assign(state, { sessionId: null, draftVersion: null, status: null, stage: "intake", planStatus: null, plan: null, conditions: null, exports: null, openCond: null, mapDay: "all", progress: null });
+    Object.assign(state, { sessionId: null, draftVersion: null, status: null, stage: "intake", planStatus: null, plan: null, conditions: null, exports: null, openCond: null, mapDay: "all", progress: null, planNo: null, planDiff: null, diffHidden: false, diffForce: false, needsReconfirm: false, undoCount: 0, planId: null });
     stashPanels();
     if (thread) Array.from(thread.children).forEach((c) => { if (c !== br) c.remove(); });
     if (br) { br.innerHTML = ""; br.hidden = true; }
@@ -3264,6 +3416,121 @@
     setMood("idle");
   }
 
+  /* 계획 버전별로 이전 대화 접기 — 지우지 않고 '펼치기'로 다시 본다 */
+  const rowsExist = () => $$("#thread > .msg").length > 1;
+  function foldThread() {
+    const thread = $("#thread");
+    if (!thread) return;
+    const msgs = $$(":scope > .msg", thread).filter((m) => !m.classList.contains("is-loading"));
+    if (msgs.length < 2) return;
+    const planOf = (m) => m.dataset.plan || "";
+    let lastP = "";
+    for (let k = msgs.length - 1; k >= 0 && !lastP; k--) lastP = planOf(msgs[k]);
+    let i = msgs.length - 1;
+    while (i > 0 && (planOf(msgs[i - 1]) || lastP) === lastP) i--;
+    const runs = [];
+    msgs.slice(0, i).forEach((m) => {
+      const pn = planOf(m) || "1";
+      const r = runs[runs.length - 1];
+      if (r && r.p === pn) r.items.push(m); else runs.push({ p: pn, items: [m] });
+    });
+    runs.forEach((r) => {
+      const sec = document.createElement("section");
+      sec.className = "fold";
+      sec.dataset.plan = r.p;
+      const n = r.items.length;
+      sec.innerHTML = `<button type="button" class="fold-h" data-act="fold-toggle" aria-expanded="false"><span class="fold-v">이전 계획 v${esc(r.p)}</span><span class="fold-n">대화 ${n}개</span><span class="fold-x">펼치기</span>${ico("ico-chev", "ico chev")}</button><div class="fold-b" hidden></div>`;
+      thread.insertBefore(sec, r.items[0]);
+      const body = $(".fold-b", sec);
+      r.items.forEach((m) => body.appendChild(m));
+    });
+  }
+  function openFoldOf(el) {
+    const f = el && el.closest(".fold");
+    if (f && !f.classList.contains("open")) {
+      f.classList.add("open"); $(".fold-b", f).hidden = false;
+      const h = $(".fold-h", f); h.setAttribute("aria-expanded", "true"); $(".fold-x", h).textContent = "접기";
+    }
+  }
+  async function fetchMessages(sid) {
+    try {
+      const r = await fetch(DEMO ? "/static/sample_messages.json" : `/trips/${encodeURIComponent(sid)}/messages?limit=300`);
+      if (!r.ok) return null;
+      const j = await r.json();
+      return Array.isArray(j.messages) ? j.messages : null;
+    } catch (e) { return null; }
+  }
+  function restoreThread(rows) {
+    // user 줄은 바로 다음 모모 답의 계획 번호를 따른다(계획 전 접수 단계는 v1)
+    let pending = [], lastNo = 1;
+    rows.forEach((m) => {
+      if (m.role === "user") {
+        const el = bubble("me", m.text || "", { mid: m.id, time: m.created });
+        if (el) { el.dataset.kind = m.kind || "chat"; pending.push(el); }
+      } else {
+        const no = m.plan_no != null ? Number(m.plan_no) : lastNo;
+        lastNo = no;
+        bubble("momo", m.text || "", { html: m.html || "", status: m.status, mid: m.id, time: m.created, plan: no, longPlan: !m.html });
+        pending.forEach((el) => { el.dataset.plan = String(no); });
+        pending = [];
+      }
+    });
+    pending.forEach((el) => { el.dataset.plan = String(lastNo); });
+    $$("#thread .replies").forEach((r) => r.remove());
+  }
+  const KIND_LABEL = { chat: "대화", start: "시작", edit: "편집", set: "조건", approve: "확정", cost: "비용" };
+  async function openHistory() {
+    const dlg = $("#hist");
+    if (!dlg) return;
+    const body = $("#hist-body", dlg);
+    body.innerHTML = `<p class="muted">불러오는 중이에요…</p>`;
+    if (dlg.showModal) { if (!dlg.open) dlg.showModal(); } else dlg.setAttribute("open", "");
+    const rows = state.sessionId || DEMO ? await fetchMessages(state.sessionId) : [];
+    state.history = (rows || []).filter((m) => m.role === "user").reverse();
+    renderHistory();
+    const q = $("#hist-q"); if (q) q.focus();
+  }
+  function renderHistory() {
+    const list = $("#hist-list");
+    if (!list) { const body = $("#hist-body"); if (body) body.innerHTML = `<label class="sr" for="hist-q">요청 찾기</label><input id="hist-q" type="search" placeholder="요청 찾기 (예: 카페)" autocomplete="off"><ul id="hist-list" class="hist-list"></ul>`; }
+    const q = (($("#hist-q") || {}).value || "").trim();
+    const items = (state.history || []).filter((m) => !q || String(m.text || "").indexOf(q) >= 0);
+    const mark = (t) => q ? esc(t).split(esc(q)).join(`<mark>${esc(q)}</mark>`) : esc(t);
+    $("#hist-list").innerHTML = items.length ? items.map((m) => `<li class="hist-item">
+        <button type="button" class="hist-go" data-act="hist-go" data-mid="${esc(m.id)}" data-text="${esc(m.text || "")}">
+          <span class="hist-meta"><span class="badge ${m.kind === "chat" ? "route" : "user"}">${esc(KIND_LABEL[m.kind] || "대화")}</span><time>${esc(fmtMsgTime(m.created))}</time></span>
+          <span class="hist-t">${mark(m.text || "")}</span></button>
+        <span class="hist-act"><button type="button" class="btn xs ghost" data-act="hist-resend" data-text="${esc(m.text || "")}">다시 보내기</button>
+        <button type="button" class="btn xs ghost" data-act="hist-copy" data-text="${esc(m.text || "")}">복사</button></span></li>`).join("")
+      : `<li class="muted hist-empty">${q ? `‘${esc(q)}’가 들어간 요청이 없어요.` : "아직 보낸 요청이 없어요."}</li>`;
+  }
+  function jumpToMessage(mid, text) {
+    let el = mid ? $(`#thread .msg[data-mid="${cssEsc(mid)}"]`) : null;
+    if (!el && text) el = $$("#thread .msg.me").reverse().find((x) => ($(".txt", x) || {}).textContent === text) || null;
+    if (!el) { toast("대화 속에서 그 요청을 찾지 못했어요"); return; }
+    openFoldOf(el);
+    el.scrollIntoView({ behavior: scrollBehavior(), block: "center" });
+    el.classList.remove("flash"); void el.offsetWidth; el.classList.add("flash");
+    setTimeout(() => el.classList.remove("flash"), 1800);
+  }
+  async function chooseReplan(key) {
+    const q = state.replanQ || state.lastQuestion || "";
+    if (!q) return;
+    if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
+    if (key === "update") {
+      state.replanUpdate = true;
+      send({ question: q, replan: "update" }, "chat", "이 계획을 새 버전으로 고칠게요");
+    } else {
+      const old = state.sessionId;
+      if (old && state.plan) Trips.remember(old);
+      resetSession();
+      Trips.setCurrent(null);
+      S.collapsed = true;
+      await send({ question: q, session_id: null, draft_version: null }, "chat", q);
+      if (state.sessionId && state.sessionId !== old) { Trips.remember(state.sessionId); Trips.setCurrent(state.sessionId); toast("새 상담으로 시작했어요 · 이전 계획은 내 여행 계획에", 6000); }
+    }
+  }
+
   async function loadTrip(sid, auto) {
     let j = null;
     try { const r = await fetch("/trips/" + encodeURIComponent(sid)); if (r.ok) j = await r.json(); } catch (e) { j = null; }
@@ -3274,14 +3541,25 @@
     resetSession();
     state.sessionId = sid; loadMode();
     S.collapsed = true;
-    bubble("momo", auto ? "지난번에 보던 계획을 다시 펼쳐 놨어요." : "저장된 계획을 불러왔어요.");
+    const rows = await fetchMessages(sid);
     const st = j.status === "초안" ? "승인 대기" : j.status;
-    handleResponse(Object.assign({}, j, { status: st, quick_replies: [] }), "chat");
+    if (rows && rows.length) {
+      restoreThread(rows);
+      const th = $("#thread"), br = $("#brochure"); if (th && br) th.appendChild(br);
+      handleResponse(Object.assign({}, j, { status: st, quick_replies: [] }), "restore");
+      foldThread();
+      const lastMsg = $$("#thread > .msg").pop();
+      if (lastMsg) requestAnimationFrame(() => lastMsg.scrollIntoView({ block: "start" }));
+    } else {
+      bubble("momo", auto ? "지난번에 보던 계획을 다시 펼쳐 놨어요." : "저장된 계획을 불러왔어요.");
+      handleResponse(Object.assign({}, j, { status: st, quick_replies: [] }), "chat");
+    }
     if (j.progress) { state.progress = j.progress; updateProgress(); renderActions(); }
   }
 
   /* ───────── 이벤트(위임) ───────── */
   function onClick(e) {
+    if (POP.el && !POP.el.hidden && !e.target.closest("#mini-pop") && !e.target.closest('[data-act="stay-open"],[data-act="free-open"]')) popClose(false);
     const mc = $("#map-panel .map-ctrl");
     if (mc && mc.dataset.open === "1" && !e.target.closest(".mc-layer")) { mc.dataset.open = ""; renderMapCtrl(); }
     const pop = $("#tp-pop");
@@ -3371,6 +3649,38 @@
         break;
       }
       case "cctv": loadCctv(); break;
+      case "stay-open": if (canEdit()) popOpen(t, "stay", { pid: t.dataset.pid, name: t.dataset.name, orig: Number(t.dataset.min), min: Number(t.dataset.min), arrive: t.dataset.arrive }); break;
+      case "stay-chip": { const D = POP.data, v = t.dataset.v; D.min = v[0] === "=" ? Number(v.slice(1)) : Math.max(15, Math.min(360, D.min + Number(v))); popRender(false); const f = POP.el.querySelector(`[data-act="stay-chip"][data-v="${v}"]`); if (f) f.focus(); break; }
+      case "stay-apply": { const D = POP.data; popClose(false); send({ question: `${D.name} 머무는 시간 ${fmtMin(D.min)}로`, action: "edit", edit: { op: "stay", place_id: D.pid, minutes: D.min } }, "edit"); break; }
+      case "free-open": if (canEdit()) popOpen(t, "free", { after: t.dataset.after || null, afterName: t.dataset.name || "", day: Number(t.dataset.day), label: "휴식", min: 45 }); break;
+      case "free-label": { POP.data.label = t.dataset.v; popRender(false); const f = POP.el.querySelector(`[data-act="free-label"][data-v="${t.dataset.v}"]`); if (f) f.focus(); break; }
+      case "free-min": { POP.data.min = Number(t.dataset.v); popRender(false); const f = POP.el.querySelector(`[data-act="free-min"][data-v="${t.dataset.v}"]`); if (f) f.focus(); break; }
+      case "free-apply": {
+        const D = POP.data; popClose(false);
+        const edit = { op: "free", action: "add", minutes: D.min, label: D.label.trim().slice(0, 30) };
+        if (D.after) edit.after = D.after; else edit.day = D.day;
+        send({ question: `${D.afterName ? D.afterName + " 다음에 " : `${D.day}일차에 `}${edit.label} ${fmtMin(D.min)} 넣기`, action: "edit", edit }, "edit");
+        break;
+      }
+      case "free-remove": if (canEdit()) send({ question: `개인 시간 ‘${t.dataset.name}’ 빼기`, action: "edit", edit: { op: "free", action: "remove", place_id: t.dataset.pid } }, "edit"); break;
+      case "pop-close": popClose(true); break;
+      case "title-edit": state.titleEdit = true; renderBrochure({}); { const i = $("#title-in"); if (i) { i.focus(); i.select(); } } break;
+      case "title-cancel": state.titleEdit = false; renderBrochure({}); { const b = $(".title-pen"); if (b) b.focus(); } break;
+      case "title-default": state.titleEdit = false; sendTitle(""); break;
+      case "trip-rename": renameTrip(t); break;
+      case "fold-toggle": {
+        const f = t.closest(".fold"), on = !f.classList.contains("open");
+        f.classList.toggle("open", on); $(".fold-b", f).hidden = !on; t.setAttribute("aria-expanded", String(on)); $(".fold-x", t).textContent = on ? "접기" : "펼치기";
+        break;
+      }
+      case "hist-open": openHistory(); break;
+      case "hist-close": { const d = $("#hist"); if (d) d.close ? d.close() : d.removeAttribute("open"); break; }
+      case "hist-go": { const d = $("#hist"); if (d && d.close) d.close(); jumpToMessage(t.dataset.mid, t.dataset.text); break; }
+      case "hist-resend": { const d = $("#hist"); if (d && d.close) d.close(); const q = $("#q"); if (q) { q.value = t.dataset.text; q.dispatchEvent(new Event("input")); q.focus(); } toast("입력창에 넣었어요. 확인하고 보내 주세요."); break; }
+      case "hist-copy": { const tx = t.dataset.text; (navigator.clipboard ? navigator.clipboard.writeText(tx) : Promise.reject()).then(() => toast("복사했어요"), () => toast("복사하지 못했어요")); break; }
+      case "replan": chooseReplan(t.dataset.k); break;
+      case "diff-only": { state.diffOnly = !state.diffOnly; $("#brochure").classList.toggle("diff-only", state.diffOnly); t.setAttribute("aria-pressed", String(state.diffOnly)); break; }
+      case "diff-hide": state.diffHidden = true; state.diffOnly = false; renderBrochure({}); break;
       case "bf-mode": if (canEdit()) send({ question: `아침 식사를 ${t.dataset.v}(으)로`, action: "edit", edit: { op: "breakfast", mode: t.dataset.v } }, "edit"); break;
       case "bf-skip": if (canEdit()) send({ question: `${t.dataset.day}일차 아침 식사 빼기`, action: "edit", edit: { op: "breakfast", day: Number(t.dataset.day), skip: true } }, "edit"); break;
       case "bf-restore": if (canEdit()) send({ question: `${t.dataset.day}일차 아침 식사 다시 넣기`, action: "edit", edit: { op: "breakfast", day: Number(t.dataset.day), skip: false } }, "edit"); break;
@@ -3554,6 +3864,14 @@
       const day = fd.get("day") ? Number(fd.get("day")) : null;
       packOp({ op: "add", label, day }, `${label} 추가`);
       f.reset();
+    } else if (kind === "title") {
+      const v = String($("#title-in").value || "").trim().slice(0, 40);
+      state.titleEdit = false;
+      if (!v) { renderBrochure({}); return; }
+      sendTitle(v);
+    } else if (kind === "trip-title") {
+      const v = String(f.querySelector("input").value || "").trim().slice(0, 40);
+      saveTripTitle(f.dataset.sid, v);
     } else if (kind === "cost-add") {
       const fd = new FormData(f);
       const label = String(fd.get("label") || "").trim();
@@ -3762,6 +4080,7 @@
     document.addEventListener("keydown", tlKeydown);
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      if (e.target && e.target.id === "title-in") { e.preventDefault(); state.titleEdit = false; renderBrochure({}); const b = $(".title-pen"); if (b) b.focus(); return; }
       if (TOASTS.length && !document.querySelector("dialog[open]") && !TP.trigger && !$("#map-panel.map-full") && !TL && !(e.target.closest && e.target.closest(".mc-layer"))) {
         e.preventDefault(); closeToast(TOASTS[TOASTS.length - 1]); return;
       }
@@ -3794,6 +4113,7 @@
       if (t.dataset && t.dataset.geo) geoOnInput(t);
       if (t.name === "place" && t.closest && t.closest(".arr-form")) ARR.label = t.value;
       if (t.dataset && t.dataset.man) state.manual[t.dataset.man] = t.value;
+      if (t.id === "hist-q") renderHistory();
       if (t.dataset && t.dataset.psearch) placeSearch(t.value);
     });
     document.addEventListener("keydown", geoKeydown);
@@ -3805,8 +4125,12 @@
     if (DEMO && params.get("start") !== "1") {
       document.documentElement.classList.add("demo");
       Object.assign(S, { region: "suncheon_gurye", from: "2026-12-12", to: "2026-12-13", comp: 3, count: 4, combo: 1 });
-      bubble("me", "순천/구례 · 12월 12일(토) ~ 12월 13일(일) · 1박 2일 · 부모님 동반 4명 · KTX·SRT + 렌터카");
-      demoPlanResponse(params.get("status") === "확정").then((j) => handleResponse(j, "chat"))
+      fetchMessages("demo").then((rows) => {
+        if (rows && rows.length) restoreThread(rows);
+        else bubble("me", "순천/구례 · 12월 12일(토) ~ 12월 13일(일) · 1박 2일 · 부모님 동반 4명 · KTX·SRT + 렌터카");
+        const th = $("#thread"), br = $("#brochure"); if (th && br) th.appendChild(br);
+        return demoPlanResponse(params.get("status") === "확정");
+      }).then((j) => { handleResponse(Object.assign({}, j, { plan_no: 3 }), rowsExist() ? "restore" : "chat"); foldThread(); })
         .catch(() => toast("데모 계획서(sample_plan.json)를 불러오지 못했어요."));
     }
   }

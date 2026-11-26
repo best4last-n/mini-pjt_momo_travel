@@ -1486,7 +1486,8 @@
      "source": "한국관광공사 TourAPI",
      "role": "place",
      "swap_hint": false,
-     "swap_kind": "관광지"
+     "swap_kind": "관광지",
+     "diff": "new"
     },
     {
      "order": 2,
@@ -1520,7 +1521,9 @@
      "source": "한국관광공사 TourAPI",
      "role": "place",
      "swap_hint": false,
-     "swap_kind": "관광지"
+     "swap_kind": "관광지",
+     "diff": "moved",
+     "from_day": 1
     },
     {
      "order": 4,
@@ -2412,5 +2415,33 @@
    "순천 낙안읍성"
   ],
   "note": "여행 끝이 아쉬우면 돌아가는 길에 잠깐 들러 보세요. 우회 시간은 직선거리 기준 추정이에요."
+ },
+ "diff": {
+  "added": [
+   {
+    "place_id": "127923",
+    "name": "화엄사",
+    "day": 2
+   }
+  ],
+  "removed": [
+   {
+    "place_id": "126267",
+    "name": "선암사계곡",
+    "day": 3
+   }
+  ],
+  "moved": [
+   {
+    "place_id": "317559",
+    "name": "사성암(구례)",
+    "from_day": 1,
+    "to_day": 2
+   }
+  ],
+  "travel_before_min": 360,
+  "travel_after_min": 330,
+  "summary": "추가 1곳 · 빠짐 1곳 · 날짜 이동 1곳 · 이동시간 −30분",
+  "big": true
  }
 }

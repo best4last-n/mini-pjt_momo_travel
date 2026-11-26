@@ -26,6 +26,7 @@
       </div>
       <nav class="desk-nav" aria-label="계획 관리">
         <button type="button" class="btn sm ghost" data-act="trips-open" aria-haspopup="dialog">내 여행 계획</button>
+        <button type="button" class="btn sm ghost" data-act="hist-open" aria-haspopup="dialog">내 요청 기록</button>
         <button type="button" class="btn sm ghost" data-act="new-chat">새 상담</button>
       </nav>
       <div class="airmail" aria-hidden="true"></div>
@@ -83,6 +84,14 @@
     <button type="button" class="x" data-act="trips-close" aria-label="닫기">×</button>
   </div>
   <div id="trips-body" class="drawer-b"></div>
+</dialog>
+
+<dialog id="hist" class="drawer hist-drawer" aria-labelledby="hist-h">
+  <div class="drawer-h">
+    <h2 id="hist-h" class="display">내 요청 기록</h2>
+    <button type="button" class="x" data-act="hist-close" aria-label="닫기">×</button>
+  </div>
+  <div id="hist-body" class="drawer-b"></div>
 </dialog>
 
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
