@@ -37,6 +37,24 @@
         {"keyword": "국립경주박물관", "type": "attraction"},
         {"keyword": "황리단길", "type": "attraction"}
       ]
+    },
+    "suwon": {
+      "label": "수원",
+      "sigungu": [
+        {"name": "수원 팔달구", "regn": "41", "signgu": "115", "share": 0.45},
+        {"name": "수원 장안구", "regn": "41", "signgu": "111", "share": 0.25},
+        {"name": "수원 영통구", "regn": "41", "signgu": "117", "share": 0.15},
+        {"name": "수원 권선구", "regn": "41", "signgu": "113", "share": 0.15}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "수원화성", "type": "attraction"},
+        {"keyword": "화성행궁", "type": "attraction"},
+        {"keyword": "수원화성박물관", "type": "attraction"},
+        {"keyword": "해우재", "type": "attraction"},
+        {"keyword": "수원전통문화관", "type": "attraction"},
+        {"keyword": "통닭", "type": "restaurant"}
+      ]
     }
   }
 }
