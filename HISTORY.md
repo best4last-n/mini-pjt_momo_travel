@@ -599,3 +599,12 @@
 - **사용자 요청**: 현재까지 진행된 내용을 문서와 git에 커밋(push는 아직 하지 않음).
 - **Claude 작업**: 문서(SERVICE.md 3-8 U1~U25, HISTORY.md, evaluation/user_scenarios.csv)는 각 작업 때 이미 반영됨을 확인. 커밋 전 비밀값·개인정보 검사(새 파일·변경분에 API 키·이메일 없음). main 브랜치에 2개 커밋: ① 기능·테스트·문서·스크린샷 ② 관광공사 API 응답 캐시·도로 경로 캐시·수집 장소(기존에도 커밋하던 데이터). `mini-pjt_momo_travel.zip`(출처 모를 압축 파일)은 커밋에서 뺌. push는 하지 않음.
 - **다음 할 일**: 사용자가 원할 때 push. zip 파일을 저장소에 넣을지·.gitignore에 넣을지 결정.
+
+### [2026-11-27 08:00] README.md 누락 원인 확인 · 복구(작성)
+- **사용자 요청**: README.md가 왜 없는지 확인하고, SERVICE.md·momo.seed.yaml 등 mini-pjt 안의 md 파일을 추적해 README.md 복구.
+- **Claude 작업**: 원인 — README.md는 삭제된 적이 없고 **처음부터 만들어지지 않았음**. git 전체 기록·버려진(dangling) 커밋 2개·reflog 어디에도 없음. HISTORY.md에 '다음 할 일'로 4번(README 골격 · 실행법·구조·평가·LifeGalaxy 메모 · 기능 동결 후 README) 적혔지만 이후 기능 요청이 이어져 진행되지 않았음. 커밋 때 있던 mini-pjt_momo_travel.zip은 지금 폴더에 없음. 근거 문서(SERVICE.md 1·2·5절, seeds/momo.seed.yaml, evaluation/round1·round2_report.md, HISTORY.md 1·2차 평가·실패 분석·U1~U25, .env.example, scripts 사용법, 코드 위치)로 가이드 3-5 템플릿 8개 절을 채워 README.md 작성: 무엇을 푸나 · 활용 패턴 9개(코드 위치 포함, ReAct·MCP·Multi-Agent 미사용 명시) · 아키텍처(그래프 흐름, src/ 대응) · 실행 방법(색인 생성 포함) · RAGAS 1·2차 · 통과율 12→17(+5) · 회고(실패·채택·한계, 2차 뒤 변경분 미재평가 명시) · LifeGalaxy 통합 메모 · 핵심 코드 위치(줄 번호 확인). 승인 조건 서술은 코드와 대조해 바로잡음(draft_version은 보내면 검사).
+- **다음 할 일**: README 검토 → 커밋. 현재 코드로 20건 평가 재실행 여부 결정(Bedrock 비용).
+
+### [2026-11-27 08:10] README.md 커밋(푸시 안 함)
+- **사용자 요청**: 현재까지 수정된 내용만 커밋(push는 하지 않음).
+- **Claude 작업**: 변경분 README.md(신규)·HISTORY.md만 main에 커밋. 비밀값 없음 확인(README에는 키 이름만). push 안 함.
