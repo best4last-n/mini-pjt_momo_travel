@@ -64,9 +64,19 @@ def region_label(region: str) -> str:
 
 @lru_cache
 def places(region: str) -> dict[str, dict]:
+    """수집 장소 + 사용자가 지정해 관광공사에서 실시간으로 찾아 편입한 장소(extra_places.json)."""
     path = DATA / "tourapi" / region / "places.json"
     rows = json.loads(path.read_text(encoding="utf-8"))
-    return {p["contentid"]: p for p in rows}
+    extra = DATA / "tourapi" / region / "extra_places.json"
+    if extra.exists():
+        rows += json.loads(extra.read_text(encoding="utf-8"))
+    enrich = DATA / "tourapi" / region / "enrich.json"
+    more = json.loads(enrich.read_text(encoding="utf-8")) if enrich.exists() else {}
+    out = {}
+    for p in rows:
+        e = more.get(p["contentid"]) or {}
+        out[p["contentid"]] = {**p, **{k: e[k] for k in ("images", "highlights", "guide_tips", "companion_notes") if k in e}}
+    return out
 
 
 @lru_cache

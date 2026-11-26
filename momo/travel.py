@@ -24,20 +24,38 @@ def _cache() -> dict:
     return json.loads(p.read_text(encoding="utf-8")) if p.exists() else {}
 
 
-def local_minutes(a_id: str | None, b_id: str | None, a: tuple | None, b: tuple | None) -> tuple[int, str]:
-    """현지 구간: (분, travel_source)."""
+def local_minutes(a_id: str | None, b_id: str | None, a: tuple | None, b: tuple | None,
+                  mode: str = "자차") -> tuple[int, str]:
+    """현지 구간: (분, travel_source). mode: 자차·렌터카 / 대중교통 (SERVICE.md 3-6 (3))."""
     key = f"{a_id}>{b_id}"
-    if a_id and b_id and key in _cache():
+    if mode != "대중교통" and a_id and b_id and key in _cache():
         return int(_cache()[key]), "cache"
     if not a or not b or None in a or None in b:
         return 20, "estimate"
     if a == b:
-        return 0, "estimate"
-    mins = km(a, b) * 1.3 / 30 * 60
+        return 5, "estimate"
+    d = km(a, b)
+    if mode == "대중교통":
+        mins = d * 1.3 / 4.5 * 60 if d <= 1.2 else d * 1.3 / 15 * 60 + 10
+    else:
+        # 시내(10km까지) 30km/h, 그 너머 군·국도 구간 60km/h
+        mins = (min(d, 10) * 1.3 / 30 + max(d - 10, 0) * 1.3 / 60) * 60
     return max(5, int(math.ceil(mins / 5) * 5)), "estimate"
 
 
-def intercity_minutes(a: tuple, b: tuple) -> int:
-    """출발지 ↔ 여행 지역 대표 지점: 직선 × 1.3 ÷ 80km/h."""
-    mins = km(a, b) * 1.3 / 80 * 60
+def distance_km(a: tuple | None, b: tuple | None) -> float | None:
+    if not a or not b or None in a or None in b:
+        return None
+    return round(km(a, b) * 1.3, 1)
+
+
+LONG_MODES = {  # 장거리: (도로 계수, 속도 km/h, 접근·대기 분)
+    "자차": (1.3, 80, 0), "KTX·SRT": (1.2, 150, 30), "고속·시외버스": (1.3, 70, 20),
+}
+
+
+def intercity_minutes(a: tuple, b: tuple, mode: str = "자차") -> int:
+    """출발지 ↔ 여행 지역 대표 지점(추정)."""
+    f, v, wait = LONG_MODES.get(mode, LONG_MODES["자차"])
+    mins = km(a, b) * f / v * 60 + wait
     return int(math.ceil(mins / 10) * 10)

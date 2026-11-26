@@ -1,0 +1,83 @@
+[
+ {
+  "contentid": "317559",
+  "title": "사성암(구례)",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주통합특별시 구례군 문척면 사성암길 303",
+  "lat": 35.1801260865484,
+  "lng": 127.480604895138,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/54/4054454_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "사성암은 구례읍에서 약 2㎞ 남쪽인 죽마리 오산 꼭대기에 위치해 있다. 이곳은 원래 오산암이라 불렀는데, 성왕 22년 (544) 연기조사가 처음 건립하였다고 전해지고 있다. 원효대사, 도선국사, 진각국사, 의상대사 4명의 고승이 수도하였다고 하여 사성암이라 부르고 있다. 사성암은 높이 20m의 바위 사이에 박혀 있는 듯한 약사전과 바위와 계단으로 이어지는 건물들이 산과 하나 되어 독특한 풍경을 만들어 내고 있다. 약사전 아래로 보이는 섬진강과 구례읍, 지리산 능선들이 한눈에 들어온다. 마애여래입상이 약사전(유리광전) 건물 내 암벽에 새겨져 있으며 원효 대사가 손톱으로 새겼다는 전설이 전해지고 있다. 사성암까지 차로 이동이 가능하지만 주차장이 협소하여 주차가 제한적이다. 사성암을 가는 방법은 걸어 올라가는 것과 마을버스를 타고 올라가는 것이다. 마을버스 가격은 왕복 기준 3,400원 (13세 이하 2,800원)이다. 사성암 주차장 마을버스 매표소나 안전 운수사를 검색하여 찾아가면 된다.",
+  "homepage": "https://www.gurye.go.kr/tour",
+  "intro": {
+   "contentid": "317559",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "061-781-4544",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "09:00~18:00",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "사성암은 구례읍에서 약 2㎞ 남쪽인 죽마리 오산 꼭대기에 위치해 있다. 이곳은 원래 오산암이라 불렀는데, 성왕 22년 (544) 연기조사가 처음 건립하였다고 전해지고 있다. 원효대사, 도선국사, 진각국사, 의상대사 4명의 고승이 수도하였다고 하여 사성암이라 부르고 있다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/54/4054454_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/55/4054455_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/55/4054455_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/56/4054456_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/56/4054456_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/57/4054457_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/57/4054457_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "높이 20m 바위 사이에 박힌 듯한 약사전과 암벽 계단이 산과 하나 되어 만드는 독특한 건축 경관",
+   "약사전 아래로 섬진강·구례읍·지리산 능선이 한눈에 펼쳐지는 조망",
+   "원효대사가 손톱으로 새겼다는 전설이 전해지는 마애여래입상이 약사전 내 암벽에 직접 새겨져 있음",
+   "원효·도선·진각·의상 4명의 고승이 수도한 곳으로 544년 연기조사가 창건한 천년 고찰"
+  ],
+  "guide_tips": "오산 정상까지 걸어 올라가거나 마을버스(왕복 3,400원, 13세 이하 2,800원)를 이용하실 수 있어요. 정상 주차장은 협소해 주차가 제한적이니 마을버스 이용을 권해드립니다. 약사전에서 내려다보는 섬진강과 지리산 조망이 압권이니 사진 촬영 포인트로 꼭 기억하세요.",
+  "companion_notes": {
+   "elder": "오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요.",
+   "child": "바위 사이 계단과 높은 곳에 위치한 건물 구조상 어린이 동반 시 안전에 각별히 주의하셔야 합니다. 유모차 이용은 현장 확인이 필요해요."
+  }
+ }
+]

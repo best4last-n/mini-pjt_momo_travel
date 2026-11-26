@@ -417,3 +417,16 @@
   - 남은 실패: #15 Judge가 일차 첫 장소 '이동 0분'을 금지 조건으로 판정(2일차 첫 장소는 숙소에서 오는 이동을 계산하지 않는 실제 개선점), #16·#17(on)은 추가 기능 미구현.
   - 리포트 머리말 데이터 표기를 실제 데이터 기준으로 수정, SERVICE.md 5절에 1·2차 결과 표 추가.
 - **다음 할 일**: README(실행법·구조·평가·LifeGalaxy 통합 메모), 시연 캡처, 제출(Day 10 15:00). 선택: #15 개선(2일차 첫 장소 숙소→장소 이동 계산) — 기능이 아닌 개선이라 동결 이후도 가능.
+
+### [2026-11-26 12:30~] 개편: 사성암 버그·4단계 상담·브로셔·편집·예산·저장 (백엔드)
+- **사용자 요청(연속)**: 사성암 미반영·디자인 불만 → 재설계 여부 문의 → "사성암 수정 + A안 화면, 확정 요소를 대화로 끌어내고 불확정 최소화 → LLM 전체 계획 → 추가/수정, html·docx·pdf 내보내기, guide의 travel_planner_system_prompt·SERVICE.md 기준으로 계획 보완". 작업 중 추가: 확정 요소 신호등 정보창(눌러서 수정), 예산·경비(유류비·통행료·식비 등)·여행 후 정산 리포트, 모모 안내 데스크 애니메이션·확정 진행률(100% 미만도 확정 가능), 우선순위 필수 장소 + 동선 최적화(사용자 조정 최우선), 계획 저장·불러오기.
+- **판단**: 재설계 불필요(원인 국소적, 화면은 API와 분리) → 기존 구조 위에 확장. SERVICE.md 3-6 (1)~(13) 신설.
+- **Claude 작업(백엔드)**:
+  - 사성암 원인: 수집 60곳에 없음 + OSM 검색어에 지역명을 붙여 실패 → momo/tourlive.py(관광공사 키워드 검색으로 실시간 편입, 사진·특장점 보강, extra_places.json 캐시), OSM은 이름만 + 지역 40km 이내.
+  - scripts/enrich_places.py: 181곳 사진 평균 3.9장(detailImage2), 관광지 91곳 특장점·관람 팁·동반자 메모(Bedrock).
+  - planner: 여행 강도(빡빡/보통/여유 시간대·수용량), 장거리·현지 이동 조합 추정, 저녁 시간대 예외, 2일차 첫 구간=숙소에서(#15 개선), 지역 내 10km 초과 구간 60km/h, 추천 1~10위(ranked), 동선 최적화(optimize_plan, 사용자 순서 날 제외), 보정 루프 버그 수정(식사 누락으로 관광지 전부 삭제되던 문제), 구조화 출력 재시도·문자열 목록 파싱.
+  - momo/brochure.py(가이드 10절 plan 스키마, 신호등 체크리스트·진행률·route), momo/costs.py(경비 추정·예산·정산 집계), momo/export.py(DOCX·여행 결과 리포트 HTML), store(trips·expenses 테이블).
+  - agent: intake(지역 없음 또는 날짜·길이 모두 없음 → 2~3개 질문 + 지역 맞춤 가이드 + '알아서 짜 줘'), pending 조건 이어받기, action edit(add/remove/move/reorder, LLM 없이 재계산·변경 요약)·set(확정 요소 변경), 응답에 stage·quick_replies·plan·conditions·progress·changes, 확정 시 html/docx/print/report URL, load_trip.
+  - API: /trips, /trips/{sid}, /plan/{id}.html·.docx·/report·/expenses(GET/POST/DELETE).
+  - E2E 확인: intake → 계획(89%) → 사성암 추가 → 강도 변경(100%) → 확정 → 공유·HTML(142KB)·DOCX(120KB)·리포트 → 지출 입력 → 목록·불러오기 모두 200. 경주 계획에서 동선 최적화로 이동 45분 단축.
+- **서브에이전트**: general-purpose · A안 화면(index/app.js/style.css/share.html — 2단 레이아웃, Leaflet 지도·스크롤 연동, 브로셔 카드, 신호등 정보창, 편집 버튼, 경비 카드·정산 화면, 모모 데스크 애니메이션, 진행률, 내 여행 계획, 인쇄 CSS, 데모 모드) 작업 중. 계약은 SendMessage로 5회 전달.

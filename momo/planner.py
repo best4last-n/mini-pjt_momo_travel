@@ -27,8 +27,20 @@ class TripSpec:
     nights: int
     departure: str | None = None          # 시·도
     depart_time: int = DEFAULT_DEPART
-    transport: str = "자차"
+    transport: str = "자차"                 # (하위 호환) 현지 이동
     companions: str | None = None
+    intensity: str = "보통"                 # 빡빡 / 보통 / 여유 (SERVICE.md 3-6 (2))
+    long_transport: str = "자차"            # 자차 / KTX·SRT / 고속·시외버스
+    local_transport: str = "자차"           # 자차 / 렌터카 / 대중교통
+    companion_type: str = "보통"            # 보통 / 노약자 / 어린이·유아
+    companion_count: int | None = None
+    origin_label: str | None = None         # 시·군·구 표기(계산은 departure 시·도)
+    assumptions: list[str] = field(default_factory=list)
+    user_ordered_days: list[int] = field(default_factory=list)   # 사용자가 순서를 정한 날(1부터) — 최적화하지 않음
+    route_saved_min: int = 0
+    budget: int | None = None               # 최대 예산(원)
+    budget_per_person: bool = False
+    budget_label: str | None = None
     preferences: list[str] = field(default_factory=list)
     many_places: bool = False
     waypoint_ids: list[str] = field(default_factory=list)       # 수집 데이터에 있는 경유지
@@ -42,24 +54,47 @@ class TripSpec:
 
 # ---------- 시간 창 ----------
 
+INTENSITY = {   # 관광 시간대(분), 하루 관광지 상한, 구간 권장 상한(분)
+    "빡빡": (8 * 60, 20 * 60, 5, None),
+    "보통": (9 * 60, 18 * 60 + 30, 4, 60),
+    "여유": (10 * 60, 17 * 60 + 30, 3, 40),
+}
+
+
+def local_mode(spec: TripSpec) -> str:
+    return "대중교통" if spec.local_transport == "대중교통" else "자차"
+
+
 def one_way_minutes(spec: TripSpec) -> int | None:
     if not spec.departure or spec.departure not in data.SIDO_COORDS:
         return None
-    return travel.intercity_minutes(data.SIDO_COORDS[spec.departure], data.region_center(spec.region))
+    return travel.intercity_minutes(data.SIDO_COORDS[spec.departure], data.region_center(spec.region),
+                                    spec.long_transport)
 
 
 def windows(spec: TripSpec) -> list[tuple[int, int]]:
     ow = one_way_minutes(spec)
     out = []
     n = spec.nights + 1
+    s0, e0, _, _ = INTENSITY.get(spec.intensity, INTENSITY["보통"])
     for i in range(n):
-        s, e = DAY_START, DAY_END
+        s, e = s0, e0
         if ow is not None:
             if i == 0:
-                s = max(DAY_START, spec.depart_time + ow + BUFFER_MIN)
+                s = max(s0, spec.depart_time + ow + BUFFER_MIN)
             if i == n - 1:
-                e = min(DAY_END, HOME_LIMIT - ow)
+                e = min(e0, HOME_LIMIT - ow)
         out.append((_ceil5(s), e))
+    return out
+
+
+def meal_windows(spec: TripSpec) -> list[tuple[int, int]]:
+    """식사용 시간 창: 관광 시간대가 끝난 뒤에도 저녁(~20:00)은 둘 수 있다. 귀가 상한이 걸린 마지막 날은 예외."""
+    ow = one_way_minutes(spec)
+    out = []
+    for i, (s, e) in enumerate(windows(spec)):
+        last_capped = ow is not None and i == len(spec.days) - 1
+        out.append((s, e if last_capped else max(e, DINNER[1])))
     return out
 
 
@@ -67,14 +102,17 @@ def _ceil5(m: int) -> int:
     return int(math.ceil(m / 5) * 5)
 
 
-def max_places(win: tuple[int, int], n_meals: int, many: bool = False) -> int:
-    """시간 창에 들어갈 관광지 수 어림(체류 75분 + 이동·여유 25분)."""
+def max_places(win: tuple[int, int], n_meals: int, many: bool = False, intensity: str = "보통") -> int:
+    """시간 창에 들어갈 관광지 수 어림(체류 75분 + 이동·여유 25분), 강도별 상한."""
+    cap = 7 if many else INTENSITY.get(intensity, INTENSITY["보통"])[2]
     free = win[1] - win[0] - n_meals * 80
-    return max(1, min(7 if many else 5, free // (100 if not many else 80)))
+    return max(1, min(cap, free // (100 if not many else 80)))
 
 
 def meal_required(win: tuple[int, int], meal: tuple[int, int]) -> bool:
-    return min(win[1], meal[1]) - max(win[0], meal[0]) >= 30
+    """점심은 시간 창과 30분 이상 겹치면, 저녁은 60분 식사가 온전히 들어갈 때만 필수(귀가 길 저녁은 안내로)."""
+    need = 60 if meal == DINNER else 30
+    return min(win[1], meal[1]) - max(win[0], meal[0]) >= need
 
 
 # ---------- 후보 ----------
@@ -155,20 +193,24 @@ PICK_SYSTEM = MOMO_PERSONA + """
 - 해당 일차에 '휴무'인 곳은 그날 넣지 않는다. '운영시간 확인 필요'는 하루 최대 1곳, 식사·마지막 자리에 두지 않는다.
 - 운영시간이 짧은 곳(예: 17시 마감)은 그날 앞쪽에 둔다. 체류시간은 관광지 60~120분, 식사 60분.
 - reason은 후보 정보(요약·종류)에 근거한 한 줄. 지어내지 않는다.
+- ranked: 후보 중 관광지·축제 추천 1~10위를 우선순위대로(동반자 적합성 → 지역 대표성 → 시기·휴무 → 동선 → 관심사).
+  일정에 넣은 곳을 포함하고, 나머지는 사용자가 바꿔 넣을 후보다. 이유는 사용자 조건과 연결한 한 문장.
+- 동반자가 노약자면 계단·급경사·장거리 도보가 필수인 곳은 순위를 낮추고, 어린이·유아면 체험·넓은 야외를 우선한다.
 """
 
 
 def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | None = None,
          base: list[dict] | None = None, indoor: bool = False) -> PlanPick:
-    wins = windows(spec)
+    wins, mwins = windows(spec), meal_windows(spec)
     day_lines = []
-    for i, (d, w) in enumerate(zip(spec.days, wins), 1):
-        meals = [n for n, m in (("점심", LUNCH), ("저녁", DINNER)) if meal_required(w, m)]
-        cap = max_places(w, len(meals), spec.many_places)
+    for i, (d, w, mw) in enumerate(zip(spec.days, wins, mwins), 1):
+        meals = [n for n, m in (("점심", LUNCH), ("저녁", DINNER)) if meal_required(mw, m)]
+        cap = max_places(w, sum(1 for n in meals if n == "점심"), spec.many_places, spec.intensity)
         day_lines.append(f"{i}일차 {d.isoformat()}({'월화수목금토일'[d.weekday()]}) 시간 창 {hours.fmt(w[0])}~{hours.fmt(w[1])}"
                          f" · 필요한 식사: {', '.join(meals) or '없음'} · 관광지는 최대 {cap}곳(시간 창을 넘기면 규칙 위반)")
     msg = [f"요청: <data>{request}</data>",
-           f"동행: {spec.companions or '정보 없음'} · 취향: {', '.join(spec.preferences) or '없음'}",
+           f"동행: {spec.companions or '정보 없음'}({spec.companion_type}) · 여행 강도: {spec.intensity} · "
+           f"현지 이동: {spec.local_transport} · 취향: {', '.join(spec.preferences) or '없음'}",
            f"여행: {data.region_label(spec.region)} {spec.nights}박 {spec.nights + 1}일",
            *day_lines]
     if spec.many_places:
@@ -184,8 +226,83 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
     if feedback:
         msg.append(f"직전 초안의 규칙 위반(반드시 고칠 것):\n{feedback}")
     msg.append(f"후보 목록 <data>\n{candidate_lines(spec, cands)}\n</data>")
-    return structured(PlanPick, temperature=0.2, max_tokens=3000).invoke(
-        [("system", PICK_SYSTEM), ("human", "\n".join(msg))])
+    prompt = [("system", PICK_SYSTEM), ("human", "\n".join(msg))]
+    out = None
+    for attempt in range(2):     # 구조화 출력이 비거나 파싱 실패하면 한 번 더
+        try:
+            out = structured(PlanPick, temperature=0.2, max_tokens=4000).invoke(prompt)
+            if out.days:
+                return out
+        except Exception:
+            if attempt == 1:
+                raise
+    return out
+
+
+# ---------- 동선 최적화 (SERVICE.md 3-6 (12)) ----------
+
+def _pcoord(spec: TripSpec, pid: str):
+    p = data.places(spec.region).get(pid) or next((w for w in spec.user_waypoints if w["place_id"] == pid), None)
+    return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
+
+
+def optimize_day(spec: TripSpec, row: list, start=None) -> list:
+    """식사·숙소는 제자리(시간 고정점), 그 사이 관광지 묶음만 순서를 바꿔 직선거리 합을 최소화(7곳 이하 완전 탐색)."""
+    import itertools
+    out, seg, prev_pt = [], [], start
+
+    def flush(next_pt):
+        nonlocal seg, prev_pt
+        if len(seg) > 1 and all(_pcoord(spec, x.place_id) for x in seg) and len(seg) <= 7:
+            def cost(order):
+                pts = [prev_pt] + [_pcoord(spec, x.place_id) for x in order] + [next_pt]
+                pts = [p for p in pts if p]
+                return sum(travel.km(a, b) for a, b in zip(pts, pts[1:]))
+            seg = list(min(itertools.permutations(seg), key=cost))
+        out.extend(seg)
+        if seg:
+            prev_pt = _pcoord(spec, seg[-1].place_id) or prev_pt
+        seg = []
+
+    for x in row:
+        if x.role == "place" and x.place_id != MEAL_ID:
+            seg.append(x)
+            continue
+        nxt = _pcoord(spec, x.place_id) if x.place_id != MEAL_ID else None
+        flush(nxt)
+        out.append(x)
+        if nxt:
+            prev_pt = nxt
+    flush(None)
+    return out
+
+
+def _travel_total(items: list[dict]) -> int:
+    return sum(it["travel_minutes_from_prev"] or 0 for it in items if it["type"] != "move")
+
+
+def optimize_plan(spec: TripSpec, picked: PlanPick, allowed: set, fixed_days: set) -> tuple[PlanPick, int]:
+    """날짜별로 최적화한 순서를 써 보고, 규칙 위반이 늘지 않고 이동이 줄 때만 채택. (채택 PlanPick, 줄어든 분)"""
+    from .schemas import DayPick
+    base_items = schedule(spec, picked, {})
+    base_v = len(validate(spec, base_items, allowed))
+    center = data.region_center(spec.region)
+    new_days, last_stay = [], None
+    for d in sorted(picked.days, key=lambda x: x.day):
+        if d.day in fixed_days:
+            new_days.append(d)
+        else:
+            start = (_pcoord(spec, last_stay) if last_stay else (center if spec.departure else None))
+            new_days.append(DayPick(day=d.day, items=optimize_day(spec, list(d.items), start)))
+        stay = next((x.place_id for x in d.items if x.role == "stay"), None)
+        last_stay = stay or last_stay
+    cand = PlanPick(days=new_days, ranked=picked.ranked, note=picked.note)
+    items = schedule(spec, cand, {})
+    v = len(validate(spec, items, allowed))
+    saved = _travel_total(base_items) - _travel_total(items)
+    if v <= base_v and saved > 0:
+        return cand, saved
+    return picked, 0
 
 
 # ---------- 코드 시각 계산 ----------
@@ -200,7 +317,11 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
     user_wp = {w["place_id"]: w for w in spec.user_waypoints}
     ow = one_way_minutes(spec)
     items: list[dict] = []
-    mode = "car"
+    lm = local_mode(spec)
+    mode = "transit" if lm == "대중교통" else "car"
+    center = data.region_center(spec.region)
+    hub = {"contentid": None, "lat": center[0], "lng": center[1], "title": "도착 지점"}
+    last_stay = None
     for di, d in enumerate(spec.days):
         w = wins[di]
         day = next((x for x in plan.days if x.day == di + 1), None)
@@ -209,6 +330,7 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             items.append(_move(d, f"{spec.departure} → {data.region_label(spec.region)}", spec.depart_time,
                                spec.depart_time + ow, "출발"))
         cursor, prev = w[0], None
+        origin = last_stay if di > 0 and last_stay else (hub if di == 0 and ow is not None else None)
         for pk in picks:
             placeholder = pk.place_id == MEAL_ID
             if placeholder:   # '주변에서 식사' (운영시간이 맞는 식당이 없을 때)
@@ -221,13 +343,15 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
                 if p is None:   # 후보 밖 id → 그대로 두고 검사에서 '없는 장소'로 잡힘
                     p = {"contentid": pk.place_id, "title": f"(알 수 없는 장소 {pk.place_id})", "kind": "attraction"}
                 info = hours.parse_open(p, d)
-            if prev is None:
+            if prev is None and origin is not None and not placeholder:     # 숙소·도착 지점에서 첫 장소까지
+                tmin, tsrc = travel.local_minutes(origin.get("contentid"), p.get("contentid"), _coords(origin), _coords(p), lm)
+            elif prev is None:
                 tmin, tsrc = 0, "estimate"
             elif placeholder or prev.get("source") == "식사 안내":
                 tmin, tsrc = 10, "estimate"
             else:
-                tmin, tsrc = travel.local_minutes(prev.get("contentid"), p.get("contentid"), _coords(prev), _coords(p))
-            start = cursor + (tmin + BUFFER_MIN if prev is not None else 0)
+                tmin, tsrc = travel.local_minutes(prev.get("contentid"), p.get("contentid"), _coords(prev), _coords(p), lm)
+            start = cursor + (tmin + BUFFER_MIN if prev is not None else tmin)
             if pk.role == "lunch":
                 start = max(start, LUNCH[0])
             elif pk.role == "dinner":
@@ -247,6 +371,8 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
                 typ = "meal"
             items.append(_item(p, d, typ, start, end, tmin, tsrc, mode, pk.reason, info))
             cursor, prev = end, p
+            if typ == "stay":
+                last_stay = p
         if ow is not None and di == len(spec.days) - 1:
             back = max(cursor, w[0])
             items.append(_move(d, f"{data.region_label(spec.region)} → {spec.departure}", back, back + ow, "귀가"))
@@ -295,11 +421,11 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
     v: list[dict] = []
     pl = data.places(spec.region)
     user_ids = {w["place_id"] for w in spec.user_waypoints}
-    wins = windows(spec)
+    wins, mwins = windows(spec), meal_windows(spec)
     for di, d in enumerate(spec.days):
         ds = d.isoformat()
         day = [it for it in items if it["date"] == ds and it["type"] != "move"]
-        w = wins[di]
+        w, mw = wins[di], mwins[di]
         prev = None
         check_cnt = 0
         for idx, it in enumerate(day):
@@ -328,8 +454,9 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
                 pe = hours.parse_hm(prev["end_time"])
                 if pe + it["travel_minutes_from_prev"] + BUFFER_MIN > s:
                     v.append(_v("시간 겹침", it, f"앞 일정 종료 {prev['end_time']} + 이동 {it['travel_minutes_from_prev']}분 + 여유 10분 > 시작 {it['start_time']}"))
-            if it["type"] != "stay" and (s < w[0] or e > w[1]):
-                v.append(_v("시간 창 밖", it, f"현지 가능 시간 {hours.fmt(w[0])}~{hours.fmt(w[1])}"))
+            win = mw if it["type"] == "meal" else w
+            if it["type"] != "stay" and (s < win[0] or e > win[1]):
+                v.append(_v("시간 창 밖", it, f"현지 가능 시간 {hours.fmt(win[0])}~{hours.fmt(win[1])}"))
             if it["type"] == "stay" and s > HOME_LIMIT:
                 v.append(_v("시간 창 밖", it, "숙소 도착이 22:00 이후"))
             prev = it
@@ -338,7 +465,7 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
                       "detail": f"{ds} 운영시간 확인 필요 장소 {check_cnt}곳(하루 최대 1곳)"})
         meals = [hours.parse_hm(it["start_time"]) for it in day if it["type"] == "meal"]
         for label, (a, b) in (("점심", LUNCH), ("저녁", DINNER)):
-            if meal_required(w, (a, b)) and not any(a - 30 <= m < b for m in meals):
+            if meal_required(mw, (a, b)) and not any(a - 30 <= m < b for m in meals):
                 v.append({"type": "식사 누락", "seq": None, "place_name": "", "date": ds,
                           "detail": f"{ds} {label}({hours.fmt(a)}~{hours.fmt(b)}) 식사 항목 없음"})
         if spec.nights and di == 0 and (not day or day[-1]["type"] != "stay"):
@@ -382,7 +509,7 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
             stay = []
         # 빠진 식사 자리표시자: 점심은 시간 순서상 정오 무렵, 저녁은 맨 뒤
         for role, win in (("lunch", LUNCH), ("dinner", DINNER)):
-            if meal_required(wins[di], win) and not any(pk.role == role for pk in picks):
+            if meal_required(meal_windows(spec)[di], win) and not any(pk.role == role for pk in picks):
                 if role == "lunch":
                     before = [it for it in day if it["type"] != "stay" and hours.parse_hm(it["start_time"]) < 12 * 60]
                     picks.insert(min(len(before), len(picks)), PickItem(place_id=MEAL_ID, role="lunch", stay_minutes=60, reason=""))
@@ -390,17 +517,23 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
                     picks.append(PickItem(place_id=MEAL_ID, role="dinner", stay_minutes=60, reason=""))
         days.append(picks + stay)
     out: list[dict] = []
-    for _ in range(8):     # 시간 창 밖·겹침이 남으면 식사 아닌 마지막 관광지를 하나씩 덜어 냄
+    for _ in range(8):     # 항목에 걸린 시간 위반만 풀어 냄: 위반한 관광지를 빼고, 식사·숙소가 밀렸으면 그 앞 관광지를 하나 뺌
         out = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=x) for i, x in enumerate(days)]), {})
-        v = [x for x in validate(spec, out, allowed | {MEAL_ID}) if x["type"] in ("시간 창 밖", "시간 겹침", "운영시간 밖", "식사 누락")]
+        v = [x for x in validate(spec, out, allowed | {MEAL_ID})
+             if x["type"] in ("시간 창 밖", "시간 겹침", "운영시간 밖") and x["seq"] is not None]
         if not v:
             break
-        dates = [d.isoformat() for d in spec.days]
-        di = dates.index(v[0]["date"])
-        idx = max((i for i, pk in enumerate(days[di]) if pk.role == "place"), default=None)
-        if idx is None:
+        bad = next(it for it in out if it["seq"] == v[0]["seq"])
+        di = [d.isoformat() for d in spec.days].index(bad["date"])
+        row = days[di]
+        hit = next((i for i, pk in enumerate(row) if pk.role == "place" and pk.place_id == bad.get("place_id")), None)
+        if hit is None:      # 식사·숙소가 밀림 → 그 앞의 마지막 관광지
+            key = bad.get("place_id") or MEAL_ID
+            pos = next((i for i, pk in enumerate(row) if pk.place_id == key), len(row))
+            hit = max((i for i, pk in enumerate(row[:pos]) if pk.role == "place"), default=None)
+        if hit is None:
             break
-        days[di].pop(idx)
+        row.pop(hit)
     return out
 
 
@@ -428,9 +561,10 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
                 cands.setdefault(pk.place_id, pl[pk.place_id])
     allowed = set(cands)
     trace.append({"step": "retrieve", "input": request[:200], "output": f"후보 {len(cands)}곳: " + ", ".join(p["title"] for p in list(cands.values())[:15])})
-    feedback, items, viol, regen = None, [], [], 0
+    feedback, items, viol, regen, last_ranked = None, [], [], 0, []
     for attempt in range(MAX_REGEN + 1):
         picked = pick(spec, cands, request, feedback, base, indoor=indoor)
+        last_ranked = picked.ranked or last_ranked
         if prefix or indoor:
             from .schemas import DayPick
             new_days = []
@@ -452,6 +586,12 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
             picked.days = [DayPick(day=d, items=locked[d]) if d in locked else
                            next((x for x in picked.days if x.day == d), DayPick(day=d, items=[]))
                            for d in range(1, spec.nights + 2)]
+        fixed = set(spec.user_ordered_days) | set((locked or {}).keys()) | set((prefix or {}).keys())
+        picked, saved = optimize_plan(spec, picked, allowed, fixed)
+        spec.route_saved_min = saved
+        if saved:
+            trace.append({"step": "tool:optimize_route", "input": f"고정 날 {sorted(fixed) or '없음'}",
+                          "output": f"동선 재정렬로 이동 {saved}분 단축"})
         items = schedule(spec, picked, cands)
         viol = validate(spec, items, allowed)
         trace.append({"step": "generate_plan" if attempt == 0 else "regenerate",
@@ -474,4 +614,26 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
                           "output": f"{it['travel_minutes_from_prev']}분 ({it['travel_source']})"})
             break
     return {"itinerary": items, "violations": viol, "regenerations": regen, "repaired": repaired,
-            "candidates": cands, "note": None}
+            "candidates": cands, "note": None, "ranked": rank_list(spec, items, cands, last_ranked)}
+
+
+def rank_list(spec: TripSpec, items: list[dict], cands: dict, llm_ranked: list) -> list[tuple[str, str]]:
+    """추천 1~10위: LLM 순위(후보 id만) → 일정에 든 관광지 → 대표 명소 → 나머지 후보 순으로 채움."""
+    out, seen = [], set()
+
+    def add(pid, reason):
+        p = cands.get(pid) or data.places(spec.region).get(pid)
+        if p and pid not in seen and p.get("kind") in ("attraction", "festival") and len(out) < 10:
+            seen.add(pid)
+            out.append((pid, reason or (p.get("summary") or "")[:60]))
+    for r in llm_ranked or []:
+        add(r.place_id, r.reason)
+    for it in items:
+        if it["type"] == "place" and it.get("place_id"):
+            add(it["place_id"], it.get("reason"))
+    for pid, p in cands.items():
+        if p.get("must_include"):
+            add(pid, "처음 가면 빠뜨리면 아쉬운 대표 명소예요")
+    for pid in cands:
+        add(pid, "")
+    return out

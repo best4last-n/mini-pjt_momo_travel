@@ -112,14 +112,18 @@ def season_of(d: date) -> str:
 
 # ---------- OSM 지명 검색 (사용자 지정 경유지) ----------
 
-def geocode(name: str, region_label: str | None = None) -> dict | None:
-    q = f"{name} {region_label or ''}".strip()
+def geocode(name: str, region: str | None = None, max_km: float = 40) -> dict | None:
+    """OSM 이름 검색(지역 이름을 붙이면 결과가 사라져 이름만 보냄). 여행 지역 대표 지점에서 max_km 안의 결과만."""
+    from .travel import km
     try:
-        r = requests.get("https://nominatim.openstreetmap.org/search", timeout=5, headers=UA,
-                         params={"q": q, "format": "json", "limit": 1, "countrycodes": "kr"})
+        r = requests.get("https://nominatim.openstreetmap.org/search", timeout=6, headers=UA,
+                         params={"q": name.strip(), "format": "json", "limit": 5, "countrycodes": "kr"})
         rows = r.json()
     except Exception:
         return None
+    if region:
+        c = data.region_center(region)
+        rows = [x for x in rows if km(c, (float(x["lat"]), float(x["lon"]))) <= max_km]
     if not rows:
         return None
     x = rows[0]

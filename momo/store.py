@@ -35,6 +35,69 @@ def save_plan(session_id: str, draft_version: str, payload: dict) -> str:
         return pid
 
 
+def _econn() -> sqlite3.Connection:
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS expenses (
+        id TEXT PRIMARY KEY, plan_id TEXT, date TEXT, category TEXT, label TEXT, amount INTEGER, memo TEXT, created TEXT)""")
+    return c
+
+
+def _tconn() -> sqlite3.Connection:
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS trips (
+        session_id TEXT PRIMARY KEY, title TEXT, region TEXT, start_date TEXT, nights INTEGER, status TEXT,
+        plan_id TEXT, progress INTEGER, updated TEXT)""")
+    return c
+
+
+def upsert_trip(session_id: str, plan: dict, status: str, plan_id: str | None = None) -> None:
+    """세운 계획 목록(초안·확정) — 언제든 다시 불러와 고칠 수 있게(SERVICE.md 3-6 (13))."""
+    t = plan.get("trip") or {}
+    now = datetime.now(KST).isoformat(timespec="seconds")
+    with _tconn() as c:
+        old = c.execute("SELECT plan_id, status FROM trips WHERE session_id=?", (session_id,)).fetchone()
+        pid = plan_id or (old[0] if old else None)
+        st = "확정" if status == "확정" else ("확정" if old and old[1] == "확정" and not plan_id and status != "승인 대기" else "초안")
+        if old and old[1] == "확정" and status == "승인 대기":
+            st = "수정 중"
+        c.execute("INSERT OR REPLACE INTO trips VALUES (?,?,?,?,?,?,?,?,?)",
+                  (session_id, t.get("title"), (t.get("regions") or [""])[0], t.get("start_date"), t.get("nights"),
+                   st, pid, (t.get("progress") or {}).get("percent"), now))
+
+
+def list_trips(ids: list[str]) -> list[dict]:
+    if not ids:
+        return []
+    with _tconn() as c:
+        q = ",".join("?" * len(ids))
+        rows = c.execute(f"SELECT session_id, title, region, start_date, nights, status, plan_id, progress, updated "
+                         f"FROM trips WHERE session_id IN ({q}) ORDER BY updated DESC", ids).fetchall()
+    keys = ("session_id", "title", "region", "start_date", "nights", "status", "plan_id", "progress", "updated")
+    return [dict(zip(keys, r)) for r in rows]
+
+
+EXPENSE_CATEGORIES = ["장거리 교통", "현지 교통", "유류비", "통행료", "렌터카", "식비", "입장료", "숙박", "기타"]
+
+
+def list_expenses(plan_id: str) -> list[dict]:
+    with _econn() as c:
+        rows = c.execute("SELECT id, date, category, label, amount, memo FROM expenses WHERE plan_id=? ORDER BY date, created",
+                         (plan_id,)).fetchall()
+    return [dict(zip(("id", "date", "category", "label", "amount", "memo"), r)) for r in rows]
+
+
+def add_expense(plan_id: str, date: str, category: str, label: str, amount: int, memo: str = "") -> None:
+    with _econn() as c:
+        c.execute("INSERT INTO expenses VALUES (?,?,?,?,?,?,?,?)",
+                  (secrets.token_urlsafe(6), plan_id, date, category, label, int(amount), memo,
+                   datetime.now(KST).isoformat(timespec="seconds")))
+
+
+def delete_expense(plan_id: str, eid: str) -> None:
+    with _econn() as c:
+        c.execute("DELETE FROM expenses WHERE plan_id=? AND id=?", (plan_id, eid))
+
+
 def get_plan(plan_id: str) -> dict | None:
     with _conn() as c:
         row = c.execute("SELECT payload FROM plans WHERE plan_id=?", (plan_id,)).fetchone()

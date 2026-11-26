@@ -55,12 +55,14 @@ async def query(request: Request):
     q = (body.get("question") or "").strip()
     action = body.get("action") or None
     sid = body.get("session_id") or None
-    if action not in (None, "approve"):
+    if action not in (None, "approve", "edit", "set"):
         raise InvalidRequest("알 수 없는 action", "앗, 모르는 요청이에요. 확정은 화면의 '확정할게요' 버튼으로 해 주세요.", summary=str(action))
     if len(q) > MAX_QUESTION_CHARS:
         raise InvalidRequest("길이 초과", f"앗, 편지가 너무 길어서 가방에 안 들어가요. {MAX_QUESTION_CHARS}자 안으로 줄여서 다시 보내 주실래요?",
                              code=413, summary=f"{len(q)}자")
-    if action == "approve":
+    if action in ("edit", "set") and not isinstance(body.get(action), dict):
+        raise InvalidRequest("형식 오류", "앗, 바꿀 내용을 알아보지 못했어요. 화면에서 다시 눌러 주실래요?", summary=f"{action} 본문 없음")
+    if action in ("approve", "edit", "set"):
         if not sid:
             raise InvalidRequest("세션 없음", "앗, 어떤 일정을 확정할지 몰라요. 일정을 먼저 만들어 볼까요?", summary="approve without session")
         state = agent.graph().get_state({"configurable": {"thread_id": sid}}).values
@@ -70,12 +72,29 @@ async def query(request: Request):
         raise InvalidRequest("빈 질문", "앗, 질문이 비어 있어서 편지를 쓸 수 없었어요. 가고 싶은 지역이랑 날짜를 담아 다시 보내 주실래요?",
                              summary="empty")
     notice = None
-    if sid and action != "approve" and not agent.graph().get_state({"configurable": {"thread_id": sid}}).values:
+    if sid and action is None and not agent.graph().get_state({"configurable": {"thread_id": sid}}).values:
         notice = "이전 상담 기록을 찾지 못해 새 상담으로 시작했어요."
-    resp = agent.handle_query(q, sid, action, body.get("draft_version"))
+    resp = agent.handle_query(q, sid, action, body.get("draft_version"),
+                              edit=body.get("edit") if action == "edit" else None,
+                              set_req=body.get("set") if action == "set" else None)
     if notice:
         resp["answer"] = notice + "\n\n" + resp["answer"]
     return resp
+
+
+@app.get("/trips")
+async def trips(ids: str = ""):
+    """내 여행 계획 목록 — 브라우저가 가진 session_id들 중 서버에 있는 것만(로그인 없이, 다른 사람 목록은 볼 수 없음)."""
+    wanted = [x for x in ids.split(",") if x and len(x) <= 64][:50]
+    return {"trips": store.list_trips(wanted)}
+
+
+@app.get("/trips/{session_id}")
+async def trip(session_id: str):
+    t = agent.load_trip(session_id)
+    if not t:
+        return JSONResponse(status_code=404, content={"answer": "저장된 계획을 찾지 못했어요.", "status": "오류"})
+    return t
 
 
 @app.get("/")
@@ -92,11 +111,99 @@ async def plan_ics(plan_id: str):
                     headers={"Content-Disposition": f'attachment; filename="momo-{plan_id}.ics"'})
 
 
+def _expenses(plan_id: str, payload: dict) -> dict:
+    from momo import costs
+    actual = store.list_expenses(plan_id)
+    planned = (payload.get("plan") or {}).get("costs")
+    return {"planned": planned, "actual": actual, "summary": costs.by_category(planned, actual),
+            "categories": store.EXPENSE_CATEGORIES}
+
+
+@app.get("/plan/{plan_id}.docx")
+async def plan_docx(plan_id: str):
+    from momo import export
+    p = store.get_plan(plan_id)
+    if not p:
+        return JSONResponse(status_code=404, content={"error": "없는 계획"})
+    data = export.to_docx(plan_id, p, _expenses(plan_id, p)["summary"])
+    return Response(data, media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    headers={"Content-Disposition": f'attachment; filename="momo-{plan_id}.docx"'})
+
+
+@app.get("/plan/{plan_id}.html")
+async def plan_html_export(plan_id: str):
+    """단일 파일 HTML 내보내기: 공유 페이지에 CSS·JS를 인라인(지도 라이브러리·글꼴만 CDN)."""
+    import re as _re
+    p = store.get_plan(plan_id)
+    if not p:
+        return HTMLResponse("<p>없는 계획이에요.</p>", status_code=404)
+    page = _render_share(plan_id, p)
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    page = _re.sub(r'<link[^>]+href="/static/style\.css"[^>]*>', lambda m: f"<style>{css}</style>", page)
+    for js in ("app.js", "cards.js"):
+        f = STATIC / js
+        if f.exists():
+            code = f.read_text(encoding="utf-8").replace("</script", r"<\/script")
+            page = _re.sub(r'<script[^>]+src="/static/' + _re.escape(js) + r'"[^>]*></script>',
+                           lambda m, c=code: f"<script>{c}</script>", page)
+    return Response(page, media_type="text/html; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="momo-{plan_id}.html"'})
+
+
+@app.get("/plan/{plan_id}/expenses")
+async def get_expenses(plan_id: str):
+    p = store.get_plan(plan_id)
+    if not p:
+        return JSONResponse(status_code=404, content={"error": "없는 계획"})
+    return _expenses(plan_id, p)
+
+
+@app.post("/plan/{plan_id}/expenses")
+async def post_expense(plan_id: str, request: Request):
+    p = store.get_plan(plan_id)
+    if not p:
+        return JSONResponse(status_code=404, content={"error": "없는 계획"})
+    try:
+        b = json.loads(await request.body() or b"{}")
+        amount = int(str(b.get("amount", "")).replace(",", ""))
+        if amount < 0 or amount > 100_000_000:
+            raise ValueError
+    except (ValueError, json.JSONDecodeError):
+        return JSONResponse(status_code=400, content={"error": "금액을 숫자로 입력해 주세요"})
+    cat = b.get("category") if b.get("category") in store.EXPENSE_CATEGORIES else "기타"
+    label = guardrails.mask_pii(str(b.get("label") or cat)[:80])[0]
+    memo = guardrails.mask_pii(str(b.get("memo") or "")[:200])[0]
+    store.add_expense(plan_id, str(b.get("date") or "")[:10], cat, label, amount, memo)
+    return _expenses(plan_id, p)
+
+
+@app.delete("/plan/{plan_id}/expenses/{eid}")
+async def del_expense(plan_id: str, eid: str):
+    p = store.get_plan(plan_id)
+    if not p:
+        return JSONResponse(status_code=404, content={"error": "없는 계획"})
+    store.delete_expense(plan_id, eid)
+    return _expenses(plan_id, p)
+
+
+@app.get("/plan/{plan_id}/report", response_class=HTMLResponse)
+async def plan_report(plan_id: str):
+    from momo import export
+    p = store.get_plan(plan_id)
+    if not p:
+        return HTMLResponse("<p>없는 계획이에요.</p>", status_code=404)
+    return export.report_html(plan_id, p, _expenses(plan_id, p))
+
+
+def _render_share(plan_id: str, p: dict) -> str:
+    tpl = (STATIC / "share.html").read_text(encoding="utf-8")
+    data = json.dumps(p, ensure_ascii=False).replace("</", r"<\/")
+    return tpl.replace("__TITLE__", html.escape(p["title"])).replace("__DATA__", data).replace("__PLAN_ID__", plan_id)
+
+
 @app.get("/plan/{plan_id}", response_class=HTMLResponse)
 async def plan_page(plan_id: str):
     p = store.get_plan(plan_id)
     if not p:
         return HTMLResponse("<p>없는 계획이에요.</p>", status_code=404)
-    tpl = (STATIC / "share.html").read_text(encoding="utf-8")
-    data = json.dumps(p, ensure_ascii=False).replace("</", "<\\/")
-    return tpl.replace("__TITLE__", html.escape(p["title"])).replace("__DATA__", data).replace("__PLAN_ID__", plan_id)
+    return _render_share(plan_id, p)
