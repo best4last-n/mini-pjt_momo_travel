@@ -48,24 +48,27 @@
 
     <form id="composer" class="composer" autocomplete="off">
       <div class="composer-row">
-        <button type="button" id="mic" class="mic" aria-label="음성으로 입력" aria-pressed="false" hidden>🎤</button>
+        <button type="button" id="mic" class="mic" aria-label="음성으로 입력" aria-pressed="false" hidden><svg class="mic-ico" aria-hidden="true" focusable="false"><use href="#ico-mic"/></svg></button>
         <label class="sr" for="q">모모에게 보낼 말</label>
-        <textarea id="q" rows="1" placeholder="모모에게 편지 쓰기… (마이크로 말해도 돼요)"></textarea>
+        <textarea id="q" rows="1" placeholder="모모에게 편지 쓰기…"></textarea>
         <button id="send" class="send" type="submit"><span>보내기</span><svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-send"/></svg></button>
       </div>
       <p id="mic-note" class="mic-note" hidden></p>
     </form>
   </section>
 
+  <div id="split" class="split" role="separator" aria-orientation="vertical" aria-label="상담 영역과 정보창 폭 조절" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62" tabindex="0" title="끌어서 폭 조절 · 두 번 누르면 기본값"><span class="grip" aria-hidden="true"></span></div>
   <aside id="side" class="side" aria-label="여행 정보">
     <section id="cond-panel" class="panel cond-panel" aria-label="여행 조건"></section>
     <section id="cost-panel" class="panel cost-panel" aria-label="예상 경비" hidden></section>
+    <section id="pack-panel" class="panel pack-panel" aria-label="준비물" hidden></section>
     <section id="map-panel" class="panel map-panel" aria-label="지도">
       <div id="map-tabs" class="map-tabs" role="tablist" aria-label="날짜별 지도"></div>
       <div class="map-box">
         <div id="map" class="map" aria-label="방문 순서 지도"></div>
         <div id="map-empty" class="map-empty"><svg class="bird big" aria-hidden="true" focusable="false"><use href="#momo-bird"/></svg><p>계획서가 나오면 여기에 날짜별 동선을 그려 드릴게요.</p></div>
       </div>
+      <p id="map-sum" class="map-sum"></p>
       <p class="legend">점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요.</p>
     </section>
     <section id="act-panel" class="panel act-panel" aria-label="합계와 확정" hidden></section>

@@ -18,7 +18,7 @@
       <div class="desk mini"><svg class="bird" aria-hidden="true" focusable="false"><use href="#momo-bird"/></svg></div>
       <div class="desk-title">
         <h1 class="display">__TITLE__</h1>
-        <p class="desk-sub">모모의 여행 상담소가 배달한 확정 계획서 · 읽기 전용</p>
+        <p class="desk-sub" id="share-sub">모모의 여행 상담소가 배달한 확정 계획서 · 읽기 전용</p>
       </div>
       <nav class="desk-nav noprint" aria-label="바로가기">
         <a class="btn sm ghost" href="/">나도 상담하기</a>
@@ -42,21 +42,25 @@
     </div>
   </section>
 
+  <div id="split" class="split" role="separator" aria-orientation="vertical" aria-label="상담 영역과 정보창 폭 조절" aria-valuemin="0" aria-valuemax="100" aria-valuenow="62" tabindex="0" title="끌어서 폭 조절 · 두 번 누르면 기본값"><span class="grip" aria-hidden="true"></span></div>
   <aside id="side" class="side" aria-label="여행 정보">
     <section id="cond-panel" class="panel cond-panel" aria-label="여행 조건"></section>
     <section id="cost-panel" class="panel cost-panel" aria-label="예상 경비" hidden></section>
+    <section id="pack-panel" class="panel pack-panel" aria-label="준비물" hidden></section>
     <section id="map-panel" class="panel map-panel" aria-label="지도">
       <div id="map-tabs" class="map-tabs" role="tablist" aria-label="날짜별 지도"></div>
       <div class="map-box">
         <div id="map" class="map" aria-label="방문 순서 지도"></div>
         <div id="map-empty" class="map-empty" hidden><p>지도에 그릴 일정이 없어요.</p></div>
       </div>
+      <p id="map-sum" class="map-sum"></p>
       <p class="legend">점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요.</p>
     </section>
     <section id="act-panel" class="panel act-panel" aria-label="내려받기" hidden></section>
   </aside>
 </div>
 <div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>(function(){ try { var b = __DATA__; if (b && b.view && !b.plan_id) { document.addEventListener("DOMContentLoaded", function(){ var s = document.getElementById("share-sub"); if (s) s.textContent = "모모의 여행 상담소가 배달한 계획서 초안 · 읽기 전용"; }); } } catch (e) {} })();</script>
 <script>window.MOMO_BOOT = { readOnly: true, planId: "__PLAN_ID__", payload: __DATA__ };</script>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="/static/app.js"></script>
