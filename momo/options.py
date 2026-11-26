@@ -7,13 +7,15 @@ from __future__ import annotations
 
 from . import data
 
-MAX_NIGHTS = 3
+MAX_NIGHTS = 8
 
 DURATION_PRESETS = [
     {"key": "day", "label": "당일치기", "nights": 0},
     {"key": "1n", "label": "1박 2일", "nights": 1},
     {"key": "2n", "label": "2박 3일", "nights": 2},
     {"key": "3n", "label": "3박 4일", "nights": 3},
+    {"key": "4n", "label": "4박 5일", "nights": 4},
+    {"key": "6n", "label": "일주일(6박 7일)", "nights": 6},
     {"key": "this_weekend", "label": "이번 주말", "nights": 1, "weekend": "this"},
     {"key": "next_weekend", "label": "다음 주말", "nights": 1, "weekend": "next"},
 ]
@@ -39,7 +41,7 @@ STYLE_PRESETS = [
 
 COMPANION_CHOICES = [
     {"label": "혼자", "type": "보통", "count": 1},
-    {"label": "연인·친구", "type": "보통", "count": 2},
+    {"label": "배우자/연인·친구", "type": "보통", "count": 2},
     {"label": "가족(아이 동반)", "type": "어린이·유아", "count": 4},
     {"label": "부모님 동반", "type": "노약자", "count": 4},
     {"label": "단체", "type": "보통", "count": 6},
@@ -51,6 +53,7 @@ TRANSPORT_COMBOS = [
     {"label": "KTX·SRT + 대중교통", "long": "KTX·SRT", "local": "대중교통"},
     {"label": "고속버스 + 대중교통", "long": "고속·시외버스", "local": "대중교통"},
     {"label": "고속버스 + 렌터카", "long": "고속·시외버스", "local": "렌터카"},
+    {"label": "비행기 + 렌터카", "long": "비행기", "local": "렌터카"},
 ]
 
 VEHICLE_TYPES = ["경차", "소형", "중형", "대형", "SUV", "승합"]

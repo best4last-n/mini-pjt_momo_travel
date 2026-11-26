@@ -47,6 +47,8 @@ class TripSpec:
     custom_costs: list[dict] = field(default_factory=list)
     preset: str | None = None
     given: list[str] = field(default_factory=list)      # 사용자가 직접 준 선택 항목(depart_time 등)
+    pack_checked: list[str] = field(default_factory=list)   # 준비물 체크한 id
+    pack_custom: list[dict] = field(default_factory=list)   # 사용자가 추가한 준비물
     budget: int | None = None               # 최대 예산(원)
     budget_per_person: bool = False
     budget_label: str | None = None
@@ -78,6 +80,13 @@ def one_way_minutes(spec: TripSpec) -> int | None:
     if not spec.departure or spec.departure not in data.SIDO_COORDS:
         return None
     a = tuple(spec.origin_coords) if spec.origin_coords else data.SIDO_COORDS[spec.departure]
+    if spec.long_transport in ("KTX·SRT", "비행기"):
+        from . import hubs
+        opts = hubs.rail_options(a, spec.region) if spec.long_transport == "KTX·SRT" else hubs.air_options(a, spec.region)
+        if not opts and spec.long_transport == "비행기":
+            opts = hubs.rail_options(a, spec.region)
+        if opts:
+            return opts[0]["total_min"]
     return travel.intercity_minutes(a, data.region_center(spec.region), spec.long_transport)
 
 
@@ -255,7 +264,7 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
     out = None
     for attempt in range(2):     # 구조화 출력이 비거나 파싱 실패하면 한 번 더
         try:
-            out = structured(PlanPick, temperature=0.2, max_tokens=4000).invoke(prompt)
+            out = structured(PlanPick, temperature=0.2, max_tokens=min(12000, 4000 + 1000 * spec.nights)).invoke(prompt)
             if out.days:
                 return out
         except Exception:

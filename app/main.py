@@ -7,6 +7,10 @@ from __future__ import annotations
 import html
 import json
 import logging
+import threading
+import time
+import uuid
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -42,27 +46,22 @@ async def _unexpected(_: Request, e: Exception):
         "trace": [{"step": "error", "input": "", "output": type(e).__name__}]})
 
 
-@app.post("/query")
-async def query(request: Request):
-    try:
-        body = json.loads(await request.body() or b"null")
-    except (json.JSONDecodeError, UnicodeDecodeError):
-        raise InvalidRequest("형식 오류", "앗, 편지 봉투가 찢어져서 읽을 수가 없었어요. 질문을 다시 보내 주실래요?", summary="JSON 아님")
-    if not isinstance(body, dict) or not isinstance(body.get("question", ""), str) \
-            or not isinstance(body.get("session_id") or "", str) or not isinstance(body.get("action") or "", str):
+def _prepare(body) -> dict:
+    """요청 검증(빠름). 실패하면 InvalidRequest. 통과하면 실행 인자."""
+    if not isinstance(body, dict) or not isinstance(body.get("question", ""), str)             or not isinstance(body.get("session_id") or "", str) or not isinstance(body.get("action") or "", str):
         raise InvalidRequest("형식 오류", "앗, 편지 형식이 조금 달라서 읽을 수가 없었어요. 질문을 글로 담아 다시 보내 주실래요?",
                              summary=str(body)[:200])
     q = (body.get("question") or "").strip()
     action = body.get("action") or None
     sid = body.get("session_id") or None
-    if action not in (None, "approve", "edit", "set", "start", "cost"):
+    if action not in (None, "approve", "edit", "set", "start", "cost", "pack"):
         raise InvalidRequest("알 수 없는 action", "앗, 모르는 요청이에요. 확정은 화면의 '확정할게요' 버튼으로 해 주세요.", summary=str(action))
     if len(q) > MAX_QUESTION_CHARS:
         raise InvalidRequest("길이 초과", f"앗, 편지가 너무 길어서 가방에 안 들어가요. {MAX_QUESTION_CHARS}자 안으로 줄여서 다시 보내 주실래요?",
                              code=413, summary=f"{len(q)}자")
-    if action in ("edit", "set", "start", "cost") and not isinstance(body.get(action), dict):
+    if action in ("edit", "set", "start", "cost", "pack") and not isinstance(body.get(action), dict):
         raise InvalidRequest("형식 오류", "앗, 바꿀 내용을 알아보지 못했어요. 화면에서 다시 눌러 주실래요?", summary=f"{action} 본문 없음")
-    if action in ("approve", "edit", "set", "cost"):
+    if action in ("approve", "edit", "set", "cost", "pack"):
         if not sid:
             raise InvalidRequest("세션 없음", "앗, 어떤 일정을 확정할지 몰라요. 일정을 먼저 만들어 볼까요?", summary="approve without session")
         state = agent.graph().get_state({"configurable": {"thread_id": sid}}).values
@@ -74,14 +73,84 @@ async def query(request: Request):
     notice = None
     if sid and action is None and not agent.graph().get_state({"configurable": {"thread_id": sid}}).values:
         notice = "이전 상담 기록을 찾지 못해 새 상담으로 시작했어요."
-    resp = agent.handle_query(q, sid, action, body.get("draft_version"),
+    return {"q": q, "sid": sid, "action": action, "body": body, "notice": notice}
+
+
+def _run(prep: dict) -> dict:
+    body, action = prep["body"], prep["action"]
+    resp = agent.handle_query(prep["q"], prep["sid"], action, body.get("draft_version"),
                               edit=body.get("edit") if action == "edit" else None,
                               set_req=body.get("set") if action == "set" else None,
                               start_req=body.get("start") if action == "start" else None,
-                              cost_req=body.get("cost") if action == "cost" else None)
-    if notice:
-        resp["answer"] = notice + "\n\n" + resp["answer"]
+                              cost_req=body.get("cost") if action == "cost" else None,
+                              pack_req=body.get("pack") if action == "pack" else None)
+    if prep["notice"]:
+        resp["answer"] = prep["notice"] + "\n\n" + resp["answer"]
     return resp
+
+
+async def _body(request: Request):
+    try:
+        return json.loads(await request.body() or b"null")
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        raise InvalidRequest("형식 오류", "앗, 편지 봉투가 찢어져서 읽을 수가 없었어요. 질문을 다시 보내 주실래요?", summary="JSON 아님")
+
+
+@app.post("/query")
+async def query(request: Request):
+    return _run(_prepare(await _body(request)))
+
+
+# ---- 백그라운드 작업(느린 재계획을 화면을 막지 않고) ----
+_EXEC = ThreadPoolExecutor(max_workers=3)
+_JOBS: dict[str, dict] = {}
+_RUNNING: dict[str, str] = {}      # session_id → job_id
+_LOCK = threading.Lock()
+
+
+def _job(job_id: str, prep: dict) -> None:
+    try:
+        _JOBS[job_id]["response"] = _run(prep)
+        _JOBS[job_id]["state"] = "done"
+    except InvalidRequest as e:
+        _JOBS[job_id].update(state="error", response={"answer": e.answer, "status": "오류", "contexts": [],
+                                                      "trace": [{"step": "error", "input": "", "output": e.kind}]})
+    except Exception as e:  # 스택은 로그로만
+        log.exception("job failed")
+        _JOBS[job_id].update(state="error", response={"answer": "앗, 편지를 전하다가 바람에 날려 버렸어요. 잠시 후 다시 보내 주실래요?",
+                                                      "status": "오류", "contexts": [],
+                                                      "trace": [{"step": "error", "input": "", "output": type(e).__name__}]})
+    finally:
+        with _LOCK:
+            if _RUNNING.get(prep["sid"]) == job_id:
+                _RUNNING.pop(prep["sid"], None)
+
+
+@app.post("/query/async")
+async def query_async(request: Request):
+    """/query와 같은 본문. 즉시 job_id를 주고 뒤에서 처리 — GET /jobs/{job_id}로 결과."""
+    prep = _prepare(await _body(request))
+    if not prep["sid"]:
+        prep["sid"] = uuid.uuid4().hex      # 새 상담도 세션 번호를 먼저 알려 줌
+    with _LOCK:
+        running = _RUNNING.get(prep["sid"])
+        if running and _JOBS.get(running, {}).get("state") == "running":
+            return JSONResponse(status_code=409, content={"answer": "이전 요청을 처리하는 중이에요", "job_id": running,
+                                                          "session_id": prep["sid"], "state": "running"})
+        job_id = uuid.uuid4().hex[:12]
+        _JOBS[job_id] = {"state": "running", "started": time.time(), "response": None, "session_id": prep["sid"]}
+        _RUNNING[prep["sid"]] = job_id
+    _EXEC.submit(_job, job_id, prep)
+    return {"job_id": job_id, "session_id": prep["sid"], "state": "running"}
+
+
+@app.get("/jobs/{job_id}")
+async def job_status(job_id: str):
+    j = _JOBS.get(job_id)
+    if not j:
+        return JSONResponse(status_code=404, content={"state": "error", "response": {"answer": "작업을 찾지 못했어요.", "status": "오류"}})
+    return {"state": j["state"], "elapsed_sec": round(time.time() - j["started"]), "session_id": j["session_id"],
+            "response": j["response"] if j["state"] != "running" else None}
 
 
 @app.get("/options")
@@ -233,6 +302,61 @@ async def del_expense(plan_id: str, eid: str):
         return JSONResponse(status_code=404, content={"error": "없는 계획"})
     store.delete_expense(plan_id, eid)
     return _expenses(plan_id, p)
+
+
+@app.post("/plan/{plan_id}/packing")
+async def plan_packing(plan_id: str, request: Request):
+    """공유 페이지에서 준비물 체크·추가·삭제."""
+    from momo import packing
+    p = store.get_plan(plan_id)
+    if not p or not (p.get("plan") or {}).get("packing"):
+        return JSONResponse(status_code=404, content={"error": "없는 계획"})
+    try:
+        op = json.loads(await request.body() or b"{}")
+    except json.JSONDecodeError:
+        return JSONResponse(status_code=400, content={"error": "형식 오류"})
+    if op.get("label"):
+        op["label"] = guardrails.mask_pii(str(op["label"]))[0]
+    p["plan"]["packing"] = packing.apply(p["plan"]["packing"], op)
+    with store._conn() as c:
+        c.execute("UPDATE plans SET payload=? WHERE plan_id=?", (json.dumps(p, ensure_ascii=False), plan_id))
+    return {"packing": p["plan"]["packing"]}
+
+
+def _view_payload(session_id: str) -> dict | None:
+    st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values
+    if not st or not st.get("plan"):
+        return None
+    t = st["plan"]["trip"]
+    return {"title": t.get("title", "여행 계획") + " · 초안", "region": t.get("region_id"),
+            "region_label": (t.get("regions") or [""])[0], "departure_sido": (st.get("spec") or {}).get("departure"),
+            "nights": t.get("nights"), "start": t.get("start_date"), "itinerary": st.get("itinerary") or [],
+            "plan": st["plan"], "view": True, "session_id": session_id, "plan_id": st.get("plan_id")}
+
+
+@app.get("/view/{session_id}.html")
+async def view_html(session_id: str):
+    """초안 계획서 HTML 내려받기(CSS·JS 인라인)."""
+    import re as _re
+    p = _view_payload(session_id)
+    if not p:
+        return HTMLResponse("<p>계획을 찾지 못했어요.</p>", status_code=404)
+    page = _render_share(f"view-{session_id[:8]}", p)
+    css = (STATIC / "style.css").read_text(encoding="utf-8")
+    page = _re.sub(r'<link[^>]+href="/static/style\.css"[^>]*>', lambda m: f"<style>{css}</style>", page)
+    code = (STATIC / "app.js").read_text(encoding="utf-8").replace("</script", r"<\/script")
+    page = _re.sub(r'<script[^>]+src="/static/app\.js"[^>]*></script>', lambda m: f"<script>{code}</script>", page)
+    return Response(page, media_type="text/html; charset=utf-8",
+                    headers={"Content-Disposition": f'attachment; filename="momo-plan-{session_id[:8]}.html"'})
+
+
+@app.get("/view/{session_id}", response_class=HTMLResponse)
+async def view_page(session_id: str):
+    """확정 전 초안도 전체 화면으로(읽기 전용 계획서)."""
+    p = _view_payload(session_id)
+    if not p:
+        return HTMLResponse("<p>계획을 찾지 못했어요.</p>", status_code=404)
+    return _render_share(f"view-{session_id[:8]}", p)
 
 
 @app.get("/plan/{plan_id}/report", response_class=HTMLResponse)

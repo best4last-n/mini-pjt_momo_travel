@@ -24,6 +24,7 @@ from langgraph.graph import END, START, StateGraph
 from . import brochure, costs, data, guardrails, hours, planner, render, retrieve, store, tools
 from .config import DEFAULT_DEPART, STATE_DB, today
 from .llm import MOMO_PERSONA, chat, structured
+from .options import MAX_NIGHTS
 from .schemas import DayPick, ParsedRequest, PickItem
 
 def supported_label() -> str:
@@ -60,6 +61,7 @@ class State(TypedDict, total=False):
     set_req: dict | None
     start_req: dict | None
     cost_req: dict | None
+    pack_req: dict | None
     pending: dict | None        # intake 중 모은 조건(다음 턴에 합침)
     plan: dict | None           # 최신 브로셔 plan (세션 유지)
     ranked: list                # 추천 1~10위 [(place_id, reason)]
@@ -237,10 +239,10 @@ def plan_node(state: State) -> State:
     if nights is None:
         nights = 1
         notes.append("여행 길이를 말씀하지 않아 1박 2일로 짰어요(기본값 적용)")
-    elif nights > 3:
-        notes.append(f"{nights}박 {nights + 1}일은 아직 지원하지 않아요. 저는 최대 3박 4일까지 꼼꼼히 검증할 수 있어서, "
-                     "우선 3박 4일로 줄여 제안드려요. 나머지 날은 나눠서 한 번 더 계획해 보시는 걸 추천해요")
-        nights = 3
+    elif nights > MAX_NIGHTS:
+        notes.append(f"{nights}박 {nights + 1}일은 아직 지원하지 않아요. 최대 {MAX_NIGHTS}박 {MAX_NIGHTS + 1}일까지 꼼꼼히 검증할 수 있어서, "
+                     f"우선 {MAX_NIGHTS}박 {MAX_NIGHTS + 1}일로 줄여 제안드려요")
+        nights = MAX_NIGHTS
     assumed = []
     if not (p.month and p.day) and not p.relative_date:
         assumed.append("date")
@@ -440,7 +442,7 @@ def _intake_reply(state: State, p: ParsedRequest, region: str) -> State:
     """확정 요소가 부족할 때: 한 번에 2~3개만, 선택지 + 지역 맞춤 가이드(가이드 3절)."""
     label = data.region_label(region)
     qs, chips = [], []
-    qs.append("**언제, 며칠** 다녀오실까요? 당일치기부터 3박 4일까지 휴무일·운영시간을 꼼꼼히 맞춰 드려요. "
+    qs.append("**언제, 며칠** 다녀오실까요? 당일치기부터 8박 9일까지 휴무일·운영시간을 꼼꼼히 맞춰 드려요. "
               "위쪽 '여행 시작' 카드의 달력에서 고르셔도 돼요.")
     chips += ["이번 주말 1박 2일", "다음 주말 2박 3일", "당일치기"]
     if not p.departure:
@@ -706,9 +708,9 @@ def start_node(state: State) -> State:
         d1 = d0
     notes, assumed, given = [], [], []
     nights = max(0, (d1 - d0).days)
-    if nights > 3:
-        notes.append("최대 3박 4일까지 검증할 수 있어 3박 4일로 줄였어요")
-        nights = 3
+    if nights > MAX_NIGHTS:
+        notes.append(f"최대 {MAX_NIGHTS}박 {MAX_NIGHTS + 1}일까지 검증할 수 있어 줄였어요")
+        nights = MAX_NIGHTS
     from . import geo
     origin = s.get("origin")
     oloc = geo.locate(origin, s.get("origin_place")) if (origin or s.get("origin_place")) else None
@@ -762,6 +764,33 @@ def start_node(state: State) -> State:
             return {"status": "정보", "stage": "intake", "answer": f"{dep}에서 {data.region_label(rid)}까지 오가는 시간이 길어서 당일치기로는 "
                     "현지에 머물 시간이 1시간도 안 돼요. 더 이른 출발이나 1박 어때요?", "trace": _t(state, "start", s, "시간 창 부족")}
     return _run_plan(state, spec, request, notes, base=None)
+
+
+def pack_node(state: State) -> State:
+    """준비물 체크리스트 체크·추가·삭제 — 일정·상태는 그대로, 즉시 반영(LLM 없음)."""
+    from . import packing
+    op = dict(state.get("pack_req") or {})
+    plan = state.get("plan")
+    if not plan or not state.get("spec") or not plan.get("packing"):
+        return {"status": "오류", "answer": "앗, 준비물을 붙일 계획이 아직 없어요.", "trace": _t(state, "pack", op, "계획 없음")}
+    if op.get("label"):
+        op["label"] = guardrails.mask_pii(str(op["label"]))[0]
+    plan = {**plan, "packing": packing.apply(json.loads(json.dumps(plan["packing"])), op)}
+    spec = spec_from_dict(state["spec"])
+    spec.pack_checked, spec.pack_custom = packing.state_of(plan["packing"])
+    pk = plan["packing"]
+    msg = {"toggle": "체크했어요", "add": "준비물을 추가했어요", "remove": "준비물을 뺐어요"}.get(op.get("op"), "반영했어요")
+    if state.get("plan_id"):
+        saved = store.get_plan(state["plan_id"])
+        if saved:
+            saved["plan"] = plan
+            store.save_plan(state["session_id"], state.get("draft_version") or "", saved)
+    extra = {"draft_version": state.get("draft_version")}
+    if state.get("plan_id"):
+        extra["plan_id"] = state["plan_id"]
+    return {"status": state.get("status") or "승인 대기", "stage": "refine", "answer": f"{msg} (준비 {pk['done']}/{pk['total']})",
+            "spec": spec_to_dict(spec), "plan": plan, "plan_out": plan, "conditions": plan["trip"]["checklist"],
+            "changes": [], "extra": extra, "trace": _t(state, "pack", op, f"{pk['done']}/{pk['total']}")}
 
 
 def cost_node(state: State) -> State:
@@ -823,14 +852,14 @@ def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: d
         return spec, True, value, None
     if key == "end_date":
         try:
-            spec.nights = max(0, min(3, (date.fromisoformat(value) - spec.start).days))
+            spec.nights = max(0, min(MAX_NIGHTS, (date.fromisoformat(value) - spec.start).days))
         except ValueError:
             return spec, False, value, "날짜 형식을 알아보지 못했어요(예: 2026-12-14)."
         a.discard("length")
         return spec, True, value, None
     if key == "length":
         m = re.search(r"(\d)\s*박", value)
-        spec.nights = 0 if "당일" in value else min(3, int(m.group(1))) if m else 1
+        spec.nights = 0 if "당일" in value else min(MAX_NIGHTS, int(m.group(1))) if m else 1
         a.discard("length")
         return spec, True, value, None
     if key == "origin":
@@ -923,7 +952,7 @@ def set_node(state: State) -> State:
                     pass
             elif key == "length":
                 m = re.search(r"(\d)\s*박", value)
-                pend["nights"] = 0 if "당일" in value else min(3, int(m.group(1))) if m else 1
+                pend["nights"] = 0 if "당일" in value else min(MAX_NIGHTS, int(m.group(1))) if m else 1
             elif key == "origin":
                 pend["departure"] = value
             elif key in ("long_transport", "local_transport", "intensity"):
@@ -1165,13 +1194,14 @@ def build_graph(checkpointer=None):
     g.add_node("setcond", set_node)
     g.add_node("start", start_node)
     g.add_node("cost", cost_node)
+    g.add_node("pack", pack_node)
     g.add_node("guard_out", guard_out)
     g.add_edge(START, "guard_in")
     g.add_conditional_edges("guard_in", lambda s: "guard_out" if s.get("status") == "거절"
-                            else {"approve": "approve", "edit": "edit", "set": "setcond", "start": "start", "cost": "cost"}.get(s.get("action") or "", "parse"))
+                            else {"approve": "approve", "edit": "edit", "set": "setcond", "start": "start", "cost": "cost", "pack": "pack"}.get(s.get("action") or "", "parse"))
     g.add_conditional_edges("parse", route_parsed, {"plan": "plan", "modify": "modify", "info": "info",
                                                     "approve_chat": "approve_chat", "reject": "reject"})
-    for n in ("plan", "modify", "info", "approve_chat", "reject", "approve", "edit", "setcond", "start", "cost"):
+    for n in ("plan", "modify", "info", "approve_chat", "reject", "approve", "edit", "setcond", "start", "cost", "pack"):
         g.add_edge(n, "guard_out")
     g.add_edge("guard_out", END)
     return g.compile(checkpointer=checkpointer)
@@ -1190,7 +1220,7 @@ def graph():
 
 def handle_query(question: str, session_id: str | None = None, action: str | None = None,
                  draft_version: str | None = None, edit: dict | None = None, set_req: dict | None = None,
-                 start_req: dict | None = None, cost_req: dict | None = None) -> dict:
+                 start_req: dict | None = None, cost_req: dict | None = None, pack_req: dict | None = None) -> dict:
     """POST /query 본체. 질문은 그래프에 들어가기 전에 마스킹(LangSmith 업로드 전 포함)."""
     new_session = not session_id
     sid = session_id or uuid.uuid4().hex
@@ -1202,7 +1232,7 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
         set_req = {**set_req, "value": guardrails.mask_pii(set_req["value"])[0]}
     out = graph().invoke({"question": masked, "action": action, "draft_version_in": draft_version,
                           "session_id": sid, "edit": edit, "set_req": set_req, "start_req": start_req,
-                          "cost_req": cost_req}, cfg)
+                          "cost_req": cost_req, "pack_req": pack_req}, cfg)
     answer = out.get("answer", "")
     if found:
         answer = "개인정보(" + ", ".join(found) + ")는 가려 두었어요. 출발지는 시·구 단위로만 쓸게요.\n\n" + answer

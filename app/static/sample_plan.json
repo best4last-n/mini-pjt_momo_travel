@@ -58,9 +58,11 @@
      "당일치기",
      "1박 2일",
      "2박 3일",
-     "3박 4일"
+     "3박 4일",
+     "4박 5일",
+     "6박 7일"
     ],
-    "hint": "최대 3박 4일까지 휴무일·운영시간을 검증해요."
+    "hint": "최대 8박 9일까지 휴무일·운영시간을 검증해요. 길수록 한 지역 안에서 일정이 여유로워져요."
    },
    {
     "key": "origin",
@@ -87,7 +89,8 @@
     "options": [
      "자차",
      "KTX·SRT",
-     "고속·시외버스"
+     "고속·시외버스",
+     "비행기"
     ],
     "hint": "구례는 관광지 사이 버스가 드물어요. KTX로 순천역까지 온 뒤 역에서 렌터카를 빌리는 조합을 가장 추천해요."
    },
@@ -1222,8 +1225,8 @@
      "place_id": "2858584",
      "name": "남녘들밥상",
      "type": "meal",
-     "arrive": "12:00",
-     "depart": "13:00",
+     "arrive": "12:20",
+     "depart": "13:20",
      "stay_min": 60,
      "hours_status": "확인됨",
      "reason": "국가정원 근처 꼬막정식 한상",
@@ -1236,8 +1239,8 @@
      "place_id": "1919548",
      "name": "순천만국가정원",
      "type": "place",
-     "arrive": "13:15",
-     "depart": "15:15",
+     "arrive": "13:35",
+     "depart": "15:35",
      "stay_min": 120,
      "hours_status": "확인됨",
      "reason": "평지 산책로가 많아 부모님과 걷기 편해요",
@@ -1250,8 +1253,8 @@
      "place_id": "126730",
      "name": "순천만습지",
      "type": "place",
-     "arrive": "15:40",
-     "depart": "16:40",
+     "arrive": "16:00",
+     "depart": "17:00",
      "stay_min": 60,
      "hours_status": "확인됨",
      "reason": "갈대밭 데크길에서 겨울 철새를 볼 수 있어요",
@@ -1666,8 +1669,8 @@
     "mode": "KTX·SRT",
     "label": "경기 → 순천/구례",
     "depart": "07:30",
-    "arrive": "10:10",
-    "duration_min": 160,
+    "arrive": "11:35",
+    "duration_min": 245,
     "estimated": true
    },
    "inbound": {
@@ -1686,6 +1689,344 @@
   "사성암(구례): 오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요.",
   "순천 낙안읍성: 넓은 평야 지대에 조성된 성곽으로 급경사는 없으나, 성곽 위를 걷는 구간은 높이 4m 정도이며 1,410m 거리를 도보로 이동해야 하므로 체력 안배가 필요합니다. 주차장 위치와 성문까지 거리는 현장 확인이 필요합니다."
  ],
+ "weather": [
+  {
+   "date": "2026-12-12",
+   "kind": "seasonal",
+   "icon": "☀️",
+   "summary": "평년 기준",
+   "tmin": -2,
+   "tmax": 8,
+   "pop": 20,
+   "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+  },
+  {
+   "date": "2026-12-13",
+   "kind": "seasonal",
+   "icon": "☀️",
+   "summary": "평년 기준",
+   "tmin": -2,
+   "tmax": 8,
+   "pop": 20,
+   "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+  },
+  {
+   "date": "2026-12-14",
+   "kind": "seasonal",
+   "icon": "☀️",
+   "summary": "평년 기준",
+   "tmin": -2,
+   "tmax": 8,
+   "pop": 20,
+   "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+  }
+ ],
+ "transport_guide": {
+  "mode": "KTX·SRT",
+  "estimated": true,
+  "options": [
+   {
+    "name": "수원역 → 구례구역",
+    "from": "수원역",
+    "to": "구례구역",
+    "operator": "KTX",
+    "access_min": 45,
+    "ride_min": 140,
+    "egress_min": 40,
+    "wait_min": 20,
+    "total_min": 245,
+    "best": true
+   },
+   {
+    "name": "수서역 → 구례구역",
+    "from": "수서역",
+    "to": "구례구역",
+    "operator": "SRT",
+    "access_min": 40,
+    "ride_min": 150,
+    "egress_min": 40,
+    "wait_min": 20,
+    "total_min": 250,
+    "best": false
+   },
+   {
+    "name": "수원역 → 순천역",
+    "from": "수원역",
+    "to": "순천역",
+    "operator": "KTX",
+    "access_min": 45,
+    "ride_min": 150,
+    "egress_min": 45,
+    "wait_min": 20,
+    "total_min": 260,
+    "best": false
+   },
+   {
+    "name": "광명역 → 구례구역",
+    "from": "광명역",
+    "to": "구례구역",
+    "operator": "KTX",
+    "access_min": 50,
+    "ride_min": 150,
+    "egress_min": 40,
+    "wait_min": 20,
+    "total_min": 260,
+    "best": false
+   }
+  ],
+  "booking": [
+   {
+    "label": "SRT 예매",
+    "url": "https://etk.srail.kr"
+   },
+   {
+    "label": "코레일 승차권 예매",
+    "url": "https://www.letskorail.com"
+   }
+  ],
+  "tips": [
+   "주말·연휴는 2~3주 전 예매를 권해요(매월 출발 한 달 전부터 열려요)",
+   "직통 여부와 정확한 소요시간은 예매 사이트에서 확인해 주세요",
+   "구례구역 근처 렌터카는 미리 예약해 두면 역에서 바로 받을 수 있어요"
+  ],
+  "legs": [
+   {
+    "type": "access",
+    "from": "경기 성남시 분당구 판교동",
+    "to": "수원역",
+    "minutes": 45,
+    "note": "자차·택시·대중교통 추정"
+   },
+   {
+    "type": "checkin",
+    "from": "수원역",
+    "to": "수원역",
+    "minutes": 20,
+    "note": "승차 대기"
+   },
+   {
+    "type": "ride",
+    "from": "수원역",
+    "to": "구례구역",
+    "minutes": 140,
+    "note": "KTX"
+   },
+   {
+    "type": "egress",
+    "from": "구례구역",
+    "to": "순천/구례",
+    "minutes": 40,
+    "note": "렌터카"
+   }
+  ],
+  "fuel": [],
+  "summary": "경기 성남시 분당구 판교동 → 수원역(약 45분) → KTX → 구례구역(약 140분) → 렌터카",
+  "total_min": 245
+ },
+ "packing": {
+  "common": [
+   {
+    "id": "p2b4af282",
+    "label": "신분증",
+    "category": "필수",
+    "reason": "숙박·렌터카·항공 탑승에 필요해요",
+    "checked": false
+   },
+   {
+    "id": "pf9bb7e5e",
+    "label": "휴대폰·충전기",
+    "category": "필수",
+    "reason": "지도·예약 확인용",
+    "checked": false
+   },
+   {
+    "id": "pdf633930",
+    "label": "보조배터리",
+    "category": "필수",
+    "reason": "이동이 길면 배터리가 빨리 닳아요",
+    "checked": false
+   },
+   {
+    "id": "p1f5f6140",
+    "label": "카드·약간의 현금",
+    "category": "필수",
+    "reason": "시장·주차장은 현금만 받는 곳도 있어요",
+    "checked": false
+   },
+   {
+    "id": "p43029994",
+    "label": "상비약(소화제·진통제·밴드)",
+    "category": "건강",
+    "reason": "현지 약국 찾기 어려운 시간 대비",
+    "checked": false
+   },
+   {
+    "id": "p0fb5bab6",
+    "label": "세면도구·잠옷",
+    "category": "숙박",
+    "reason": "2박 숙박",
+    "checked": false
+   },
+   {
+    "id": "p6e6d03dd",
+    "label": "갈아입을 옷 2벌",
+    "category": "옷",
+    "reason": "날짜 수만큼",
+    "checked": false
+   },
+   {
+    "id": "pd6b207d1",
+    "label": "운전면허증(렌터카 필수)",
+    "category": "차량",
+    "reason": "대여 시 면허 확인",
+    "checked": false
+   },
+   {
+    "id": "pf9d92fc6",
+    "label": "렌터카 예약 확인 문자",
+    "category": "교통",
+    "reason": "픽업 장소·시간 확인",
+    "checked": false
+   },
+   {
+    "id": "p5d39921f",
+    "label": "승차권(앱 QR)",
+    "category": "교통",
+    "reason": "역에서 바로 탑승",
+    "checked": false
+   },
+   {
+    "id": "paa3d048a",
+    "label": "복용 중인 약",
+    "category": "어르신",
+    "reason": "일정 중 시간 맞춰 복용",
+    "checked": false
+   },
+   {
+    "id": "p42b1c7bc",
+    "label": "휴대용 방석·지팡이(필요 시)",
+    "category": "어르신",
+    "reason": "오래 걷거나 앉을 때",
+    "checked": false
+   },
+   {
+    "id": "p4032ce0b",
+    "label": "경비 기록 앱·영수증 챙기기",
+    "category": "경비",
+    "reason": "여행 후 정산 리포트에 입력",
+    "checked": false
+   }
+  ],
+  "by_day": [
+   {
+    "date": "2026-12-12",
+    "day": 1,
+    "weather": {
+     "date": "2026-12-12",
+     "kind": "seasonal",
+     "icon": "☀️",
+     "summary": "평년 기준",
+     "tmin": -2,
+     "tmax": 8,
+     "pop": 20,
+     "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+    },
+    "items": [
+     {
+      "id": "p51a8c557",
+      "label": "두꺼운 외투·장갑·목도리",
+      "category": "날씨",
+      "reason": "아침 최저 -2°C",
+      "checked": false
+     },
+     {
+      "id": "pfddf127d",
+      "label": "핫팩",
+      "category": "날씨",
+      "reason": "야외 관람 시 손 시림",
+      "checked": false
+     }
+    ]
+   },
+   {
+    "date": "2026-12-13",
+    "day": 2,
+    "weather": {
+     "date": "2026-12-13",
+     "kind": "seasonal",
+     "icon": "☀️",
+     "summary": "평년 기준",
+     "tmin": -2,
+     "tmax": 8,
+     "pop": 20,
+     "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+    },
+    "items": [
+     {
+      "id": "pfb4ab0ac",
+      "label": "두꺼운 외투·장갑·목도리",
+      "category": "날씨",
+      "reason": "아침 최저 -2°C",
+      "checked": false
+     },
+     {
+      "id": "pffe13315",
+      "label": "핫팩",
+      "category": "날씨",
+      "reason": "야외 관람 시 손 시림",
+      "checked": false
+     },
+     {
+      "id": "p9f0e7059",
+      "label": "편한 운동화",
+      "category": "사찰/등산",
+      "reason": "화엄사, 사성암(구례) — 걷는 길·계단이 있어요",
+      "checked": false
+     },
+     {
+      "id": "p58f27c07",
+      "label": "단정한 복장(사찰 예절)",
+      "category": "사찰/등산",
+      "reason": "법당 출입 시",
+      "checked": false
+     }
+    ]
+   },
+   {
+    "date": "2026-12-14",
+    "day": 3,
+    "weather": {
+     "date": "2026-12-14",
+     "kind": "seasonal",
+     "icon": "☀️",
+     "summary": "평년 기준",
+     "tmin": -2,
+     "tmax": 8,
+     "pop": 20,
+     "note": "예보 범위(약 16일) 밖이라 평년 기준이에요"
+    },
+    "items": [
+     {
+      "id": "p47a5e8db",
+      "label": "두꺼운 외투·장갑·목도리",
+      "category": "날씨",
+      "reason": "아침 최저 -2°C",
+      "checked": false
+     },
+     {
+      "id": "p3c06a8c7",
+      "label": "핫팩",
+      "category": "날씨",
+      "reason": "야외 관람 시 손 시림",
+      "checked": false
+     }
+    ]
+   }
+  ],
+  "custom": [],
+  "done": 0,
+  "total": 21
+ },
  "costs": {
   "currency": "KRW",
   "people": 4,

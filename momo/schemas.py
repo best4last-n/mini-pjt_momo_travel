@@ -20,7 +20,7 @@ class ParsedRequest(BaseModel):
     month: int | None = Field(None, description="여행 시작 월(숫자). 말하지 않았으면 null")
     day: int | None = Field(None, description="여행 시작 일(숫자, 검증하지 말고 말한 그대로 예: 30). 없으면 null")
     relative_date: str | None = Field(None, description="'이번 주말','다음 주말','내일' 같은 상대 표현 그대로. 없으면 null")
-    nights: int | None = Field(None, description="숙박 수. 당일·당일치기·하루 코스=0, 1박 2일=1, 3박 4일=3. 말하지 않았으면 null")
+    nights: int | None = Field(None, description="숙박 수. 당일·당일치기·하루 코스=0, 1박 2일=1, 3박 4일=3, 일주일=6(최대 8). 말하지 않았으면 null")
     departure: str | None = Field(None, description="출발지 지명(시·도 또는 시·군·구 이름만, 상세 주소 금지). 없으면 null")
     depart_time: str | None = Field(None, description="출발 시각 HH:MM. 없으면 null")
     transport: Literal["자차", "대중교통"] | None = Field(None, description="차·자가용=자차, KTX·기차·버스=대중교통. 없으면 null")
@@ -33,8 +33,8 @@ class ParsedRequest(BaseModel):
     send_request: bool = Field(False, description="문자·이메일·카톡 등으로 보내 달라는 요청이 있으면 true")
     intensity: Literal["빡빡", "보통", "여유"] | None = Field(
         None, description="여행 강도. '많이/최대한/빡빡하게'=빡빡, '여유롭게/쉬엄쉬엄/천천히'=여유, 말하지 않았으면 null")
-    long_transport: Literal["자차", "KTX·SRT", "고속·시외버스"] | None = Field(
-        None, description="출발지에서 여행지까지 이동. 차·자가용=자차, KTX·SRT·기차=KTX·SRT, 고속·시외버스=고속·시외버스. 없으면 null")
+    long_transport: Literal["자차", "KTX·SRT", "고속·시외버스", "비행기"] | None = Field(
+        None, description="출발지에서 여행지까지 이동. 차·자가용=자차, KTX·SRT·기차=KTX·SRT, 고속·시외버스=고속·시외버스, 비행기·항공=비행기. 없으면 null")
     local_transport: Literal["자차", "렌터카", "대중교통"] | None = Field(
         None, description="여행지 안 이동. 차로 가면 자차, 렌터카·렌트, 버스·택시·대중교통. 없으면 null")
     companion_type: Literal["보통", "노약자", "어린이·유아"] | None = Field(

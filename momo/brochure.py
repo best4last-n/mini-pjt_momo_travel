@@ -14,7 +14,7 @@ KIND_KO = {"attraction": "관광", "restaurant": "음식점", "lodging": "숙박
 CHECK_OPTIONS = {
     "intensity": ["빡빡", "보통", "여유"],
     "companions": ["보통", "노약자", "어린이·유아"],
-    "long_transport": ["자차", "KTX·SRT", "고속·시외버스"],
+    "long_transport": ["자차", "KTX·SRT", "고속·시외버스", "비행기"],
     "local_transport": ["자차", "렌터카", "대중교통"],
 }
 RURAL = {"suncheon_gurye"}   # 대중교통 배차가 드문 군 지역 포함 권역
@@ -128,7 +128,7 @@ def checklist(spec) -> list[dict]:
          "status": _status("date", a), "input": "date", "options": [],
          "hint": "날짜에 따라 휴무일·운영시간·축제가 달라져요."},
         {"key": "length", "label": "여행 길이", "value": length, "status": _status("length", a), "input": "select",
-         "options": ["당일치기", "1박 2일", "2박 3일", "3박 4일"], "hint": "최대 3박 4일까지 휴무일·운영시간을 검증해요."},
+         "options": ["당일치기", "1박 2일", "2박 3일", "3박 4일", "4박 5일", "6박 7일"], "hint": "최대 8박 9일까지 휴무일·운영시간을 검증해요. 길수록 한 지역 안에서 일정이 여유로워져요."},
         {"key": "origin", "label": "출발지", "value": spec.origin_label or spec.departure or "미정",
          "status": _status("origin", a, missing=no_origin), "input": "text",
          "options": ["서울", "경기 수원", "대전", "광주", "부산", "대구"],
@@ -283,6 +283,13 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
         "warnings": warnings,
     }
     out["trip"]["progress"] = progress(out["trip"]["checklist"])
+    from . import hubs, packing, planner as _pl
+    out["weather"] = packing.weather_days(spec.region, spec.days)
+    out["transport_guide"] = hubs.guide(spec, _pl.one_way_minutes(spec))
+    if out["transport_guide"] and out["transport_guide"].get("fuel"):
+        for f in out["transport_guide"]["fuel"][:2]:
+            warnings.append(f"⛽ {f['at']}: {f['text']}")
+    out["packing"] = packing.build(spec, out, out["weather"])
     from . import costs
     out["costs"] = costs.estimate(spec, out)
     if out["costs"]["over_budget"]:
