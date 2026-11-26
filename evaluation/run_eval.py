@@ -64,7 +64,17 @@ def save(p: Path, obj) -> None:
 
 # ---------------- 1) 응답 수집 ----------------
 
+def git_commit() -> str:
+    c = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "momo", "app", "evaluation/run_eval.py",
+                                 "evaluation/test_queries.csv"], cwd=ROOT, capture_output=True, text=True).stdout.strip())
+    return c + ("+dirty" if dirty else "")
+
+
 def collect(rnd: int) -> None:
+    meta = load(path(rnd, "meta"), {})
+    meta.setdefault("responses_commit", git_commit())
+    save(path(rnd, "meta"), meta)
     from fastapi.testclient import TestClient
     from app.main import app
     from momo import store
@@ -251,7 +261,7 @@ def ragas_eval(rnd: int) -> None:
     from ragas.run_config import RunConfig
 
     region = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
-    llm = LangchainLLMWrapper(ChatBedrockConverse(model=JUDGE_MODEL, region_name=region, temperature=0, max_tokens=4000))
+    llm = LangchainLLMWrapper(ChatBedrockConverse(model=JUDGE_MODEL, region_name=region, temperature=0, max_tokens=8000))
     emb = LangchainEmbeddingsWrapper(BedrockEmbeddings(model_id="amazon.titan-embed-text-v2:0",
                                                        client=boto3.client("bedrock-runtime", region_name=region)))
     resp = load(path(rnd, "responses"), {})
@@ -267,7 +277,7 @@ def ragas_eval(rnd: int) -> None:
         ids.append(cid)
     ds = EvaluationDataset.from_list(samples)
     res = evaluate(ds, metrics=[Faithfulness(), ResponseRelevancy(), LLMContextPrecisionWithReference(), LLMContextRecall()],
-                   llm=llm, embeddings=emb, run_config=RunConfig(max_workers=2, timeout=180), show_progress=False)
+                   llm=llm, embeddings=emb, run_config=RunConfig(max_workers=2, timeout=300, max_retries=3), show_progress=False)
     df = res.to_pandas()
     cols = {"faithfulness": "faithfulness", "answer_relevancy": "answer_relevancy",
             "context_precision": "llm_context_precision_with_reference", "context_recall": "context_recall"}
@@ -297,9 +307,8 @@ def report(rnd: int) -> None:
     rg = load(path(rnd, "ragas"), {})
     rows = load_rows()
     sha = hashlib.sha256(CSV.read_bytes()).hexdigest()
-    commit = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "momo", "app", "evaluation/run_eval.py",
-                                 "evaluation/test_queries.csv"], cwd=ROOT, capture_output=True, text=True).stdout.strip())
+    commit = git_commit()
+    meta = load(path(rnd, "meta"), {})
     passed = sum(1 for x in jd.values() if x["passed"])
     guard = [x for x in jd.values() if x["category"] == "guardrail"]
     cats: dict[str, list] = {}
@@ -309,7 +318,8 @@ def report(rnd: int) -> None:
                "guardrail_passed": sum(x["passed"] for x in guard), "guardrail_total": len(guard),
                "by_category": {k: f"{sum(v)}/{len(v)}" for k, v in cats.items()},
                "rule_violations_total": sum(len(r["violations"]) for x in jd.values() for r in x["runs"]),
-               "csv_sha256": sha, "commit": commit + ("+dirty" if dirty else ""), "today": "2026-11-25",
+               "csv_sha256": sha, "commit": commit, "responses_commit": meta.get("responses_commit", commit),
+               "notes": meta.get("notes", []), "today": "2026-11-25",
                "judge_model": JUDGE_MODEL, "ragas": rg.get("average"), "ragas_n": rg.get("n"),
                "avg_latency_sec": round(sum(r["_sec"] for x in resp.values() for r in x["runs"]) /
                                         max(1, sum(len(x["runs"]) for x in resp.values())), 1)}
@@ -317,7 +327,8 @@ def report(rnd: int) -> None:
     target = "70% 이상(14건+)" if rnd == 1 else "85% 이상(17건+)"
     md = [f"# Round {rnd} 자체 평가 리포트", "",
           f"- 실행: `python evaluation/run_eval.py --round {rnd}` · 평가 기준일 2026-11-25(MOMO_TODAY) · 채점 모델 {JUDGE_MODEL}(temperature 0)",
-          f"- 채점 장치 고정 증거: test_queries.csv SHA-256 `{sha}` · 커밋 `{summary['commit']}`",
+          f"- 채점 장치 고정 증거: test_queries.csv SHA-256 `{sha}` · 응답 수집 커밋 `{summary['responses_commit']}` · 채점 실행 커밋 `{summary['commit']}`",
+          *[f"- 비고: {n}" for n in summary["notes"]],
           f"- 수집 데이터: 경주 60곳 + 순천/구례 60곳 (수원은 2차 전 보강 예정)", "",
           "## 결과 요약", "",
           f"| 항목 | 결과 | 목표 |", "|---|---|---|",
@@ -331,6 +342,13 @@ def report(rnd: int) -> None:
                "| 지표 | 값 | 프로젝트 기준 |", "|---|---|---|"]
         md += [f"| {k} | {rg['average'].get(k)} | ≥ {v} |" for k, v in RAGAS_TARGET.items()]
         md += ["", f"- 대상 {rg['n']}건, 제외(contexts 없음: 거절·되묻기·지원 밖 안내 등) {', '.join('#' + c for c in rg['excluded_no_context'])}", ""]
+    md += ["## RAGAS 해석", "",
+           "- **contexts 구성**: 장소 문서(관광공사) + 일정 생성에 쓴 도구·코드 판정 결과(조건 구조화, 날씨, 이동시간 추정, 운영시간·규칙 검사). "
+           "1차 응답은 장소 문서만 담고 있어, 코드가 계산한 시각·이동시간·기본값 안내 문장이 '근거 없음'으로 판정되었다(2차부터 도구 결과 포함).",
+           "- **context_recall의 구조적 한계**: 기준 정답(reference)은 공정성을 위해 1차 전에 고정했고, '~라고 안내한다' 같은 기대 동작 서술이 많다. "
+           "이런 문장은 어떤 검색 문서로도 뒷받침될 수 없어 context_recall 상한이 낮다. 기준 정답은 바꾸지 않고 이 한계를 그대로 보고한다.",
+           "- **answer_relevancy**: 모모 말투·기본값 안내·출처 문구가 답변에 함께 있어, 답변에서 역으로 만든 질문과 원 질문의 유사도가 낮아지는 경향이 있다.",
+           "- RAGAS는 케이스 통과 판정과 별도 지표이며, 기준치는 프로젝트 자체 기준이다.", ""]
     md += ["## 케이스별", "", "| # | 분류 | status | 결과 | 실패 사유 |", "|---|---|---|---|---|"]
     for r in rows:
         x = jd.get(r["id"])
