@@ -1237,3 +1237,67 @@ body.view-full .app, body.view-full .convo { overflow: visible !important; }
 .ps-far-msg { font-size: var(--text-md); line-height: var(--leading-body); }
 .ps-item.far { background: var(--feedback-warn-bg); border-color: color-mix(in srgb, var(--feedback-warn) 30%, transparent); }
 .ps-var { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-2); }
+
+/* ───────── 5차: 자차 경로 카드 · 경로 CCTV · 직접 추가 ───────── */
+.tg-drive { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-3); align-items: start; padding: var(--space-3) var(--space-4); border-radius: var(--radius-m); background: var(--color-brand-soft); border: 1px solid color-mix(in srgb, var(--color-brand) 25%, transparent); }
+.tg-drive-ico { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; background: var(--color-brand); color: var(--color-brand-contrast); }
+.tg-drive-ico .ico { width: 22px; height: 22px; }
+.tg-drive-b { display: flex; flex-direction: column; gap: var(--space-1); min-width: 0; }
+.tg-drive-route { font-size: var(--text-base); }
+.tg-drive-nums { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); font-size: var(--text-md); color: var(--color-text-muted); }
+.tg-drive-nums b { font-size: var(--text-xl); color: var(--color-text); font-variant-numeric: tabular-nums; }
+.tg-traffic { font-size: var(--text-sm); color: var(--feedback-warn); }
+.tg-src { font-size: var(--text-xs); color: var(--color-text-subtle); }
+.tg-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.tg-alt { border-top: 1px dashed var(--color-border-strong); padding-top: var(--space-2); }
+.tg-alt summary { cursor: pointer; font-size: var(--text-md); color: var(--color-text-muted); }
+.tg-alt[open] summary { margin-bottom: var(--space-2); }
+.tg-alt .tbl { font-size: var(--text-sm); color: var(--color-text-muted); }
+
+.cctv-box { display: flex; flex-direction: column; gap: var(--space-2); }
+.cctv-h { font-weight: 700; font-size: var(--text-md); }
+.cctv-h .muted { font-weight: 400; font-size: var(--text-xs); margin-left: var(--space-1); }
+.cctv-none { font-size: var(--text-md); color: var(--color-text-muted); background: var(--color-surface-2); border: 1px dashed var(--color-border-strong); border-radius: var(--radius-m); padding: var(--space-3); }
+.cctv-grid { list-style: none; display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: var(--space-2); }
+.cctv-c {
+  width: 100%; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; min-height: var(--control-h-md); padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--card-border); background: var(--card-bg); border-radius: var(--radius-m); text-align: left; font-size: var(--text-md);
+}
+.cctv-c:hover { border-color: var(--color-brand); background: var(--state-hover-bg); }
+.cctv-c:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.cctv-c .ico { color: var(--color-text-subtle); }
+.cctv-n { flex: 1; min-width: 0; }
+.cctv-dlg { width: min(720px, 96vw); border: 0; border-radius: var(--radius-l); padding: var(--space-4); background: var(--card-bg); color: var(--color-text); box-shadow: var(--shadow-2); }
+.cctv-dlg::backdrop { background: var(--color-overlay); }
+.cctv-dh { display: flex; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); }
+.cctv-dh h2 { font-size: var(--text-lg); flex: 1; }
+.cctv-v { position: relative; background: var(--c-black); border-radius: var(--radius-m); overflow: hidden; aspect-ratio: 16 / 9; }
+.cctv-v video { width: 100%; height: 100%; display: block; }
+.cctv-err { position: absolute; inset: auto 0 0 0; padding: var(--space-3); background: var(--color-surface); font-size: var(--text-md); }
+.cctv-src { font-size: var(--text-xs); color: var(--color-text-subtle); margin-top: var(--space-2); }
+
+.mk.cam { background: var(--map-search); color: var(--map-marker-ring); }
+.mk.cam .ico { width: 12px; height: 12px; }
+.mk.home { background: var(--map-marker-ring); color: var(--c); border: 2px solid var(--c); }
+.mk.home .ico { width: 14px; height: 14px; }
+.route-tab { margin-left: auto; }
+.route-tab .ico { width: 14px; height: 14px; }
+.map.picking, .map.picking .leaflet-interactive { cursor: crosshair !important; }
+
+.badge.kakao { color: var(--c-gray-800); background: color-mix(in srgb, var(--c-amber-300) 45%, var(--color-surface)); }
+.badge.naver { color: var(--feedback-success); background: var(--feedback-success-bg); }
+.ps-meta2 { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-3); font-size: var(--text-xs); color: var(--color-text-muted); }
+.ps-ext { display: inline-flex; align-items: center; gap: 2px; color: var(--color-brand); }
+.ps-ext .ico { width: 11px; height: 11px; }
+.ps-man { margin-top: var(--space-3); padding-top: var(--space-2); border-top: 1px dashed var(--color-border-strong); }
+.ps-man > .linkish { font-size: var(--text-md); }
+.man-form { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: var(--space-2) var(--space-3); margin-top: var(--space-2); }
+.man-form .st-in { margin-top: 0; }
+.man-pick, .man-go, .man-form > p { grid-column: 1 / -1; }
+.man-pick { display: flex; align-items: center; gap: var(--space-3); flex-wrap: wrap; }
+.man-pick .btn.on { border-color: var(--color-brand); background: var(--state-hover-bg); }
+.man-coord { font-size: var(--text-sm); color: var(--color-text-subtle); font-variant-numeric: tabular-nums; }
+.man-coord.set { color: var(--feedback-success); }
+.man-go { display: flex; gap: var(--space-2); justify-content: flex-end; }
+@media (max-width: 520px) { .man-form { grid-template-columns: 1fr; } }
+.man-form input { flex: none; }

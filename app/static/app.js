@@ -95,6 +95,9 @@
 <symbol id="ico-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 <symbol id="ico-pop" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5V13a.5.5 0 0 1-.5.5h-8A.5.5 0 0 1 3 13V5a.5.5 0 0 1 .5-.5H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.6V8l2.3 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-car" viewBox="0 0 16 16"><path d="M2.5 10.5V8.2l1.4-3.4A1.5 1.5 0 0 1 5.3 3.9h5.4a1.5 1.5 0 0 1 1.4.9l1.4 3.4v2.3M2 10.5h12v1.7a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8zM3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="4.8" cy="11.7" r=".9" fill="currentColor"/><circle cx="11.2" cy="11.7" r=".9" fill="currentColor"/></symbol>
+<symbol id="ico-cam" viewBox="0 0 16 16"><rect x="1.8" y="4.2" width="9" height="7.6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 7 14.2 5v6l-3.4-2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="4.5" cy="6.6" r=".8" fill="currentColor"/></symbol>
+<symbol id="ico-home" viewBox="0 0 16 16"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.8h2V13h3V6.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></symbol>
 <symbol id="ico-pin" viewBox="0 0 16 16"><path d="M8 15s5-4.6 5-8.4A5 5 0 0 0 3 6.6C3 10.4 8 15 8 15z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.6" r="1.8" fill="currentColor"/></symbol>
 </defs></svg>`;
   const bird = (cls = "bird") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${BRAND_SPRITE}"/></svg>`;
@@ -159,6 +162,7 @@
     busy: false, openCond: null, mapDay: "all", mobileMapOpen: false,
     expenses: null, progress: null,
     search: { q: "", results: [], loading: false }, pending: {},
+    manual: { open: false, name: "", address: "", lat: null, lng: null, src: null, picking: false, place: null }, cctv: [], routeFit: false,
   };
   const canEdit = () => !READ_ONLY && state.planStatus === "승인 대기";
 
@@ -783,6 +787,7 @@
     const t = inp.dataset.geo;
     if (t === "origin") S.origin_place = null;
     else if (t === "end") S.end_place = null;
+    else if (t === "manual" && state.manual.src === "geo") Object.assign(state.manual, { lat: null, lng: null, src: null, place: null });
     else if (t === "cond") delete condPlace[inp.dataset.key];
   }
   function geoClose() {
@@ -827,6 +832,7 @@
     const t = inp.dataset.geo;
     if (t === "origin") { S.origin = it.label; S.origin_place = it; const end = $('[data-st="end_location"]'); if (end) end.placeholder = `${it.label} (출발지와 같아요)`; }
     else if (t === "end") { S.end_location = it.label; S.end_place = it; }
+    else if (t === "manual") { Object.assign(state.manual, { address: it.label, place: it, lat: it.lat != null ? it.lat : null, lng: it.lng != null ? it.lng : null, src: it.lat != null ? "geo" : null }); geoClose(); paintManual(); return; }
     else if (t === "cond") { condPlace[inp.dataset.key] = it; if (inp.dataset.key === ARR.key) ARR.label = it.label; }
     geoClose();
     inp.focus();
@@ -1385,7 +1391,47 @@
         <label class="sr" for="an-in">장소 찾기</label>
         <input id="an-in" name="q" type="search" data-psearch="1" value="${esc(state.search.q)}" placeholder="예) 사성, 낙안, 꼬막" maxlength="40" autocomplete="off" aria-controls="ps-results">
         <button class="btn sm ghost">찾기</button></form>
-      <div id="ps-results" class="ps-results" aria-live="polite">${searchResultsHtml(days)}</div></section>`;
+      <div id="ps-results" class="ps-results" aria-live="polite">${searchResultsHtml(days)}</div>
+      <div id="ps-manual">${manualHtml(days)}</div></section>`;
+  }
+  /* 검색에 없을 때: 이름 + (주소 자동완성 또는 지도에서 찍기)로 직접 추가 */
+  function manualHtml(days) {
+    const Mn = state.manual;
+    days = days || (state.plan && state.plan.itinerary) || [];
+    const open = Mn.open || (state.search.manual_add && !Mn.closed);
+    const coord = Mn.lat != null ? `${Number(Mn.lat).toFixed(5)}, ${Number(Mn.lng).toFixed(5)}${Mn.src === "map" ? " (지도에서 찍음)" : ""}` : "위치를 아직 정하지 않았어요";
+    return `<div class="ps-man">
+      <button type="button" class="linkish" data-act="man-toggle" aria-expanded="${!!open}" aria-controls="man-form">찾는 곳이 없나요? 직접 추가</button>
+      ${open ? `<form id="man-form" class="man-form" data-form="manual" aria-label="장소 직접 추가">
+        <label class="st-in"><span>장소 이름</span><input type="text" name="name" data-man="name" value="${esc(Mn.name)}" maxlength="40" required autocomplete="off" placeholder="예) 1001카페"></label>
+        <label class="st-in"><span>주소 <small class="muted">선택 · 고르면 위치가 정해져요</small></span><input type="text" name="address" data-man="address" value="${esc(Mn.address)}" maxlength="60" autocomplete="off" placeholder="도로명이나 동 이름"${geoAttrs("manual")}></label>
+        <div class="man-pick"><button type="button" class="btn sm ghost${Mn.picking ? " on" : ""}" data-act="man-pick" aria-pressed="${!!Mn.picking}">${ico("ico-pin")}${Mn.picking ? "지도를 눌러 주세요…" : "지도에서 위치 찍기"}</button>
+          <span class="man-coord${Mn.lat != null ? " set" : ""}">${esc(coord)}</span></div>
+        <div class="man-go"><label class="sr" for="man-day">넣을 날</label>${daySelect(days, "man-day", true)}<button class="btn sm primary">추가</button></div>
+        <p class="small muted">사용자 지정 장소로 넣어요. 운영시간·휴무는 확인이 필요해요.</p></form>` : ""}</div>`;
+  }
+  function paintManual() { const b = $("#ps-manual"); if (b) b.innerHTML = manualHtml(); showManualPin(); }
+  function showManualPin() {
+    if (!M.map || !window.L) return;
+    if (M.manualPin) { M.map.removeLayer(M.manualPin); M.manualPin = null; }
+    const Mn = state.manual;
+    if (Mn.lat == null) return;
+    M.manualPin = L.marker([Number(Mn.lat), Number(Mn.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk search">+</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), title: `직접 추가: ${Mn.name || "새 장소"}` }).addTo(M.map);
+  }
+  function startMapPick() {
+    const Mn = state.manual;
+    if (!window.L) { toast("지도를 불러오지 못해 위치를 찍을 수 없어요. 주소로 골라 주세요."); return; }
+    if (!MQ_PC.matches && !state.mobileMapOpen) { const mb = $('[data-act="m-map"]'); if (mb) mb.click(); }
+    if (!M.map) return;
+    Mn.picking = true; paintManual();
+    M.map.getContainer().classList.add("picking");
+    toast("지도에서 넣을 위치를 눌러 주세요");
+    { const mp = $("#map"); if (mp && !MQ_PC.matches) mp.scrollIntoView({ behavior: scrollBehavior(), block: "center" }); }
+    M.map.once("click", (e) => {
+      Object.assign(Mn, { lat: e.latlng.lat, lng: e.latlng.lng, src: "map", picking: false });
+      M.map.getContainer().classList.remove("picking");
+      paintManual();
+    });
   }
   function searchResultsHtml(days) {
     const R = state.search;
@@ -1394,6 +1440,7 @@
     if (!R.q || R.q.length < 2) return "";
     if (R.error) return `<p class="muted small">${esc(R.error)}</p>`;
     const list = R.results || [];
+    const srcLine = (R.sources || []).length ? `<p class="ps-var">찾아본 곳: ${R.sources.map(esc).join(" · ")}</p>` : "";
     const fallback = `<p class="ps-none">원하는 곳이 없나요? <button type="button" class="linkish" data-act="ps-name" data-q="${esc(R.q)}">'${esc(R.q)}' 이름 그대로 모모에게 찾아 달라고 하기</button></p>`;
     const vars = (R.variants || []).filter((v) => v && v !== R.q);
     const varLine = vars.length ? `<p class="ps-var">찾은 이름 변형: ${vars.map(esc).join(" · ")}</p>` : "";
@@ -1410,17 +1457,22 @@
             <button type="button" class="btn xs primary" data-act="ps-add-far" data-i="${i}">포함할게요</button>
             <button type="button" class="btn xs ghost" data-act="ps-far-no">아니요</button></div></li>`).join("")}</ul>` : ""}
         </div></div>` : "";
-    if (!list.length) return farCard ? farCard + varLine : `<p class="muted small">'${esc(R.q)}'와 비슷한 곳을 찾지 못했어요.</p>${varLine}${fallback}`;
+    if (!list.length) return farCard ? farCard + varLine + srcLine : `<p class="muted small">'${esc(R.q)}'와 비슷한 곳을 찾지 못했어요.</p>${varLine}${srcLine}${fallback}`;
     return `${farCard}${R.note ? `<p class="muted small">${esc(R.note)}</p>` : ""}<ul class="ps-list">${list.map((r, i) => {
-      const osm = /openstreetmap|osm/i.test(r.source || "") || String(r.key || "").indexOf("osm:") === 0;
+      const src = String(r.source || "");
+      const osm = /openstreetmap|osm/i.test(src) || String(r.key || "").indexOf("osm:") === 0;
+      const kakao = /카카오|kakao/i.test(src), naver = /네이버|naver/i.test(src);
+      const badge = kakao ? ["kakao", "카카오맵"] : naver ? ["naver", "네이버"] : osm ? ["draft", "지도"] : ["route", "관광공사"];
+      const ext = /^https:\/\//i.test(r.place_url || "") ? `<a class="ps-ext" href="${esc(r.place_url)}" target="_blank" rel="noopener">${kakao ? "카카오맵에서 보기" : naver ? "네이버에서 보기" : "자세히 보기"} ${ico("ico-pop")}</a>` : "";
       return `<li class="ps-item">
-        <div class="ps-img">${r.image ? `<img src="${esc(r.image)}" alt="" loading="lazy">` : bird("bird")}</div>
-        <div class="ps-body"><p class="ps-name"><b>${esc(r.name)}</b><span class="badge ${osm ? "draft" : "route"}">${osm ? "지도" : "관광공사"}</span>${r.category ? `<span class="tag">${esc(r.category)}</span>` : ""}</p>
+        <div class="ps-img">${r.image ? `<img src="${esc(r.image)}" alt="" loading="lazy" title="${esc(r.image_source ? "사진: " + r.image_source : "")}">` : bird("bird")}</div>
+        <div class="ps-body"><p class="ps-name"><b>${esc(r.name)}</b><span class="badge ${badge[0]}">${badge[1]}</span>${r.category ? `<span class="tag">${esc(r.category)}</span>` : ""}</p>
           <p class="ps-meta">${r.distance_km != null ? `약 ${esc(Number(r.distance_km).toFixed(1))}km` : ""}${r.address ? ` · ${esc(r.address)}` : ""}</p>
-          ${osm ? `<p class="ps-warn">지도 정보라 운영시간 확인이 필요해요</p>` : ""}</div>
+          ${r.phone || ext || (r.image && r.image_source) ? `<p class="ps-meta2">${r.phone ? `<span>${esc(r.phone)}</span>` : ""}${ext}${r.image && r.image_source ? `<span class="muted">사진: ${esc(r.image_source)}</span>` : ""}</p>` : ""}
+          ${osm || kakao || naver ? `<p class="ps-warn">${osm ? "지도 정보라" : "외부 지도 정보라"} 운영시간 확인이 필요해요</p>` : ""}</div>
         <div class="ps-add"><label class="sr" for="ps-d-${i}">넣을 날</label>${daySelect(days, "ps-d-" + i, true)}
           <button type="button" class="btn xs primary" data-act="ps-add" data-i="${i}">넣기</button></div></li>`;
-    }).join("")}</ul>${varLine}${fallback}`;
+    }).join("")}</ul>${varLine}${srcLine}${fallback}`;
   }
   let psTimer = 0, psSeq = 0;
   function placeSearch(q, immediate) {
@@ -1448,7 +1500,8 @@
         }
         if (seq !== psSeq) return;
         state.search = { q, results: ((j && j.results) || []).slice().sort((a, b) => (a.distance_km == null ? 1e9 : a.distance_km) - (b.distance_km == null ? 1e9 : b.distance_km)), note: j && j.note, loading: false,
-          far: (j && j.far) || [], far_message: (j && j.far_message) || "", variants: (j && j.variants) || [], radius_km: j && j.radius_km };
+          far: (j && j.far) || [], far_message: (j && j.far_message) || "", variants: (j && j.variants) || [], radius_km: j && j.radius_km,
+          sources: (j && j.sources) || [], manual_add: !!(j && j.manual_add) };
       } catch (e) {
         if (seq !== psSeq) return;
         state.search = { q, results: [], loading: false, error: e.message || "검색하지 못했어요. 잠시 후 다시 해 주세요." };
@@ -1459,6 +1512,8 @@
   function paintSearch() {
     const box = $("#ps-results");
     if (box) box.innerHTML = searchResultsHtml();
+    const mb = $("#ps-manual");
+    if (mb && !(mb.contains(document.activeElement))) mb.innerHTML = manualHtml();
     showSearchMarkers();
   }
 
@@ -1555,9 +1610,11 @@
   }
 
   /* ───────── 교통 안내 카드 ───────── */
-  const LEG_TYPE = { access: "이동", ride: "탑승", egress: "도착 후", checkin: "수속" };
+  const LEG_TYPE = { access: "이동", ride: "탑승", egress: "도착 후", checkin: "수속", drive: "운전" };
+  const isDrive = (g) => !!g && (g.mode === "자차" || (g.legs || []).some((l) => l.type === "drive"));
   function transportGuide(g) {
     if (!g) return "";
+    if (isDrive(g)) return driveGuide(g);
     const legs = (g.legs || []).map((l, i) => `<li class="tg-leg t-${esc(l.type || "ride")}"><span class="tg-ty">${esc(LEG_TYPE[l.type] || l.type || "")}</span>
       <b>${esc(l.from || "")}${l.to ? ` → ${esc(l.to)}` : ""}</b>${l.minutes != null ? `<span class="tg-min">약 ${fmtMin(l.minutes)}</span>` : ""}${l.note ? `<small>${esc(l.note)}</small>` : ""}</li>`).join("");
     const opts = (g.options || []).length ? `<div class="mm-scroll tg-scroll"><table class="tbl tg-opts"><thead><tr><th scope="col">경로</th><th scope="col">역·공항까지</th><th scope="col">탑승</th><th scope="col">합계</th></tr></thead><tbody>
@@ -1572,6 +1629,114 @@
       ${book ? `<div class="tg-book"><div class="tg-book-b">${book}</div><p class="small muted">예약은 해당 사이트에서 직접 해 주세요. 모모는 예약·결제를 대신하지 않아요.</p></div>` : ""}
       ${(g.tips || []).length ? `<ul class="tg-tips">${g.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
       ${fuel}</section>`;
+  }
+
+  /* 자차: 도로 경로 요약이 주인공, 열차는 '참고'로 접어 둔다 */
+  function driveGuide(g) {
+    const d = (g.legs || []).find((l) => l.type === "drive") || {};
+    const alts = g.alternatives || [];
+    const altTbl = alts.length ? `<details class="tg-alt"><summary>참고: 열차로 가면</summary><div class="mm-scroll tg-scroll"><table class="tbl tg-opts"><thead><tr><th scope="col">경로</th><th scope="col">역까지</th><th scope="col">탑승</th><th scope="col">합계</th></tr></thead><tbody>
+      ${alts.map((o) => `<tr><th scope="row">${esc(o.name)}</th><td class="num-c">${o.access_min != null ? fmtMin(o.access_min) : "-"}</td><td class="num-c">${o.ride_min != null ? fmtMin(o.ride_min) : "-"}</td><td class="num-c">${o.total_min != null ? fmtMin(o.total_min) : "-"}</td></tr>`).join("")}</tbody></table></div></details>` : "";
+    const fuel = (g.fuel || []).length ? `<div class="tg-fuel"><p class="tg-fuel-h"><span aria-hidden="true">⛽</span> 주유 안내</p><ul>${g.fuel.map((f) => `<li><b>${esc(f.at)}</b> ${esc(f.text)}</li>`).join("")}</ul></div>` : "";
+    const hasRoute = Array.isArray(g.route_path) && g.route_path.length > 1;
+    return `<section class="tguide drive" aria-labelledby="tg-h">
+      <div class="tg-head"><h3 id="tg-h">어떻게 가나요?</h3><span class="badge route">자차</span>${g.total_min != null ? `<span class="tg-total">편도 약 <b>${fmtMin(g.total_min)}</b>${g.estimated !== false ? " (추정)" : ""}</span>` : ""}</div>
+      <div class="tg-drive">
+        <div class="tg-drive-ico" aria-hidden="true">${ico("ico-car")}</div>
+        <div class="tg-drive-b">
+          <p class="tg-drive-route"><b>${esc(d.from || "")}</b> → <b>${esc(d.to || "")}</b></p>
+          <p class="tg-drive-nums">${d.distance_km != null ? `<span><b>${esc(Math.round(d.distance_km))}</b> km</span>` : ""}${d.minutes != null ? `<span>약 <b>${fmtMin(d.minutes)}</b></span>` : ""}</p>
+          ${g.summary ? `<p class="tg-sum">${esc(g.summary)}</p>` : ""}
+          ${g.traffic_note ? `<p class="tg-traffic">${esc(g.traffic_note)}</p>` : ""}
+          ${d.note || g.source ? `<p class="tg-src">${esc([...new Set([d.note, g.source].filter(Boolean))].join(" · "))}</p>` : ""}
+        </div>
+      </div>
+      <div class="tg-actions noprint">
+        ${hasRoute ? `<button type="button" class="btn sm ghost" data-act="route-fit">${ico("ico-pin")}지도에서 가는 길 보기</button>` : ""}
+        <button type="button" class="btn sm ghost" data-act="cctv">${ico("ico-cam")}경로 CCTV 보기</button>
+      </div>
+      <div id="cctv-box" class="cctv-box" hidden></div>
+      ${fuel}
+      ${(g.tips || []).length ? `<ul class="tg-tips">${g.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul>` : ""}
+      ${altTbl}</section>`;
+  }
+
+  /* ───────── 경로 CCTV (국가교통정보센터) ───────── */
+  const HLS_SRC = "https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.13/hls.min.js";
+  let hlsLoading = null;
+  const loadHls = () => hlsLoading || (hlsLoading = new Promise((res, rej) => {
+    if (window.Hls) return res(window.Hls);
+    const s = document.createElement("script"); s.src = HLS_SRC; s.crossOrigin = "anonymous";
+    s.onload = () => res(window.Hls); s.onerror = () => { hlsLoading = null; rej(new Error("hls")); };
+    document.head.appendChild(s);
+  }));
+  async function loadCctv() {
+    const box = $("#cctv-box");
+    if (!box) return;
+    box.hidden = false;
+    box.innerHTML = `<p class="muted small">CCTV 목록을 불러오는 중이에요…</p>`;
+    let j = null;
+    if (DEMO) j = { available: false, message: "데모 모드에서는 CCTV를 불러오지 않아요. 실제 상담 화면에서 국가교통정보센터 CCTV를 볼 수 있어요." };
+    else { try { const r = await fetch("/traffic/cctv?session_id=" + encodeURIComponent(state.sessionId || "")); j = await r.json(); } catch (e) { j = null; } }
+    if (!j || !j.available || !(j.items || []).length) {
+      state.cctv = [];
+      box.innerHTML = `<p class="cctv-none">${esc((j && j.message) || "지금은 경로 CCTV를 불러올 수 없어요.")}</p>`;
+      showCctvMarkers();
+      return;
+    }
+    state.cctv = j.items;
+    box.innerHTML = `<p class="cctv-h">경로 CCTV <span class="muted">${esc(j.items.length)}곳 · 출처: ${esc(j.source || "국가교통정보센터")}</span></p>
+      <ul class="cctv-grid">${j.items.map((c, i) => `<li><button type="button" class="cctv-c" data-act="cctv-play" data-i="${i}">${ico("ico-cam")}<span class="cctv-n">${esc(c.name)}</span>${c.road ? `<span class="badge ${c.road === "고속도로" ? "user" : "draft"}">${esc(c.road)}</span>` : ""}</button></li>`).join("")}</ul>`;
+    showCctvMarkers();
+  }
+  function showCctvMarkers() {
+    if (!M.map || !window.L) return;
+    if (M.cctv) { M.map.removeLayer(M.cctv); M.cctv = null; }
+    const list = (state.cctv || []).filter((c) => c.lat != null && c.lng != null);
+    if (!list.length) return;
+    M.cctv = L.layerGroup();
+    list.forEach((c) => {
+      const i = state.cctv.indexOf(c);
+      L.marker([Number(c.lat), Number(c.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk cam">${ico("ico-cam")}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }), title: `CCTV ${c.name}`, alt: `CCTV ${c.name}` })
+        .on("click", () => playCctv(i)).addTo(M.cctv);
+    });
+    M.cctv.addTo(M.map);
+  }
+  let hlsInst = null;
+  function cctvDialog() {
+    let d = $("#cctv-dlg");
+    if (!d) {
+      d = document.createElement("dialog");
+      d.id = "cctv-dlg"; d.className = "cctv-dlg"; d.setAttribute("aria-labelledby", "cctv-t");
+      document.body.appendChild(d);
+      d.addEventListener("close", () => { if (hlsInst) { hlsInst.destroy(); hlsInst = null; } const v = $("video", d); if (v) { v.pause(); v.removeAttribute("src"); } });
+    }
+    return d;
+  }
+  async function playCctv(i) {
+    const c = (state.cctv || [])[i];
+    if (!c) return;
+    const d = cctvDialog();
+    const safeUrl = /^https?:\/\//i.test(c.url || "") ? c.url : "";
+    d.innerHTML = `<div class="cctv-dh"><h2 id="cctv-t">${esc(c.name)}</h2>${c.road ? `<span class="badge draft">${esc(c.road)}</span>` : ""}<button type="button" class="x" data-act="cctv-close" aria-label="닫기">×</button></div>
+      <div class="cctv-v"><video muted autoplay playsinline controls aria-label="${esc(c.name)} CCTV 영상"></video><p class="cctv-err" hidden>영상을 바로 재생하지 못했어요. ${safeUrl ? `<a href="${esc(safeUrl)}" target="_blank" rel="noopener">새 창에서 보기</a>` : ""}</p></div>
+      <p class="cctv-src">영상 출처: 국가교통정보센터(ITS) · 실시간 영상은 몇 초 늦을 수 있어요</p>`;
+    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+    const v = $("video", d), err = $(".cctv-err", d);
+    const fail = () => { err.hidden = false; };
+    if (!safeUrl) { fail(); return; }
+    v.addEventListener("error", fail);
+    const isHls = /\.m3u8(\?|$)/i.test(safeUrl) || /hls/i.test(c.format || "");
+    if (isHls && !v.canPlayType("application/vnd.apple.mpegurl")) {
+      try {
+        const Hls = await loadHls();
+        if (!Hls || !Hls.isSupported()) return fail();
+        hlsInst = new Hls();
+        hlsInst.on(Hls.Events.ERROR, (_, data) => { if (data && data.fatal) fail(); });
+        hlsInst.loadSource(safeUrl); hlsInst.attachMedia(v);
+      } catch (e) { fail(); }
+    } else v.src = safeUrl;
+    const p = v.play && v.play(); if (p && p.catch) p.catch(() => {});
   }
 
   /* ───────── 준비물 체크리스트 ───────── */
@@ -1870,15 +2035,30 @@
       M.groups[d.day] = g;
     });
     M.all = allPts.length ? L.latLngBounds(allPts) : null;
+    // 자차 도로 경로(OSRM): 실선. '전체' 화면 맞춤에는 넣지 않고 '가는 길 보기'로 따로 맞춘다
+    if (M.route) { map.removeLayer(M.route); M.route = null; M.routeBounds = null; }
+    const tg = plan.transport_guide;
+    if (isDrive(tg) && Array.isArray(tg.route_path) && tg.route_path.length > 1) {
+      const rp = tg.route_path.map((q) => [Number(q[0]), Number(q[1])]).filter((q) => isFinite(q[0]) && isFinite(q[1]));
+      M.route = L.layerGroup();
+      L.polyline(rp, { color: dayColor(1), weight: 3, opacity: 0.6, interactive: false }).addTo(M.route);
+      L.marker(rp[0], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk home" style="--c:${dayColor(1)}">${ico("ico-home")}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), title: "출발지", alt: "출발지" }).addTo(M.route);
+      M.routeBounds = L.latLngBounds(rp);
+    } else state.routeFit = false;
+    const lg = $("#map-panel .legend");
+    if (lg) lg.textContent = "점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요." + (M.route ? " 실선은 자차 도로 경로(OSRM)예요." : "");
     if (state.mapDay !== "all" && !M.groups[state.mapDay]) state.mapDay = "all";
     if (tabs) {
       tabs.innerHTML = [["all", "전체"]].concat(plan.itinerary.map((d) => [String(d.day), `${d.day}일차`])).map(([v, t]) =>
-        `<button type="button" role="tab" class="tab${String(state.mapDay) === v ? " on" : ""}" aria-selected="${String(state.mapDay) === v}" data-act="mapday" data-v="${v}"${v !== "all" ? ` style="--c:${dayColor(v)}"` : ""}>${v !== "all" ? `<i class="dot" style="background:${dayColor(v)}"></i>` : ""}${t}</button>`).join("");
+        `<button type="button" role="tab" class="tab${String(state.mapDay) === v && !state.routeFit ? " on" : ""}" aria-selected="${String(state.mapDay) === v && !state.routeFit}" data-act="mapday" data-v="${v}"${v !== "all" ? ` style="--c:${dayColor(v)}"` : ""}>${v !== "all" ? `<i class="dot" style="background:${dayColor(v)}"></i>` : ""}${t}</button>`).join("")
+        + (M.route ? `<button type="button" class="tab route-tab${state.routeFit ? " on" : ""}" aria-pressed="${!!state.routeFit}" data-act="route-fit">${ico("ico-car")}가는 길 보기</button>` : "");
     }
     applyMapDay();
   }
   function applyMapDay() {
     if (!M.map) return;
+    if (M.route) { if (state.mapDay === "all" || String(state.mapDay) === "1" || state.routeFit) M.route.addTo(M.map); else M.map.removeLayer(M.route); }
+    if (state.routeFit && M.routeBounds) { fitMap(M.routeBounds); return; }
     let b = null;
     Object.entries(M.groups).forEach(([day, g]) => {
       const show = state.mapDay === "all" || String(state.mapDay) === day;
@@ -2152,7 +2332,17 @@
       case "copy":
         if (navigator.clipboard) navigator.clipboard.writeText(new URL(t.dataset.url, location.href).href).then(() => toast("공유 링크를 복사했어요"), () => toast("복사하지 못했어요. 링크를 길게 눌러 복사해 주세요."));
         break;
-      case "mapday": state.mapDay = t.dataset.v === "all" ? "all" : Number(t.dataset.v); renderMap(); break;
+      case "mapday": state.mapDay = t.dataset.v === "all" ? "all" : Number(t.dataset.v); state.routeFit = false; renderMap(); break;
+      case "route-fit": {
+        state.routeFit = t.closest("#map-tabs") ? !state.routeFit : true;
+        if (!MQ_PC.matches && !state.mobileMapOpen) { const mb = $('[data-act="m-map"]'); if (mb) mb.click(); }
+        renderMap();
+        if (!t.closest("#map-tabs")) { const mp = $("#map"); if (mp) mp.scrollIntoView({ behavior: scrollBehavior(), block: "center" }); }
+        break;
+      }
+      case "cctv": loadCctv(); break;
+      case "cctv-play": playCctv(Number(t.dataset.i)); break;
+      case "cctv-close": { const dl = $("#cctv-dlg"); if (dl) { if (dl.close) dl.close(); else dl.removeAttribute("open"); } break; }
       case "m-cond": {
         const open = t.getAttribute("aria-expanded") !== "true";
         t.setAttribute("aria-expanded", String(open));
@@ -2172,6 +2362,8 @@
       case "share-link": shareLink(VIEW || READ_ONLY ? location.href.split("?")[0] : fullViewUrl()); break;
       case "print": if (DEMO_VIEW) { document.documentElement.classList.add("print-mode"); window.print(); } else location.href = location.pathname + "?print=1"; break;
       case "cost-del": sendCost({ op: "remove", id: t.dataset.id }, t.dataset.name || ""); break;
+      case "man-toggle": { const was = t.getAttribute("aria-expanded") === "true"; state.manual.open = !was; state.manual.closed = was; paintManual(); if (!was) { const n = $('#man-form [data-man="name"]'); if (n) n.focus(); } break; }
+      case "man-pick": startMapPick(); break;
       case "ps-far-no": state.search.farDismissed = true; paintSearch(); break;
       case "ps-add-far": {
         if (!canEdit()) return;
@@ -2247,6 +2439,22 @@
       const edit = { op: "add", name };
       if (day) edit.day = Number(day);
       sendEdit(edit, `${name} 추가${day ? ` (${day}일차)` : ""}`);
+    } else if (kind === "manual") {
+      if (!canEdit()) return;
+      if (Geo.items.length && Geo.active >= 0) return;
+      const Mn = state.manual;
+      const name = String(f.querySelector('[name="name"]').value || "").trim();
+      const address = String(f.querySelector('[name="address"]').value || "").trim();
+      if (!name) return;
+      const manual = { name };
+      if (address) manual.address = address;
+      if (Mn.lat != null) { manual.lat = Number(Mn.lat); manual.lng = Number(Mn.lng); }
+      const day = f.querySelector("select").value;
+      const edit = { op: "add", manual };
+      if (day) edit.day = Number(day);
+      state.manual = { open: false, name: "", address: "", lat: null, lng: null, src: null, picking: false, place: null };
+      showManualPin();
+      sendEdit(edit, `${name} 직접 추가${day ? ` (${day}일차)` : ""}`);
     } else if (kind === "arrival") {
       if (Geo.items.length && Geo.active >= 0) return;
       arrSubmit(f);
@@ -2464,6 +2672,7 @@
       const t = e.target;
       if (t.dataset && t.dataset.geo) geoOnInput(t);
       if (t.name === "place" && t.closest && t.closest(".arr-form")) ARR.label = t.value;
+      if (t.dataset && t.dataset.man) state.manual[t.dataset.man] = t.value;
       if (t.dataset && t.dataset.psearch) placeSearch(t.value);
     });
     document.addEventListener("keydown", geoKeydown);
