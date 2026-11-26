@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import re
 from collections import Counter
 from datetime import date
 
@@ -30,6 +31,50 @@ def category(p: dict) -> str:
 
 def _coord(p: dict | None):
     return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
+
+
+_URL_CH = r"[A-Za-z0-9\-._~:/?#@!$&*+,;=%]"
+_URL_RE = re.compile(r"(https?://" + _URL_CH + r"+|(?:www\.)?[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:kr|com|net|org)(?:/" + _URL_CH + r"*)?)", re.I)
+
+
+def links_of(p: dict) -> list[dict]:
+    """관광공사 homepage 필드(형식 제각각: <a href>, 'URL', '이름 URL', 'www.도메인') → [{label, url}] (중복 제거).
+    링크 앞에 이름이 있으면 그 이름으로(예: '수원관광 홈페이지'), 없으면 '공식 홈페이지'. 사용자 지정 장소는 place_url."""
+    raw = p.get("homepage") or ""
+    text = re.sub(r"<a [^>]*href=[\"']([^\"']+)[\"'][^>]*>.*?</a>", r" \1 ", raw, flags=re.I | re.S)
+    text = re.sub(r"<[^>]+>", " ", text)
+    out, seen, pos = [], set(), 0
+    for m in _URL_RE.finditer(text):
+        u = m.group(0).strip().rstrip(".,;")
+        before = text[pos:m.start()]
+        pos = m.end()
+        if "@" in u or len(u) < 6:
+            continue
+        if not u.lower().startswith(("http://", "https://")):
+            u = "https://" + u
+        key = re.sub(r"^https?://(www\.)?", "", u.lower()).rstrip("/")
+        if key in seen:
+            continue
+        seen.add(key)
+        low = u.lower()
+        prefix = re.sub(r"(공식|홈페이지|:|\s)+", " ", before).strip().split(" ")[-1][:12] if before.strip() else ""
+        label = ("인스타그램" if "instagram." in low else "블로그" if "blog." in low else "페이스북" if "facebook." in low
+                 else "유튜브" if "youtube." in low else f"{prefix} 홈페이지" if prefix
+                 else "지자체 관광 안내" if re.match(r"https?://(www|main|culture)\.[a-z]+\.go\.kr(/tour|/)?/?$", low) else "공식 홈페이지")
+        out.append({"label": label, "url": u})
+    if p.get("place_url") and str(p["place_url"]).startswith("https://"):
+        out.append({"label": "지도에서 보기", "url": p["place_url"]})
+    return out[:4]
+
+
+def fee_check(p: dict) -> bool:
+    """입장료를 확인해야 하는 곳: 관광지인데 요금 정보가 없거나 '문의·변동·별도' 같은 말이 있는 곳."""
+    if p.get("kind") not in ("attraction", "festival"):
+        return False
+    fee = hours.clean((p.get("intro") or {}).get("usefee")) or ""
+    if not fee:
+        return True
+    return bool(re.search(r"(문의|변동|별도|상이|홈페이지|확인|유료)", fee)) and not re.fullmatch(r"\s*무료\s*", fee)
 
 
 def _planner():
@@ -98,6 +143,7 @@ def place_entry(p: dict, spec, rank: int | None, reason: str, in_itin: bool, on_
         "hours_status": info.status if info else None,
         "closed": hours.clean(intro.get("restdate") or intro.get("restdatefood")) or None,
         "fee": hours.clean(intro.get("usefee")) or None,
+        "links": links_of(p), "homepage": (links_of(p) or [{}])[0].get("url"), "fee_check": fee_check(p),
         "parking": hours.clean(intro.get("parking") or intro.get("parkingfood")) or None,
         "contact": hours.clean(intro.get("infocenter") or intro.get("infocenterfood") or p.get("tel")) or None,
         "companion_notes": cnote, "images": imgs[:4],
@@ -250,6 +296,8 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
             _pl = data.places(spec.region).get(it.get("place_id")) or next(
                 (w for w in spec.user_waypoints if w["place_id"] == it.get("place_id")), {"title": it["place_name"]})
             stop["swap_kind"] = alternatives.kind_label(_pl, it["type"])
+            stop["homepage"] = (links_of(_pl) or [{}])[0].get("url")
+            stop["fee_check"] = fee_check(_pl)
             stop["swap_hint"] = alternatives.swap_hint(_pl, it["type"])
             stops.append(stop)
             if prev is not None and it["travel_minutes_from_prev"]:

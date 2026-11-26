@@ -92,7 +92,9 @@ def to_docx(plan_id: str, payload: dict, summary: dict | None = None) -> bytes:
                         pass
             for label, val in (("추천 이유", s.get("reason") or p.get("reason")), ("소개", p.get("summary")),
                                ("관람 팁", p.get("guide_tips")), ("동반자 참고", p.get("companion_notes")),
-                               ("운영", p.get("hours")), ("휴무", p.get("closed"))):
+                               ("운영", p.get("hours")), ("휴무", p.get("closed")),
+                               ("요금", p.get("fee") or ("홈페이지에서 입장료를 확인해 주세요" if p.get("fee_check") else None)),
+                               ("홈페이지", " · ".join(f"{l['label']} {l['url']}" for l in p.get("links") or []))):
                 if val:
                     q = doc.add_paragraph()
                     q.add_run(f"{label}: ").bold = True
