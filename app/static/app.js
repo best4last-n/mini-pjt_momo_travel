@@ -187,17 +187,47 @@
   }
 
   /* ───────── 토스트 ───────── */
-  let toastTimer = 0;
-  function toast(msg, ms = 3200, action) {
-    const t = $("#toast");
-    if (!t) return;
-    t.innerHTML = (Array.isArray(msg) ? msg.map((m) => `<span>${esc(m)}</span>`).join("") : `<span>${esc(msg)}</span>`)
-      + (action ? `<button type="button" class="toast-act" data-act="${esc(action.act)}">${esc(action.label)}</button>` : "");
-    t.classList.toggle("has-act", !!action);
-    t.classList.add("show");
-    clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => t.classList.remove("show"), ms);
+  const TOASTS = [];
+  function toast(msg, ms, action, opts) {
+    const box = $("#toast");
+    if (!box) return null;
+    opts = opts || {};
+    const lines = (Array.isArray(msg) ? msg : [msg]).filter((x) => x != null && x !== "");
+    const text = lines.join(" ");
+    const progress = Number(ms) >= 30000;
+    const kind = opts.kind || (progress ? "progress" : /(못했|실패|끊겼|오류|잃었|불러오지 못)/.test(text) ? "error" : "info");
+    // 진행 중 알림과 같은 내용의 알림은 새 알림이 오면 비킨다
+    TOASTS.filter((x) => x.kind === "progress" || x.text === text).forEach((x) => closeToast(x, true));
+    const dur = kind === "error" || kind === "progress" ? 0 : action ? 6000 : (ms && ms < 3000 ? ms : 4000);
+    const el = document.createElement("div");
+    el.className = `toast-item k-${kind}`;
+    el.setAttribute("role", kind === "error" ? "alert" : "status");
+    el.innerHTML = `<div class="toast-msg">${lines.map((m) => `<span>${esc(m)}</span>`).join("")}</div>
+      ${action ? `<button type="button" class="toast-act" data-act="${esc(action.act)}">${esc(action.label)}</button>` : ""}
+      <button type="button" class="toast-x" data-act="toast-close" aria-label="닫기">×</button>
+      ${dur ? `<span class="toast-bar" style="animation-duration:${dur}ms" aria-hidden="true"></span>` : ""}`;
+    box.appendChild(el);
+    const t = { el, kind, dur, text, left: dur, start: 0, timer: 0, paused: false };
+    TOASTS.push(t);
+    while (TOASTS.length > 3) closeToast(TOASTS[0], true);
+    const pause = () => { if (!t.dur || t.paused) return; clearTimeout(t.timer); t.left -= Date.now() - t.start; t.paused = true; el.classList.add("paused"); };
+    const resume = () => { if (!t.dur || !t.paused || el.matches(":hover") || el.contains(document.activeElement)) return; t.paused = false; el.classList.remove("paused"); runToast(t); };
+    el.addEventListener("mouseenter", pause); el.addEventListener("focusin", pause);
+    el.addEventListener("mouseleave", () => setTimeout(resume, 0)); el.addEventListener("focusout", () => setTimeout(resume, 0));
+    if (dur) runToast(t);
+    box.classList.add("show");
+    return t;
   }
+  function runToast(t) { t.start = Date.now(); clearTimeout(t.timer); t.timer = setTimeout(() => closeToast(t), Math.max(200, t.left)); }
+  function closeToast(t, instant) {
+    const i = TOASTS.indexOf(t);
+    if (i < 0) return;
+    TOASTS.splice(i, 1);
+    clearTimeout(t.timer);
+    t.el.classList.add("out");
+    setTimeout(() => t.el.remove(), instant ? 0 : 180);
+  }
+  function closeToastOf(el) { const t = TOASTS.find((x) => x.el === el); if (t) closeToast(t); }
 
   /* ───────── API ───────── */
   async function callApi(body) {
@@ -898,7 +928,15 @@
 
   /* ───────── 여행 조건(신호등) ───────── */
   function currentConds() {
-    return (state.conditions && state.conditions.length) ? state.conditions : PLACEHOLDER_CONDS;
+    const base = (state.conditions && state.conditions.length) ? state.conditions : PLACEHOLDER_CONDS;
+    const ml = state.plan && state.plan.meals;
+    if (!ml || base.some((c) => c.key === "breakfast")) return base;
+    const row = { key: "breakfast", label: "아침 식사", value: ml.breakfast || "근처 식당", status: "confirmed", input: "select",
+      options: ml.options && ml.options.length ? ml.options : ["근처 식당", "숙소 조식", "안 먹음"], hint: ml.note || "숙박 다음 날 아침을 어떻게 할지 골라요." };
+    const out = base.slice();
+    const at = out.findIndex((c) => c.key === "intensity");
+    out.splice(at >= 0 ? at : out.length, 0, row);
+    return out;
   }
   function condCounts(conds) {
     const c = { confirmed: 0, assumed: 0, missing: 0, optional: 0 };
@@ -1232,10 +1270,14 @@
     if (state.needsReconfirm) return `<span class="st-pill edit">수정 중</span>`;
     return state.planStatus === "확정" || ((VIEW || state.planId) && (state.view ? state.view.plan_id : state.planId)) ? `<span class="st-pill ok">확정</span>` : `<span class="st-pill draft">초안</span>`;
   }
-  function reconfirmBanner() {
+  const bannerOff = () => { try { return sessionStorage.getItem("momo.reconfirm.off." + state.sessionId) === "1"; } catch (e) { return !!state.reconfirmOff; } };
+  function reconfirmBanner(compact) {
     if (!state.needsReconfirm || !editAllowed()) return "";
+    if (bannerOff() && !compact) return "";
+    if (bannerOff()) return `<button type="button" class="btn sm primary wide" data-act="reconfirm"${state.busy ? " disabled" : ""}>수정한 계획으로 다시 확정</button>`;
     return `<div class="reconfirm" role="status"><p><b>확정 후 수정됨</b> · 공유 링크에는 확정 당시 내용이 보여요</p>
-      <button type="button" class="btn sm primary" data-act="reconfirm"${state.busy ? " disabled" : ""}>다시 확정</button></div>`;
+      <button type="button" class="btn sm primary" data-act="reconfirm"${state.busy ? " disabled" : ""}>다시 확정</button>
+      <button type="button" class="toast-x" data-act="reconfirm-off" aria-label="이 안내 닫기">×</button></div>`;
   }
   function modeBar() {
     if (!editAllowed()) return "";
@@ -1374,8 +1416,61 @@
     const dl = isDrive(g) ? (g.legs || []).find((l) => l.type === "drive") : null;
     const dist = dl && dl.distance_km != null ? ` · ${esc(Math.round(dl.distance_km))}km` : "";
     const hasRoute = isDrive(g) && Array.isArray(g.route_path) && g.route_path.length > 1;
-    return `<li class="leg long${back ? " back" : ""}"><span class="leg-in">${ico(isDrive(g) || leg.mode === "자차" ? "ico-car" : "ico-pin")}<b>${esc(leg.label || "")}</b> · ${esc(leg.mode || "")} 약 ${fmtMin(leg.duration_min)}${dist}${leg.estimated !== false ? " (추정)" : ""}${leg.depart && leg.arrive ? ` <span class="muted">${esc(leg.depart)}→${esc(leg.arrive)}</span>` : ""}
+    const via = back ? ((plan.return_stopovers && plan.return_stopovers.items) || []).filter((x) => x.added).map((x) => x.name) : [];
+    return `<li class="leg long${back ? " back" : ""}"><span class="leg-in">${via.length ? `<span class="leg-via">${esc(((homePoints(plan).en || {}).name) || "집")}으로 가는 길: ${via.map(esc).join(", ")} 들렀다가</span>` : ""}${ico(isDrive(g) || leg.mode === "자차" ? "ico-car" : "ico-pin")}<b>${esc(leg.label || "")}</b> · ${esc(leg.mode || "")} 약 ${fmtMin(leg.duration_min)}${dist}${leg.estimated !== false ? " (추정)" : ""}${leg.depart && leg.arrive ? ` <span class="muted">${esc(leg.depart)}→${esc(leg.arrive)}</span>` : ""}
       ${(hasRoute || (homePoints(plan).st || {}).lat != null) ? `<button type="button" class="linkish" data-act="route-fit">${back ? "오는 길 보기" : "가는 길 보기"}</button>` : ""}</span></li>`;
+  }
+  /* 아침 식사 · 숙소 안내 · 돌아오는 길 들를 곳 */
+  const isBreakfast = (s) => s && s.type === "meal" && (/조식|아침/.test(s.name || "") || /조식|아침/.test(String(s.notes || "")));
+  function prevStay(plan, d) {
+    const its = plan.itinerary || [];
+    const i = its.indexOf(d);
+    const prev = i > 0 ? its[i - 1] : null;
+    return prev ? (prev.stops || []).filter((x) => x.type === "stay").pop() || null : null;
+  }
+  function breakfastCard(s, d, plan, id, time) {
+    const ml = plan.meals || {};
+    const hotel = /숙소 조식/.test(s.name || "") || /숙소 조식/.test(String(s.notes || "")) || ml.breakfast === "숙소 조식";
+    const stay = prevStay(plan, d);
+    const hint = stay && stay.breakfast_hint && ml.breakfast !== "숙소 조식"
+      ? `<p class="bf-hint">이 숙소는 조식 정보가 있어요 — 숙소 조식으로 바꾸면 이동 없이 30분 여유</p>` : "";
+    const ctl = canEdit() ? `<span class="bf-ctl">
+        <button type="button" class="btn xs ghost" data-act="bf-mode" data-v="${hotel ? "근처 식당" : "숙소 조식"}">${hotel ? "근처 식당으로" : "숙소 조식으로 바꾸기"}</button>
+        <button type="button" class="btn xs danger" data-act="bf-skip" data-day="${esc(d.day)}">빼기</button></span>` : "";
+    return `<li class="stop slim breakfast t-meal" id="${id}" data-day="${esc(d.day)}" data-pid="">
+      <span class="num" aria-hidden="true">${hotel ? "🍳" : "☕"}</span>
+      <div class="card slim-card bf-card"><span class="time">${time}</span><span class="tag">아침</span><b>${esc(s.name)}</b>${ctl}${hint}</div></li>`;
+  }
+  function breakfastSkipped(d, plan) {
+    const ml = plan.meals || {};
+    if (!canEdit() || !(ml.breakfast_skip_days || []).map(Number).includes(Number(d.day))) return "";
+    return `<li class="stop slim breakfast skipped" data-pid=""><span class="num" aria-hidden="true">☕</span>
+      <div class="card slim-card bf-card"><span class="muted">이 날 아침 식사를 뺐어요</span><button type="button" class="btn xs ghost" data-act="bf-restore" data-day="${esc(d.day)}">다시 넣기</button></div></li>`;
+  }
+  function lodgingNotice(d) {
+    const n = d.lodging_notice;
+    if (!n) return "";
+    const k = n.kind === "연박" ? "stay" : n.kind === "이동" ? "move" : "last";
+    const head = n.kind === "연박" ? "🧳 짐은 두고 가볍게" : n.kind === "이동" ? `🧳 짐 챙겨 체크아웃${n.checkout ? ` ${esc(n.checkout)}까지` : ""}` : `✅ 두고 온 물건 확인${n.checkout ? ` · 체크아웃 ${esc(n.checkout)}` : ""}`;
+    return `<div class="lodge-notice k-${k}"><p class="ln-h"><b>${head}</b>${n.title ? `<span>${esc(n.title)}</span>` : ""}</p>${n.message ? `<p class="ln-m">${esc(n.message)}</p>` : ""}
+      ${k === "last" ? `<ul class="ln-check" aria-label="챙길 것"><li>충전기·보조배터리</li><li>세면도구·화장품</li><li>옷걸이·욕실 속 빨래</li><li>냉장고 속 음식</li></ul>` : ""}</div>`;
+  }
+  function stopoversCard(plan) {
+    const R = plan.return_stopovers;
+    if (!R || !(R.items || []).length) return "";
+    const added = (R.items || []).filter((x) => x.added).length || (R.added || []).length;
+    const full = added >= 3;
+    const items = (R.items || []).map((x) => {
+      const img = x.image && /^https?:\/\//i.test(x.image) ? `<img src="${esc(x.image.replace(/^http:/, "https:"))}" alt="" loading="lazy">` : bird("bird");
+      const btn = canEdit() ? (x.added
+        ? `<button type="button" class="btn xs ghost" data-act="ret-remove" data-key="${esc(x.key || x.name)}" data-name="${esc(x.name)}">들를 곳에서 빼기</button>`
+        : `<button type="button" class="btn xs primary" data-act="ret-add" data-key="${esc(x.key || x.name)}"${full ? ' disabled title="최대 3곳까지예요"' : ""}>+ 들르기</button>`) : "";
+      return `<li class="so-item${x.added ? " added" : ""}"><div class="so-img">${img}</div>
+        <div class="so-b"><p class="so-name"><b>${esc(x.name)}</b><span class="badge ${x.kind === "카페" ? "user" : "route"}">${esc(x.kind || "")}</span>${x.added ? `<span class="badge ok">들를 곳</span>` : ""}</p>
+        <p class="so-meta">돌아가는 길 ${esc(x.km_from_start)}km 지점 · 우회 약 ${fmtMin(x.detour_min)} · 머무는 ${fmtMin(x.stay_min)}</p>${btn}</div></li>`;
+    }).join("");
+    return `<li class="stopovers" aria-label="돌아오는 길에 들를 곳"><div class="so-card"><p class="so-h"><b>아쉬우면 들러 가요</b><span class="muted">${esc(R.note || "")}${canEdit() ? ` · 최대 3곳` : ""}</span></p>
+      <ul class="so-list">${items}</ul></div></li>`;
   }
   function homeCard(pt, end) {
     if (!pt) return "";
@@ -1395,7 +1490,7 @@
     const hp = homePoints(plan);
     const isFirst = its[0] === d, isLast = its[its.length - 1] === d;
     const headHome = isFirst && hp.st ? homeCard(hp.st, false) + homeLegLine(hp.st.leg, plan, false) : "";
-    const tailHome = isLast && hp.en ? homeLegLine(hp.en.leg, plan, true) + homeCard(hp.en, true) : "";
+    const tailHome = isLast && hp.en ? stopoversCard(plan) + homeLegLine(hp.en.leg, plan, true) + homeCard(hp.en, true) : (isLast ? stopoversCard(plan) : "");
     const items = stops.map((s, i) => {
       const leg = findLeg(d, s);
       const legHtml = leg ? `<li class="leg" aria-label="이동 ${esc(km(leg.distance_km))}, 약 ${fmtMin(leg.duration_min)}">
@@ -1415,7 +1510,8 @@
         ${wxChip(weatherOf(d.date))}
         ${canEdit() ? `<button type="button" class="btn sm re-open-btn noprint" data-act="re-open" data-day="${esc(d.day)}" aria-haspopup="dialog">${ico("ico-route")}동선 편집</button>` : ""}
       </header>
-      <ol class="stops">${headHome}${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}${tailHome}</ol></section>`;
+      ${lodgingNotice(d)}
+      <ol class="stops">${headHome}${breakfastSkipped(d, plan)}${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}${tailHome}</ol></section>`;
   }
 
   function licenseOf(img) { return LICENSE[img.license] || img.license || "공공누리"; }
@@ -1435,6 +1531,7 @@
     const id = `stop-${d.day}-${s.order != null ? s.order : i + 1}`;
     const time = s.arrive === s.depart || !s.depart ? `${esc(s.arrive || "")}${s.type === "stay" ? " 체크인" : ""}` : `${esc(s.arrive || "")}–${esc(s.depart || "")}`;
     const num = `<span class="num" aria-hidden="true">${s.type === "meal" ? ico("ico-fork") : s.type === "stay" ? "숙" : esc(s.order != null ? s.order : i + 1)}</span>`;
+    if (!p && s.place_id == null && isBreakfast(s)) return breakfastCard(s, d, plan, id, time);
     if (!p && s.place_id == null) {
       return `<li class="stop slim t-${esc(s.type)}" id="${id}" data-day="${esc(d.day)}" data-pid="">${num}
         <div class="card slim-card"><span class="time">${time}</span><span class="tag">${esc(TYPE_LABEL[s.type] || "")}</span><b>${esc(s.name)}</b>${s.reason ? `<span class="muted">${esc(s.reason)}</span>` : ""}</div></li>`;
@@ -1446,6 +1543,16 @@
       ? `<span class="badge warn">운영시간 확인 필요</span>`
       : place.hours ? `<span class="badge ok">운영 ${esc(place.hours)}</span>` : "";
     const rank = place.rank ? `<span class="badge rank">추천 ${esc(place.rank)}위</span>` : "";
+    const okUrl = (u) => /^https?:\/\//i.test(String(u || ""));
+    const homepage = okUrl(s.homepage) ? s.homepage : okUrl(place.homepage) ? place.homepage : null;
+    let links = (place.links || []).filter((l) => l && okUrl(l.url)).slice(0, 4);
+    if (!links.length && homepage) links = [{ label: "공식 홈페이지", url: homepage }];
+    const feeCheck = s.fee_check != null ? !!s.fee_check : !!place.fee_check;
+    const feeBadge = feeCheck ? (homepage
+      ? `<a class="badge warn fee-chk" href="${esc(homepage)}" target="_blank" rel="noopener noreferrer">입장료 확인 · 홈페이지에서 입장료 확인 ↗</a>`
+      : `<span class="badge warn fee-chk">입장료 확인 · 방문 전 입장료 확인 필요</span>`) : "";
+    const feeText = place.fee ? `<span class="fee-t">요금 ${esc(place.fee)}</span>` : "";
+    const linkRow = links.length ? `<p class="place-links">${links.map((l) => `<a class="link-btn" href="${esc(l.url)}" target="_blank" rel="noopener noreferrer"><span aria-hidden="true">🔗</span> ${esc(l.label || "홈페이지")} ↗</a>`).join("")}</p>` : "";
     const mine = place.added_by_user ? `<span class="badge user">직접 추가</span>` : "";
     const reason = s.reason || place.reason;
     const comp = (plan.trip && plan.trip.companions) || {};
@@ -1488,12 +1595,16 @@
       <article class="card" aria-labelledby="${id}-h">
         ${mediaHtml(p, name)}
         <div class="body">
-          <p class="meta"><span class="time">${time}</span><span class="tag">${esc(cat)}</span>${rank}${mine}${hoursBadge}</p>
+          <p class="meta"><span class="time">${time}</span><span class="tag">${esc(cat)}</span>${rank}${mine}${hoursBadge}${feeText}${feeBadge}</p>
           <h4 id="${id}-h">${esc(name)}</h4>
           ${reason ? `<p class="reason">${esc(reason)}</p>` : ""}
           ${place.summary ? `<p class="summary">${esc(place.summary)}</p>` : ""}
           ${foodsBox}
           ${hasDetails ? `<div class="details" id="${id}-d">${details}</div>` : ""}
+          ${s.type === "stay" && (s.checkin || s.checkout || s.stay_note) ? `<p class="stay-info">${s.consecutive ? `<span class="badge ok">연박</span>` : ""}${Number(s.nights_here) > 1 ? `<span class="badge route">${esc(s.nights_here)}박</span>` : ""}
+            ${s.consecutive ? "" : `<span>${s.checkin ? `체크인 <b>${esc(s.checkin)}</b>${s.checkin_known === false ? "(추정)" : ""}` : ""}${s.checkout ? ` · 체크아웃 다음 날 <b>${esc(s.checkout)}</b>${s.checkout_known === false ? "(추정)" : ""}` : ""}</span>`}
+            ${s.stay_note ? `<span class="muted">${esc(s.stay_note)}</span>` : ""}</p>` : ""}
+          ${linkRow}
           <div class="card-foot">
             ${hasDetails ? `<button type="button" class="more" data-act="more" aria-expanded="false" aria-controls="${id}-d">자세히${ico("ico-chev", "ico chev")}</button>` : ""}
             <span class="src">출처: ${esc(place.source || s.source || "한국관광공사 TourAPI")}</span>
@@ -2708,25 +2819,34 @@
     } else if (READ_ONLY) {
       const id = esc(BOOT.planId);
       act = `<nav class="exports" aria-label="공유"><button type="button" class="btn sm ghost" data-act="share-link">링크 공유</button></nav>` + exportLinks({ html_url: `/plan/${id}.html`, docx_url: `/plan/${id}.docx`, print_url: `/plan/${id}?print=1`, ics_url: `/plan/${id}.ics`, report_url: `/plan/${id}/report` });
-    } else if (state.planStatus === "확정" && state.exports && !state.needsReconfirm) {
-      act = `<p class="state ok"><i class="dot ok"></i>확정됐어요. 원하는 형식으로 가져가세요.</p>${exportLinks(state.exports)}`;
-    } else if (state.needsReconfirm) {
-      act = reconfirmBanner() + (state.exports ? `<p class="muted small">지금 공유 링크(확정 당시 내용)</p>${exportLinks(state.exports)}` : "");
-    } else if (state.planStatus === "승인 대기") {
-      const pg = getProgress();
-      const full = Number(pg.percent) >= 100;
-      const na = (pg.assumed || []).length, nm = (pg.missing || []).length;
-      const left = [na ? `가정 ${na}개` : "", nm ? `미정 ${nm}개` : ""].filter(Boolean).join("·") || "확정하지 않은 조건";
+    } else {
+      // 상담 화면: 한 줄짜리 확정 막대(오른쪽 정보창 아래에 고정, 모바일은 입력창 위에 고정)
+      const fv = fullViewUrl();
+      const busy = state.busy ? " disabled" : "";
+      const lbl = (long, short) => `<span class="ab-l">${long}</span><span class="ab-s">${short}</span>`;
       const np = pendingCount();
-      if (np) act = `<p class="approve-note pend">조건을 바꿨어요 — 다시 세운 뒤 확정할 수 있어요.</p>
-        <button type="button" class="btn primary wide" data-act="cond-apply"${state.busy ? " disabled" : ""}>변경 ${np}건 · 계획 다시 세우기</button>
-        <button type="button" class="btn primary wide ghostish" disabled aria-disabled="true">지금 조건 그대로 확정할게요</button>`;
-      else act = `${full ? "" : `<p class="approve-note">${esc(left)}가 남아 있어요 · 그대로 확정해도 괜찮아요</p>`}
-        <button type="button" class="btn primary wide" data-act="approve"${state.busy ? " disabled" : ""}>${full ? "이 계획으로 확정할게요" : "지금 조건 그대로 확정할게요"}</button>
-        <p class="muted small">확정하면 공유 링크·HTML·Word·PDF·캘린더를 만들어요. 확정 전에는 저장·공유하지 않아요.</p>`;
+      let main = "", note = "";
+      if (np) {
+        main = `<button type="button" class="btn primary" data-act="cond-apply"${busy} title="조건을 바꿨어요 — 다시 세운 뒤 확정할 수 있어요">${lbl(`변경 ${np}건 · 계획 다시 세우기`, `다시 세우기 (${np})`)}</button>`;
+      } else if (state.needsReconfirm) {
+        main = `<button type="button" class="btn primary" data-act="reconfirm"${busy} title="확정 후 수정됨 · 공유 링크는 그대로예요">${lbl("수정한 계획으로 다시 확정", "다시 확정")}</button>`;
+      } else if (state.planStatus === "확정" && state.exports) {
+        main = `${state.exports.share_url ? `<a class="btn primary" href="${esc(state.exports.share_url)}" target="_blank" rel="noopener">${lbl("공유 링크 열기", "공유")}</a>` : ""}
+          <details class="ab-more"><summary class="btn ghost">${lbl("내려받기·내보내기", "내보내기")}</summary><div class="ab-menu">${exportLinks(state.exports)}</div></details>`;
+      } else if (state.planStatus === "승인 대기") {
+        const pg = getProgress();
+        const full = Number(pg.percent) >= 100;
+        const na = (pg.assumed || []).length, nm = (pg.missing || []).length;
+        const left = [na ? `가정 ${na}` : "", nm ? `미정 ${nm}` : ""].filter(Boolean).join(" · ");
+        if (!full && left) note = `<span class="ab-note" title="${esc(left)}이(가) 남아 있어요 · 그대로 확정해도 괜찮아요">${esc(left)}</span>`;
+        main = `<button type="button" class="btn primary" data-act="approve"${busy} title="확정하면 공유 링크·HTML·Word·PDF·캘린더를 만들어요. 확정 전에는 저장·공유하지 않아요.">${lbl(full ? "이 계획으로 확정할게요" : "지금 조건 그대로 확정", "확정하기")}</button>`;
+      }
+      act = `<div class="actbar">${statusPill()}${note}<span class="ab-sp"></span>${main}
+        ${fv ? `<a class="ab-fv" href="${esc(fv)}" target="_blank" rel="noopener" title="전체 화면으로 보기"><span aria-hidden="true">⛶</span>${lbl("전체 화면으로 보기", "전체 화면")}</a>` : ""}</div>`;
+      el.classList.add("is-bar");
     }
-    const fv = !READ_ONLY && fullViewUrl();
-    el.innerHTML = totals + act + (fv ? `<a class="fv-link" href="${esc(fv)}" target="_blank" rel="noopener">${ico("ico-pop")}전체 화면으로 보기</a>` : "");
+    if (VIEW || READ_ONLY) el.classList.remove("is-bar");
+    el.innerHTML = totals + act;
   }
   function exportLinks(x) {
     const items = [
@@ -2933,8 +3053,13 @@
     }
     if (rb.length) { M.route = rg; M.routeBounds = L.latLngBounds(rb); } else state.routeFit = false;
     if (M.roadEv) { map.removeLayer(M.roadEv); M.roadEv = null; }
-    if (isDrive(tg) && ((tg.road_events || []).length || (tg.road_cautions || []).length)) {
+    const soAdded = ((plan.return_stopovers && plan.return_stopovers.items) || []).filter((x) => x.added && x.lat != null);
+    if (soAdded.length) {
       M.roadEv = L.layerGroup();
+      soAdded.forEach((x, i) => L.marker([Number(x.lat), Number(x.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk so" style="--c:${dayColor(lastDayNo())}">${i + 1}</span>`, iconSize: [22, 22], iconAnchor: [11, 11] }), title: `돌아오는 길 들를 곳 · ${x.name}`, keyboard: false }).addTo(M.roadEv));
+    }
+    if (isDrive(tg) && ((tg.road_events || []).length || (tg.road_cautions || []).length)) {
+      M.roadEv = M.roadEv || L.layerGroup();
       (tg.road_events || []).concat((tg.road_cautions || []).map((x) => Object.assign({ caution: true }, x))).forEach((x) => {
         if (x.lat == null || x.lng == null) return;
         L.marker([Number(x.lat), Number(x.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk warnmk${x.caution ? " caution" : ""}">${ico("ico-alert")}</span>`, iconSize: [20, 20], iconAnchor: [10, 10] }),
@@ -3063,7 +3188,9 @@
       const mc = $("#m-cond-slot"), mm = $("#m-map-body"), ma = $("#m-act-slot");
       if (cond && mc && cond.parentNode !== mc) mc.appendChild(cond);
       if (mapP && mm && mapP.parentNode !== mm) mm.appendChild(mapP);
-      if (ma) { if (cost && cost.parentNode !== ma) ma.appendChild(cost); if (pack && pack.parentNode !== ma) ma.appendChild(pack); if (act && act.parentNode !== ma) ma.appendChild(act); }
+      if (ma) { if (cost && cost.parentNode !== ma) ma.appendChild(cost); if (pack && pack.parentNode !== ma) ma.appendChild(pack); }
+      if (act && !READ_ONLY) { let bar = $("#m-actbar"); if (!bar) { bar = document.createElement("div"); bar.id = "m-actbar"; document.body.appendChild(bar); } if (act.parentNode !== bar) bar.appendChild(act); }
+      else if (act && ma && act.parentNode !== ma) ma.appendChild(act);
     }
     setTimeout(refitMap, 60);
   }
@@ -3162,6 +3289,8 @@
     const t = e.target.closest("[data-act]");
     if (!t) return;
     const act = t.dataset.act;
+    const inToast = t.closest(".toast-item");
+    if (inToast) { closeToastOf(inToast); if (act === "toast-close") return; }
     if (/^tp-/.test(act)) { tpClick(t, act); return; }
     if (/^(st-|cal-)/.test(act)) { if (!t.disabled) starterClick(t, act); return; }
     switch (act) {
@@ -3242,9 +3371,22 @@
         break;
       }
       case "cctv": loadCctv(); break;
+      case "bf-mode": if (canEdit()) send({ question: `아침 식사를 ${t.dataset.v}(으)로`, action: "edit", edit: { op: "breakfast", mode: t.dataset.v } }, "edit"); break;
+      case "bf-skip": if (canEdit()) send({ question: `${t.dataset.day}일차 아침 식사 빼기`, action: "edit", edit: { op: "breakfast", day: Number(t.dataset.day), skip: true } }, "edit"); break;
+      case "bf-restore": if (canEdit()) send({ question: `${t.dataset.day}일차 아침 식사 다시 넣기`, action: "edit", edit: { op: "breakfast", day: Number(t.dataset.day), skip: false } }, "edit"); break;
+      case "ret-add": {
+        if (!canEdit()) return;
+        const it = (((state.plan || {}).return_stopovers || {}).items || []).find((x) => String(x.key || x.name) === t.dataset.key);
+        if (it) send({ question: `돌아가는 길에 ${it.name} 들르기`, action: "edit", edit: { op: "return_stop", action: "add", stop: it } }, "edit");
+        break;
+      }
+      case "ret-remove":
+        if (canEdit()) send({ question: `돌아가는 길 ${t.dataset.name} 빼기`, action: "edit", edit: { op: "return_stop", action: "remove", stop: { key: t.dataset.key, name: t.dataset.name } } }, "edit");
+        break;
       case "tg-more": { const blk = t.closest(".tg-block"); const on = !blk.classList.contains("show-all"); blk.classList.toggle("show-all", on); t.setAttribute("aria-expanded", String(on)); t.textContent = on ? "접기" : `더 보기 (${$$(".x-more", blk).length})`; break; }
       case "mode": setMode(t.dataset.v); break;
       case "undo": doUndo(); break;
+      case "reconfirm-off": { try { sessionStorage.setItem("momo.reconfirm.off." + state.sessionId, "1"); } catch (err) { state.reconfirmOff = true; } renderBrochure({}); renderSide(); break; }
       case "reconfirm":
         if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
         state.reconfirming = true;
@@ -3433,6 +3575,9 @@
   function initComposer() {
     const form = $("#composer");
     if (!form) return;
+    const setH = () => document.documentElement.style.setProperty("--composer-h", form.offsetHeight + "px");
+    setH(); window.addEventListener("resize", setH);
+    if (window.ResizeObserver) new ResizeObserver(setH).observe(form);
     const q = $("#q");
     const grow = () => { q.style.height = "auto"; q.style.height = Math.min(q.scrollHeight, 140) + "px"; };
     q.addEventListener("input", grow);
@@ -3617,6 +3762,9 @@
     document.addEventListener("keydown", tlKeydown);
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
+      if (TOASTS.length && !document.querySelector("dialog[open]") && !TP.trigger && !$("#map-panel.map-full") && !TL && !(e.target.closest && e.target.closest(".mc-layer"))) {
+        e.preventDefault(); closeToast(TOASTS[TOASTS.length - 1]); return;
+      }
       const mc = $("#map-panel .map-ctrl");
       if (mc && mc.dataset.open === "1") { mc.dataset.open = ""; renderMapCtrl(); const b = $("#map-panel .mc-layer .mc-btn"); if (b) b.focus(); e.preventDefault(); return; }
       if ($("#map-panel.map-full") && !(TP.trigger)) { e.preventDefault(); toggleMapFull(false); }

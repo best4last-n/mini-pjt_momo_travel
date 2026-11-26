@@ -1317,7 +1317,15 @@
      "source": "한국관광공사 TourAPI",
      "role": "stay",
      "swap_hint": true,
-     "swap_kind": "숙소"
+     "swap_kind": "숙소",
+     "checkin": "15:00",
+     "checkout": "11:00",
+     "checkin_known": true,
+     "checkout_known": false,
+     "breakfast_hint": true,
+     "consecutive": false,
+     "nights_here": 2,
+     "stay_note": "체크인 15:00부터 · 2박 연속 · 조식 정보 있음(숙소 확인)"
     }
    ],
    "legs": [
@@ -1450,6 +1458,20 @@
    "theme": "구례 권역",
    "stops": [
     {
+     "order": 0,
+     "place_id": null,
+     "name": "숙소 조식 · 순천만민속한옥펜션",
+     "type": "meal",
+     "arrive": "08:15",
+     "depart": "08:50",
+     "stay_min": 35,
+     "notes": [
+      "조식",
+      "숙소 조식"
+     ],
+     "role": "breakfast"
+    },
+    {
      "order": 1,
      "place_id": "127923",
      "name": "화엄사",
@@ -1532,7 +1554,15 @@
      "source": "한국관광공사 TourAPI",
      "role": "stay",
      "swap_hint": true,
-     "swap_kind": "숙소"
+     "swap_kind": "숙소",
+     "checkin": "15:00",
+     "checkout": "11:00",
+     "checkin_known": true,
+     "checkout_known": false,
+     "breakfast_hint": true,
+     "consecutive": true,
+     "nights_here": null,
+     "stay_note": "어제와 같은 숙소(연박) — 체크인 없이 바로 쉬어요"
     }
    ],
    "legs": [
@@ -1638,7 +1668,12 @@
     }
    ],
    "day_distance_km": 107.8,
-   "day_travel_min": 165
+   "day_travel_min": 165,
+   "lodging_notice": {
+    "kind": "연박",
+    "title": "오늘도 같은 숙소예요",
+    "message": "순천만민속한옥펜션에 연박이라 짐은 두고 가볍게 나가요. 귀중품만 챙기세요."
+   }
   },
   {
    "day": 3,
@@ -1646,6 +1681,20 @@
    "weekday": "월",
    "theme": "순천 권역",
    "stops": [
+    {
+     "order": 0,
+     "place_id": null,
+     "name": "숙소 조식 · 순천만민속한옥펜션",
+     "type": "meal",
+     "arrive": "08:15",
+     "depart": "08:50",
+     "stay_min": 35,
+     "notes": [
+      "조식",
+      "숙소 조식"
+     ],
+     "role": "breakfast"
+    },
     {
      "order": 1,
      "place_id": "127931",
@@ -1742,6 +1791,12 @@
      "duration_min": 160,
      "estimated": true
     }
+   },
+   "lodging_notice": {
+    "kind": "마지막",
+    "title": "마지막 날 · 체크아웃",
+    "checkout": "11:00",
+    "message": "짐을 모두 챙겨 11:00까지 순천만민속한옥펜션에서 체크아웃하세요. 충전기·세면도구처럼 두고 오기 쉬운 물건을 한 번 더 확인해요!"
    }
   }
  ],
@@ -2271,5 +2326,91 @@
   "over_budget": false,
   "over_by": 0,
   "note": "모든 금액은 추정이에요. 입장료는 관광공사 요금 정보에 금액이 있을 때만 넣었고, 없으면 '확인 필요'로 두었어요."
+ },
+ "meals": {
+  "breakfast": "숙소 조식",
+  "breakfast_skip_days": [],
+  "options": [
+   "근처 식당",
+   "숙소 조식",
+   "안 먹음"
+  ],
+  "note": "숙박 다음 날 아침은 기본으로 넣어요. 숙소 조식이면 이동이 없어 30분 늦게 시작해도 돼요. 필요 없으면 빼 주세요."
+ },
+ "return_stopovers": {
+  "items": [
+   {
+    "key": "tour:127931",
+    "place_id": "127931",
+    "name": "순천 낙안읍성",
+    "kind": "관광지",
+    "lat": 34.9060616206,
+    "lng": 127.3417276358,
+    "address": "전남광주통합특별시 순천시 낙안면 충민길 30",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/81/4099881_image2_1.jpg",
+    "km_from_start": 10,
+    "off_route_km": 2.0,
+    "detour_min": 10,
+    "stay_min": 45,
+    "source": "한국관광공사",
+    "why": "돌아가는 길 약 10km 지점",
+    "added": true
+   },
+   {
+    "key": "tour:126371",
+    "place_id": "126371",
+    "name": "송광사(순천)",
+    "kind": "관광지",
+    "lat": 35.0023748995,
+    "lng": 127.2748324991,
+    "address": "전남광주통합특별시 순천시 송광면 송광사안길 100",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/93/3577593_image2_1.jpg",
+    "km_from_start": 35,
+    "off_route_km": 3.0,
+    "detour_min": 15,
+    "stay_min": 45,
+    "source": "한국관광공사",
+    "why": "돌아가는 길 약 35km 지점",
+    "added": false
+   },
+   {
+    "key": "tour:2469439",
+    "place_id": "2469439",
+    "name": "순천 드라마촬영장",
+    "kind": "관광지",
+    "lat": 34.9583877769,
+    "lng": 127.5378062234,
+    "address": "전남광주통합특별시 순천시 비례골길 24 (조례동)",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/26/4066426_image2_1.jpg",
+    "km_from_start": 60,
+    "off_route_km": 4.0,
+    "detour_min": 20,
+    "stay_min": 45,
+    "source": "한국관광공사",
+    "why": "돌아가는 길 약 60km 지점",
+    "added": false
+   },
+   {
+    "key": "tour:126267",
+    "place_id": "126267",
+    "name": "선암사계곡",
+    "kind": "카페",
+    "lat": 34.992281,
+    "lng": 127.341399,
+    "address": "전남광주통합특별시 순천시 승주읍 죽학리",
+    "image": "https://tong.visitkorea.or.kr/cms/resource/71/3460071_image2_1.jpg",
+    "km_from_start": 85,
+    "off_route_km": 5.0,
+    "detour_min": 25,
+    "stay_min": 30,
+    "source": "한국관광공사",
+    "why": "돌아가는 길 약 85km 지점",
+    "added": false
+   }
+  ],
+  "added": [
+   "순천 낙안읍성"
+  ],
+  "note": "여행 끝이 아쉬우면 돌아가는 길에 잠깐 들러 보세요. 우회 시간은 직선거리 기준 추정이에요."
  }
 }
