@@ -908,6 +908,10 @@ def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: d
         spec.preferences = [x.strip() for x in re.split(r"[,·/]", value) if x.strip()]
         return spec, True, value, None
     if key == "depart_time":
+        if not value.strip():      # '선택 안 함' → 기본 08:00, 선택 항목으로 되돌림
+            spec.depart_time = DEFAULT_DEPART
+            spec.given = [g for g in spec.given if g != "depart_time"]
+            return spec, False, "선택 안 함(기본 08:00)", None
         t = _hm(value)
         if t is None:
             return spec, False, value, "출발 시각을 알아보지 못했어요(예: 07:30)."
@@ -919,6 +923,8 @@ def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: d
         where = re.sub(r"\d{1,2}\s*[:시]\s*(\d{2})?\s*(까지|분)?", "", value).replace("출발지로", "").strip(" ·,")
         if t is not None:
             spec.arrive_time = t
+        elif not where and not place:     # 시각 지움
+            spec.arrive_time = None
         if where or place:
             loc = geo.locate(where, place)
             if not loc:

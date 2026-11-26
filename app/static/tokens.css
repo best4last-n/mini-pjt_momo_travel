@@ -1,0 +1,228 @@
+/* ═══════════════════════════════════════════════════════════════════════
+ * 모모의 여행 상담소 — 디자인 토큰 (style.css 보다 먼저 로드)
+ * ═══════════════════════════════════════════════════════════════════════
+ *
+ * 층 구조 (위층은 아래층만 참조한다)
+ *   1. 원시 팔레트  --c-<색>-<단계>      실제 색 값. 여기서만 hex를 쓴다.
+ *   2. 의미 토큰    --color-* --status-* --feedback-* --day-* --season-* --map-*
+ *                   "무엇에 쓰는 색인가". 다크 모드는 이 층만 다시 정의한다.
+ *   3. 브랜드 토큰  [data-brand="momo"] 블록 — 브랜드색·디스플레이 글꼴·캐릭터 색·장식
+ *   4. 컴포넌트 토큰 --btn-* --chip-* --card-* --input-* --pill-* --bubble-* --table-*
+ *                   의미/크기 토큰만 참조한다.
+ *
+ * 크기 토큰
+ *   --space-1..8   4px 단위 (4 8 12 16 20 24 32 40)
+ *   --radius-s/m/l/pill   4 / 8 / 14 / 999px
+ *   --shadow-1..3  카드 · 떠 있는 카드 · 드로어/팝오버
+ *   --text-xs..2xl 글자 크기 (+ --leading-*)
+ *   --z-*          sticky 20 · 조건 바 30 · 입력창 40 · 팝오버 60 · 토스트 90 · 모달 100
+ *   --dur-fast/base · --ease-out/spring
+ *
+ * 사용 규칙
+ *   - 컴포넌트 CSS에서는 원시 팔레트(--c-*)를 직접 쓰지 않는다. 의미/컴포넌트 토큰만 쓴다.
+ *   - 상태 색: 확정=--status-confirmed, 가정=--status-assumed, 미정=--status-missing, 선택=--status-optional
+ *   - 알림 박스: 성공 --feedback-success(-bg), 주의 --feedback-warn(-bg), 오류 --feedback-danger(-bg), 정보 --feedback-info(-bg)
+ *   - 일자 색은 --day-1..9 (지도 선·마커·일자 머리·표가 같은 값을 쓴다. app.js가 이 값을 읽는다)
+ *   - 상호작용 상태는 한 패턴: hover=--state-hover-bg, focus=--focus-ring, 선택=--state-selected-bg/fg, 비활성=--state-disabled-opacity
+ *
+ * 테마(캐릭터) 교체
+ *   <html data-brand="momo"> 의 [data-brand="momo"] 블록(밝은/어두운 두 곳)을 복제해 이름만 바꾸고
+ *   --color-brand*, --color-accent, --font-display, --char-*, --deco-*, --brand-sprite 를 고치면 된다.
+ *   --brand-sprite 는 app.js 의 SVG sprite symbol id 이다(새 캐릭터 symbol을 SPRITE에 추가).
+ */
+
+/* ───────── 1. 원시 팔레트 ───────── */
+:root {
+  --c-white: #ffffff;
+  --c-black: #000000;
+  --c-cream-50: #fffdf7;  --c-cream-100: #fffaf0;  --c-cream-300: #c9b48a;
+
+  --c-gray-50: #f7fafc;   --c-gray-75: #f3f7fa;    --c-gray-100: #eef1f4;  --c-gray-200: #dde6ee;
+  --c-gray-300: #c6d4e1;  --c-gray-400: #94a1ae;   --c-gray-450: #8a96a3;  --c-gray-500: #8593a3;
+  --c-gray-600: #566679;  --c-gray-800: #1f2d3d;   --c-gray-900: #111111;
+
+  --c-ink-100: #e6edf5;   --c-ink-300: #a8b6c5;    --c-ink-400: #7c8b9b;   --c-ink-450: #7d8a97;
+  --c-ink-600: #36475a;   --c-ink-650: #283646;    --c-ink-700: #222c36;   --c-ink-750: #1f2c3d;
+  --c-ink-800: #1b2530;   --c-ink-850: #18222d;    --c-ink-900: #141d27;   --c-ink-950: #0f151c;
+
+  --c-sky-50: #eaf5fc;    --c-sky-200: #a9d4f0;    --c-sky-300: #8cc8ec;   --c-sky-400: #4f97cc;  --c-sky-600: #2f6f9c;
+  --c-navy-50: #e7eef8;   --c-navy-300: #93b6e8;   --c-navy-500: #3a5a8c;  --c-navy-600: #2c4a7a; --c-navy-700: #1d3457;
+
+  --c-amber-50: #fcf2dd;  --c-amber-300: #f0b85a;  --c-amber-400: #e3a72f; --c-amber-600: #b7791f; --c-amber-900: #33270f;
+  --c-green-50: #e2f3ea;  --c-green-300: #6fcf97;  --c-green-600: #2f8a5b; --c-green-900: #15301f;
+  --c-red-50: #fbe8e4;    --c-red-300: #f08a7a;    --c-red-600: #c2483a;   --c-red-900: #3a1d19;
+  --c-orange-300: #f4a63a; --c-orange-400: #eb8b67; --c-orange-600: #d0603a;
+  --c-pink-50: #fdf0f3;   --c-pink-200: #f2b8c6;   --c-pink-300: #f4a3b4;  --c-pink-600: #b4546f;
+  --c-mint-50: #eaf8f2;   --c-mint-200: #9ad9c4;   --c-mint-600: #2b8068;
+  --c-honey-50: #fbf3e4;  --c-honey-200: #e8b66a;  --c-honey-600: #a8661c;
+  --c-wood-400: #c79a6b;  --c-wood-500: #a97a4c;   --c-wood-600: #8a5a3a;  --c-wood-700: #7a5a3c; --c-wood-800: #5f442b;
+
+  /* 일자 색 원본 (9일까지) */
+  --c-day-1: #3a5a8c; --c-day-2: #d0703a; --c-day-3: #2f8a5b; --c-day-4: #7a5ab0; --c-day-5: #b0466a;
+  --c-day-6: #3b8c8c; --c-day-7: #8a6d3b; --c-day-8: #5a6fb0; --c-day-9: #6a8a3a;
+}
+
+/* ───────── 크기·글꼴·움직임 (테마와 무관) ───────── */
+:root {
+  --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
+  --space-5: 20px; --space-6: 24px; --space-7: 32px; --space-8: 40px;
+
+  --radius-s: 4px; --radius-m: 8px; --radius-l: 14px; --radius-pill: 999px;
+
+  --font-body: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+  --text-xs: 11.5px;  --text-sm: 12.5px;  --text-md: 13.5px;  --text-base: 15px;
+  --text-lg: 17px;    --text-xl: 20px;    --text-2xl: 26px;
+  --leading-tight: 1.25; --leading-snug: 1.4; --leading-body: 1.6;
+
+  --z-sticky: 20; --z-bar: 30; --z-composer: 40; --z-popover: 60; --z-toast: 90; --z-modal: 100;
+  --dur-fast: .15s; --dur-base: .25s;
+  --ease-out: cubic-bezier(.3, .8, .3, 1); --ease-spring: cubic-bezier(.3, 1.4, .5, 1);
+}
+
+/* ───────── 2. 의미 토큰 (밝은 모드 기본) ───────── */
+:root {
+  --color-bg: var(--c-gray-75);
+  --color-surface: var(--c-white);
+  --color-surface-2: var(--c-gray-50);
+  --color-paper: var(--c-cream-50);
+  --color-text: var(--c-gray-800);
+  --color-text-muted: var(--c-gray-600);
+  --color-text-subtle: var(--c-gray-500);
+  --color-border: var(--c-gray-200);
+  --color-border-strong: var(--c-gray-300);
+  --color-on-color: var(--c-white);          /* 일자색·상태색 위 글자 */
+  --color-overlay: rgba(15, 21, 28, .38);
+
+  --feedback-success: var(--c-green-600);  --feedback-success-bg: var(--c-green-50);
+  --feedback-warn: var(--c-amber-600);     --feedback-warn-bg: var(--c-amber-50);
+  --feedback-danger: var(--c-red-600);     --feedback-danger-bg: var(--c-red-50);
+  --feedback-info: var(--c-sky-600);       --feedback-info-bg: var(--c-sky-50);
+
+  --status-confirmed: var(--c-green-600);  --status-confirmed-bg: var(--c-green-50);
+  --status-assumed: var(--c-amber-400);    --status-assumed-bg: var(--c-amber-50);
+  --status-missing: var(--c-red-600);      --status-missing-bg: var(--c-red-50);
+  --status-optional: var(--c-gray-400);    --status-optional-bg: var(--c-gray-100);
+
+  --day-1: var(--c-day-1); --day-2: var(--c-day-2); --day-3: var(--c-day-3); --day-4: var(--c-day-4); --day-5: var(--c-day-5);
+  --day-6: var(--c-day-6); --day-7: var(--c-day-7); --day-8: var(--c-day-8); --day-9: var(--c-day-9);
+
+  --map-marker-ring: var(--c-white);
+  --map-label-bg: rgba(255, 255, 255, .92);
+  --map-search: var(--c-gray-450);
+  --map-tile-filter: none;
+
+  --shadow-1: 0 1px 2px rgba(31, 45, 61, .06);
+  --shadow-2: 0 1px 2px rgba(31, 45, 61, .05), 0 6px 18px rgba(31, 45, 61, .07);
+  --shadow-3: -8px 0 30px rgba(0, 0, 0, .18);
+  --shadow-marker: 0 1px 4px rgba(0, 0, 0, .35);
+  --shadow-ticket: 0 2px 6px rgba(31, 45, 61, .08);
+}
+/* 계절(여행 날짜 기준) */
+[data-season="spring"] { --season: var(--c-pink-200);  --season-soft: var(--c-pink-50);  --season-deep: var(--c-pink-600); }
+[data-season="summer"] { --season: var(--c-mint-200);  --season-soft: var(--c-mint-50);  --season-deep: var(--c-mint-600); }
+[data-season="autumn"] { --season: var(--c-honey-200); --season-soft: var(--c-honey-50); --season-deep: var(--c-honey-600); }
+:root, [data-season="winter"] { --season: var(--c-sky-200); --season-soft: var(--c-sky-50); --season-deep: var(--c-sky-600); }
+
+/* ───────── 3. 브랜드: 모모 (밝은 모드) ───────── */
+[data-brand="momo"] {
+  --brand-sprite: momo-bird;
+  --font-display: "Jua", "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  --color-brand: var(--c-navy-600);
+  --color-brand-contrast: var(--c-white);
+  --color-brand-soft: var(--c-navy-50);
+  --color-accent: var(--c-orange-600);          /* 우표·소인·항공우편 줄 */
+  /* 캐릭터 색 (sprite·안내 데스크 SVG가 사용) */
+  --char-body: var(--c-sky-300);  --char-wing: var(--c-sky-400);  --char-belly: var(--c-white);
+  --char-eye: var(--c-gray-800);  --char-beak: var(--c-orange-300); --char-cheek: var(--c-pink-300);
+  --char-cap: var(--c-navy-600);  --char-cap-brim: var(--c-navy-700); --char-badge: var(--c-orange-600);
+  --char-letter: var(--c-cream-100); --char-letter-line: var(--c-cream-300);
+  --deco-desk: var(--c-wood-400); --deco-desk-top: var(--c-wood-500); --deco-stamp-handle: var(--c-wood-600);
+  /* 장식: 항공우편 띠 */
+  --deco-stripe-1: var(--color-accent);
+  --deco-stripe-2: var(--color-brand);
+}
+
+/* ───────── 다크 모드: 의미 토큰만 재정의 ───────── */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-bg: var(--c-ink-950); --color-surface: var(--c-ink-850); --color-surface-2: var(--c-ink-900); --color-paper: var(--c-ink-800);
+    --color-text: var(--c-ink-100); --color-text-muted: var(--c-ink-300); --color-text-subtle: var(--c-ink-400);
+    --color-border: var(--c-ink-650); --color-border-strong: var(--c-ink-600);
+    --feedback-success: var(--c-green-300); --feedback-success-bg: var(--c-green-900);
+    --feedback-warn: var(--c-amber-300);    --feedback-warn-bg: var(--c-amber-900);
+    --feedback-danger: var(--c-red-300);    --feedback-danger-bg: var(--c-red-900);
+    --feedback-info: var(--c-sky-200);      --feedback-info-bg: var(--c-ink-750);
+    --status-confirmed: var(--c-green-300); --status-confirmed-bg: var(--c-green-900);
+    --status-assumed: var(--c-amber-300);   --status-assumed-bg: var(--c-amber-900);
+    --status-missing: var(--c-red-300);     --status-missing-bg: var(--c-red-900);
+    --status-optional: var(--c-ink-450);    --status-optional-bg: var(--c-ink-700);
+    --map-tile-filter: brightness(.78) contrast(1.08) saturate(.85);
+    --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+    --shadow-2: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px rgba(0, 0, 0, .28);
+    --season-soft: color-mix(in srgb, var(--season) 14%, var(--c-ink-850));
+    --season-deep: color-mix(in srgb, var(--season) 85%, var(--c-white));
+  }
+  [data-brand="momo"]:not([data-theme="light"]) {
+    --color-brand: var(--c-navy-300); --color-brand-contrast: var(--c-ink-950); --color-brand-soft: var(--c-ink-750);
+    --color-accent: var(--c-orange-400);
+    --deco-desk: var(--c-wood-700); --deco-desk-top: var(--c-wood-800);
+  }
+}
+:root[data-theme="dark"] {
+  --color-bg: var(--c-ink-950); --color-surface: var(--c-ink-850); --color-surface-2: var(--c-ink-900); --color-paper: var(--c-ink-800);
+  --color-text: var(--c-ink-100); --color-text-muted: var(--c-ink-300); --color-text-subtle: var(--c-ink-400);
+  --color-border: var(--c-ink-650); --color-border-strong: var(--c-ink-600);
+  --feedback-success: var(--c-green-300); --feedback-success-bg: var(--c-green-900);
+  --feedback-warn: var(--c-amber-300);    --feedback-warn-bg: var(--c-amber-900);
+  --feedback-danger: var(--c-red-300);    --feedback-danger-bg: var(--c-red-900);
+  --feedback-info: var(--c-sky-200);      --feedback-info-bg: var(--c-ink-750);
+  --status-confirmed: var(--c-green-300); --status-confirmed-bg: var(--c-green-900);
+  --status-assumed: var(--c-amber-300);   --status-assumed-bg: var(--c-amber-900);
+  --status-missing: var(--c-red-300);     --status-missing-bg: var(--c-red-900);
+  --status-optional: var(--c-ink-450);    --status-optional-bg: var(--c-ink-700);
+  --map-tile-filter: brightness(.78) contrast(1.08) saturate(.85);
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .3);
+  --shadow-2: 0 1px 2px rgba(0, 0, 0, .3), 0 8px 22px rgba(0, 0, 0, .28);
+  --season-soft: color-mix(in srgb, var(--season) 14%, var(--c-ink-850));
+  --season-deep: color-mix(in srgb, var(--season) 85%, var(--c-white));
+}
+[data-brand="momo"][data-theme="dark"] {
+  --color-brand: var(--c-navy-300); --color-brand-contrast: var(--c-ink-950); --color-brand-soft: var(--c-ink-750);
+  --color-accent: var(--c-orange-400);
+  --deco-desk: var(--c-wood-700); --deco-desk-top: var(--c-wood-800);
+}
+
+/* ───────── 4. 컴포넌트 토큰 (의미·크기 토큰만 참조) ───────── */
+:root {
+  --focus-ring: 0 0 0 3px color-mix(in srgb, var(--color-brand) 35%, transparent);
+  --state-hover-bg: var(--color-brand-soft);
+  --state-selected-bg: var(--color-brand);
+  --state-selected-fg: var(--color-brand-contrast);
+  --state-disabled-opacity: .45;
+
+  --control-h-sm: 32px; --control-h-md: 40px; --control-h-lg: 46px;
+
+  --btn-radius: var(--radius-m);
+  --btn-pad-x: var(--space-4); --btn-pad-x-sm: var(--space-3); --btn-pad-x-xs: 9px;
+  --btn-border: var(--color-border-strong);
+
+  --chip-h: 32px; --chip-h-sm: 26px; --chip-pad-x: 13px; --chip-radius: var(--radius-pill);
+  --chip-fg: var(--color-brand); --chip-border: color-mix(in srgb, var(--color-brand) 45%, transparent); --chip-bg: var(--color-surface);
+
+  --card-bg: var(--color-surface); --card-border: var(--color-border); --card-radius: var(--radius-m);
+  --card-pad: var(--space-4); --card-shadow: var(--shadow-1);
+
+  --input-h: var(--control-h-md); --input-pad-x: 10px; --input-radius: var(--radius-m);
+  --input-bg: var(--color-surface); --input-border: var(--color-border-strong);
+
+  --pill-h: 36px; --pill-radius: var(--radius-m); --pill-pad-x: 10px;
+
+  --bubble-radius: var(--radius-l); --bubble-pad: 10px 14px;
+  --bubble-me-bg: var(--color-brand); --bubble-me-fg: var(--color-brand-contrast);
+  --bubble-momo-bg: var(--color-surface); --bubble-momo-border: var(--color-border);
+
+  --table-cell-pad: 7px 6px; --table-border: var(--color-border); --table-head-fg: var(--color-text-subtle);
+
+  --deco-stripe: repeating-linear-gradient(-45deg, var(--deco-stripe-1) 0 10px, transparent 10px 16px, var(--deco-stripe-2) 16px 26px, transparent 26px 32px);
+}

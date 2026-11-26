@@ -20,7 +20,11 @@
   const PRINT = READ_ONLY && params.get("print") === "1";
   const REDUCED = window.matchMedia("(prefers-reduced-motion: reduce)");
   const MQ_PC = window.matchMedia("(min-width: 1024px)");
-  const DAY_COLORS = ["#3a5a8c", "#d0703a", "#2f8a5b", "#7a5ab0", "#b0466a", "#3b8c8c", "#8a6d3b", "#5a6fb0", "#6a8a3a"];
+  // 테마 값은 tokens.css 에서 읽는다 (브랜드 캐릭터 sprite id, 일자 색)
+  const ROOT_CSS = window.getComputedStyle(document.documentElement);
+  const cssVar = (name, fb) => ((ROOT_CSS.getPropertyValue(name) || "").trim().replace(/^["']|["']$/g, "") || fb);
+  const BRAND_SPRITE = cssVar("--brand-sprite", "momo-bird");
+  const DAY_COLORS = ["#3a5a8c", "#d0703a", "#2f8a5b", "#7a5ab0", "#b0466a", "#3b8c8c", "#8a6d3b", "#5a6fb0", "#6a8a3a"].map((fb, i) => cssVar(`--day-${i + 1}`, fb));
   const WD = "일월화수목금토";
   const LICENSE = { Type1: "공공누리 제1유형", Type3: "공공누리 제3유형(변경 금지)" };
   const STATUS = {
@@ -70,69 +74,70 @@
   /* ───────── SVG ───────── */
   const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false"><defs>
 <symbol id="momo-bird" viewBox="0 0 64 64">
- <path d="M11 41 L1 33 L3 43 L0 51 L13 47 Z" fill="var(--bird-wing)"/>
- <ellipse cx="28" cy="41" rx="20" ry="16" fill="var(--bird)"/>
- <circle cx="41" cy="28" r="12" fill="var(--bird)"/>
- <ellipse cx="35" cy="46" rx="12" ry="8" fill="#fff"/>
- <path d="M13 39 C17 30 30 32 33 41 C29 47 18 48 13 39Z" fill="var(--bird-wing)"/>
- <g transform="rotate(-10 26 47)"><rect x="19" y="42" width="14" height="9.5" rx="1" fill="#fffaf0" stroke="#c9b48a" stroke-width=".9"/>
- <path d="M19.4 42.4 L26 47.3 L32.6 42.4" fill="none" stroke="#c9b48a" stroke-width=".9"/><circle cx="26" cy="47.4" r="1.5" fill="#d0603a"/></g>
- <circle cx="45" cy="28.5" r="2.5" fill="#1f2d3d"/><circle cx="45.9" cy="27.6" r=".85" fill="#fff"/>
- <circle cx="47.5" cy="33" r="2.4" fill="#f4a3b4" opacity=".75"/>
- <path d="M52 27.5 L60 30 L52 32.6Z" fill="#f4a63a"/>
- <path d="M29 23.5 C29.5 11 51 10 53 22.5 L53 24.5 L29 24.5Z" fill="#2c4a7a"/>
- <path d="M44 23 L59 24.6 Q58 27.4 46 26.6Z" fill="#1d3457"/>
- <circle cx="40" cy="17.5" r="2.4" fill="#d0603a"/>
- <path d="M25 56 v4 M33 56 v4" stroke="#f4a63a" stroke-width="2" stroke-linecap="round"/>
+ <path d="M11 41 L1 33 L3 43 L0 51 L13 47 Z" fill="var(--char-wing)"/>
+ <ellipse cx="28" cy="41" rx="20" ry="16" fill="var(--char-body)"/>
+ <circle cx="41" cy="28" r="12" fill="var(--char-body)"/>
+ <ellipse cx="35" cy="46" rx="12" ry="8" fill="var(--char-belly)"/>
+ <path d="M13 39 C17 30 30 32 33 41 C29 47 18 48 13 39Z" fill="var(--char-wing)"/>
+ <g transform="rotate(-10 26 47)"><rect x="19" y="42" width="14" height="9.5" rx="1" fill="var(--char-letter)" stroke="var(--char-letter-line)" stroke-width=".9"/>
+ <path d="M19.4 42.4 L26 47.3 L32.6 42.4" fill="none" stroke="var(--char-letter-line)" stroke-width=".9"/><circle cx="26" cy="47.4" r="1.5" fill="var(--char-badge)"/></g>
+ <circle cx="45" cy="28.5" r="2.5" fill="var(--char-eye)"/><circle cx="45.9" cy="27.6" r=".85" fill="var(--char-belly)"/>
+ <circle cx="47.5" cy="33" r="2.4" fill="var(--char-cheek)" opacity=".75"/>
+ <path d="M52 27.5 L60 30 L52 32.6Z" fill="var(--char-beak)"/>
+ <path d="M29 23.5 C29.5 11 51 10 53 22.5 L53 24.5 L29 24.5Z" fill="var(--char-cap)"/>
+ <path d="M44 23 L59 24.6 Q58 27.4 46 26.6Z" fill="var(--char-cap-brim)"/>
+ <circle cx="40" cy="17.5" r="2.4" fill="var(--char-badge)"/>
+ <path d="M25 56 v4 M33 56 v4" stroke="var(--char-beak)" stroke-width="2" stroke-linecap="round"/>
 </symbol>
 <symbol id="ico-fork" viewBox="0 0 16 16"><path d="M4.5 1.5v4.2M3 1.5v3.6a1.5 1.5 0 0 0 3 0V1.5M4.5 6.6v7.9M12 1.5c-1.6 1-2.2 3-2.2 5.3h2.2v7.7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-chev" viewBox="0 0 16 16"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-send" viewBox="0 0 20 20"><path d="M2.5 9.6 17 3 12.6 17.2l-2.7-5.6zM9.9 11.6 17 3" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
 <symbol id="ico-mic" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M9 21h6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 <symbol id="ico-pop" viewBox="0 0 16 16"><path d="M9 2.5h4.5V7M13.5 2.5 7.5 8.5M12 9.5V13a.5.5 0 0 1-.5.5h-8A.5.5 0 0 1 3 13V5a.5.5 0 0 1 .5-.5H7" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-clock" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 4.6V8l2.3 1.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-pin" viewBox="0 0 16 16"><path d="M8 15s5-4.6 5-8.4A5 5 0 0 0 3 6.6C3 10.4 8 15 8 15z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.6" r="1.8" fill="currentColor"/></symbol>
 </defs></svg>`;
-  const bird = (cls = "bird") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#momo-bird"/></svg>`;
+  const bird = (cls = "bird") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${BRAND_SPRITE}"/></svg>`;
   const ico = (id, cls = "ico") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${id}"/></svg>`;
   const MOMO_ILLUST = `<svg class="illust" viewBox="0 0 160 110" role="img" aria-label="사진이 없어 모모 그림으로 대신했어요">
 <rect width="160" height="110" fill="var(--season-soft)"/>
-<ellipse cx="34" cy="28" rx="18" ry="6" fill="var(--surface)" opacity=".9"/><ellipse cx="128" cy="20" rx="14" ry="5" fill="var(--surface)" opacity=".9"/>
+<ellipse cx="34" cy="28" rx="18" ry="6" fill="var(--color-surface)" opacity=".9"/><ellipse cx="128" cy="20" rx="14" ry="5" fill="var(--color-surface)" opacity=".9"/>
 <path d="M8 92 C40 70 70 96 100 74 S150 60 156 44" fill="none" stroke="var(--season-deep)" stroke-width="1.4" stroke-dasharray="3 4" opacity=".6"/>
-<use href="#momo-bird" x="54" y="22" width="60" height="60"/></svg>`;
+<use href="#${BRAND_SPRITE}" x="54" y="22" width="60" height="60"/></svg>`;
 
   /* 안내 데스크의 모모 — 부위별 그룹(m-*)을 CSS가 상태(data-mood)에 따라 움직인다 */
   const DESK_SVG = `<svg class="desk-svg" viewBox="0 0 150 112" role="img" aria-label="안내 데스크에 앉은 우체부 철새 모모">
 <circle cx="86" cy="54" r="38" fill="var(--season-soft)"/>
 <g class="m-spark" fill="var(--season-deep)"><path d="M40 30 l2 5 5 2 -5 2 -2 5 -2 -5 -5 -2 5 -2z"/><path d="M132 60 l1.5 4 4 1.5 -4 1.5 -1.5 4 -1.5 -4 -4 -1.5 4 -1.5z"/><path d="M58 14 l1.2 3 3 1.2 -3 1.2 -1.2 3 -1.2 -3 -3 -1.2 3 -1.2z"/></g>
 <g transform="translate(46 20)"><g class="m-jump"><g class="m-breathe">
- <path d="M11 41 L1 33 L3 43 L0 51 L13 47 Z" fill="var(--bird-wing)"/>
- <g class="m-wing-back"><path d="M30 34 C36 20 50 18 56 22 C50 30 42 38 32 42Z" fill="var(--bird-wing)"/></g>
- <ellipse cx="28" cy="41" rx="20" ry="16" fill="var(--bird)"/>
- <ellipse cx="35" cy="46" rx="12" ry="8" fill="#fff"/>
+ <path d="M11 41 L1 33 L3 43 L0 51 L13 47 Z" fill="var(--char-wing)"/>
+ <g class="m-wing-back"><path d="M30 34 C36 20 50 18 56 22 C50 30 42 38 32 42Z" fill="var(--char-wing)"/></g>
+ <ellipse cx="28" cy="41" rx="20" ry="16" fill="var(--char-body)"/>
+ <ellipse cx="35" cy="46" rx="12" ry="8" fill="var(--char-belly)"/>
  <g class="m-head">
-  <circle cx="41" cy="28" r="12" fill="var(--bird)"/>
-  <g class="m-eye"><circle cx="45" cy="28.5" r="2.5" fill="#1f2d3d"/><circle cx="45.9" cy="27.6" r=".85" fill="#fff"/></g>
-  <path class="m-eye-closed" d="M42.4 29 q2.6 2.2 5.2 0" fill="none" stroke="#1f2d3d" stroke-width="1.5" stroke-linecap="round"/>
-  <circle cx="47.5" cy="33" r="2.4" fill="#f4a3b4" opacity=".75"/>
-  <path d="M52 27.5 L60 30 L52 32.6Z" fill="#f4a63a"/>
-  <path d="M29 23.5 C29.5 11 51 10 53 22.5 L53 24.5 L29 24.5Z" fill="#2c4a7a"/>
-  <path d="M44 23 L59 24.6 Q58 27.4 46 26.6Z" fill="#1d3457"/>
-  <circle cx="40" cy="17.5" r="2.4" fill="#d0603a"/>
+  <circle cx="41" cy="28" r="12" fill="var(--char-body)"/>
+  <g class="m-eye"><circle cx="45" cy="28.5" r="2.5" fill="var(--char-eye)"/><circle cx="45.9" cy="27.6" r=".85" fill="var(--char-belly)"/></g>
+  <path class="m-eye-closed" d="M42.4 29 q2.6 2.2 5.2 0" fill="none" stroke="var(--char-eye)" stroke-width="1.5" stroke-linecap="round"/>
+  <circle cx="47.5" cy="33" r="2.4" fill="var(--char-cheek)" opacity=".75"/>
+  <path d="M52 27.5 L60 30 L52 32.6Z" fill="var(--char-beak)"/>
+  <path d="M29 23.5 C29.5 11 51 10 53 22.5 L53 24.5 L29 24.5Z" fill="var(--char-cap)"/>
+  <path d="M44 23 L59 24.6 Q58 27.4 46 26.6Z" fill="var(--char-cap-brim)"/>
+  <circle cx="40" cy="17.5" r="2.4" fill="var(--char-badge)"/>
  </g>
- <g class="m-wing"><path d="M13 39 C17 30 30 32 33 41 C29 47 18 48 13 39Z" fill="var(--bird-wing)"/></g>
+ <g class="m-wing"><path d="M13 39 C17 30 30 32 33 41 C29 47 18 48 13 39Z" fill="var(--char-wing)"/></g>
 </g></g></g>
-<g class="m-letters"><rect x="15" y="63" width="30" height="8" rx="1" fill="#fffaf0" stroke="#c9b48a" stroke-width=".8" transform="rotate(-4 30 67)"/>
- <rect x="17" y="58" width="28" height="9" rx="1" fill="#fffdf6" stroke="#c9b48a" stroke-width=".8"/><path d="M17.4 58.4 L31 63.4 L44.6 58.4" fill="none" stroke="#c9b48a" stroke-width=".8"/>
- <g class="m-mark"><circle cx="31" cy="62.5" r="5.2" fill="none" stroke="#d0603a" stroke-width="1.4"/><text x="31" y="64.6" text-anchor="middle" font-size="5" fill="#d0603a" font-weight="700">확정</text></g></g>
-<g class="m-stamp"><rect x="25" y="34" width="12" height="4" rx="1" fill="#d0603a"/><rect x="29" y="22" width="4" height="12" rx="1.5" fill="#8a5a3a"/><circle cx="31" cy="21" r="3.4" fill="#8a5a3a"/></g>
-<rect x="6" y="70" width="138" height="7" rx="2" fill="var(--desk-top)"/>
-<rect x="12" y="77" width="126" height="33" rx="2" fill="var(--desk)"/>
-<rect x="52" y="84" width="46" height="15" rx="2" fill="var(--surface)" stroke="var(--brand)" stroke-width="1"/>
-<text x="75" y="94.6" text-anchor="middle" font-size="8.5" fill="var(--brand)" font-family="Jua, 'Noto Sans KR', sans-serif">여행 상담</text>
-<g class="m-bub m-bub-think"><circle cx="124" cy="26" r="13" fill="var(--surface)" stroke="var(--line-2)"/><circle cx="111" cy="41" r="3" fill="var(--surface)" stroke="var(--line-2)"/>
- <circle class="bd" cx="118" cy="26" r="1.8" fill="var(--ink-2)"/><circle class="bd" cx="124" cy="26" r="1.8" fill="var(--ink-2)"/><circle class="bd" cx="130" cy="26" r="1.8" fill="var(--ink-2)"/></g>
-<g class="m-bub m-bub-ask"><circle cx="124" cy="26" r="13" fill="var(--surface)" stroke="var(--line-2)"/><path d="M113 36 l-4 7 9 -4z" fill="var(--surface)" stroke="var(--line-2)"/>
- <text x="124" y="31.5" text-anchor="middle" font-size="15" font-weight="700" fill="var(--brand)" font-family="Jua, sans-serif">?</text></g>
+<g class="m-letters"><rect x="15" y="63" width="30" height="8" rx="1" fill="var(--char-letter)" stroke="var(--char-letter-line)" stroke-width=".8" transform="rotate(-4 30 67)"/>
+ <rect x="17" y="58" width="28" height="9" rx="1" fill="var(--char-letter)" stroke="var(--char-letter-line)" stroke-width=".8"/><path d="M17.4 58.4 L31 63.4 L44.6 58.4" fill="none" stroke="var(--char-letter-line)" stroke-width=".8"/>
+ <g class="m-mark"><circle cx="31" cy="62.5" r="5.2" fill="none" stroke="var(--char-badge)" stroke-width="1.4"/><text x="31" y="64.6" text-anchor="middle" font-size="5" fill="var(--char-badge)" font-weight="700">확정</text></g></g>
+<g class="m-stamp"><rect x="25" y="34" width="12" height="4" rx="1" fill="var(--char-badge)"/><rect x="29" y="22" width="4" height="12" rx="1.5" fill="var(--deco-stamp-handle)"/><circle cx="31" cy="21" r="3.4" fill="var(--deco-stamp-handle)"/></g>
+<rect x="6" y="70" width="138" height="7" rx="2" fill="var(--deco-desk-top)"/>
+<rect x="12" y="77" width="126" height="33" rx="2" fill="var(--deco-desk)"/>
+<rect x="52" y="84" width="46" height="15" rx="2" fill="var(--color-surface)" stroke="var(--color-brand)" stroke-width="1"/>
+<text x="75" y="94.6" text-anchor="middle" font-size="8.5" fill="var(--color-brand)" font-family="Jua, 'Noto Sans KR', sans-serif">여행 상담</text>
+<g class="m-bub m-bub-think"><circle cx="124" cy="26" r="13" fill="var(--color-surface)" stroke="var(--color-border-strong)"/><circle cx="111" cy="41" r="3" fill="var(--color-surface)" stroke="var(--color-border-strong)"/>
+ <circle class="bd" cx="118" cy="26" r="1.8" fill="var(--color-text-muted)"/><circle class="bd" cx="124" cy="26" r="1.8" fill="var(--color-text-muted)"/><circle class="bd" cx="130" cy="26" r="1.8" fill="var(--color-text-muted)"/></g>
+<g class="m-bub m-bub-ask"><circle cx="124" cy="26" r="13" fill="var(--color-surface)" stroke="var(--color-border-strong)"/><path d="M113 36 l-4 7 9 -4z" fill="var(--color-surface)" stroke="var(--color-border-strong)"/>
+ <text x="124" y="31.5" text-anchor="middle" font-size="15" font-weight="700" fill="var(--color-brand)" font-family="Jua, sans-serif">?</text></g>
 </svg>`;
   const MOOD_TEXT = { idle: "편지를 기다리고 있어요", thinking: "모모가 날아가는 중…", happy: "계획서를 배달했어요!", stamp: "확정 도장 쾅!", asking: "조금만 더 알려 주세요", sorry: "앗, 미안해요" };
   let moodTimer = 0;
@@ -364,7 +369,7 @@
   }
   function openAnswerWindow(html) {
     const css = Array.from(document.querySelectorAll('link[rel="stylesheet"]')).map((l) => `<link rel="stylesheet" href="${esc(l.href)}">`).join("");
-    const page = `<!doctype html><html lang="ko" data-season="${esc(document.documentElement.dataset.season || "winter")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>모모의 답변</title>${css}</head>
+    const page = `<!doctype html><html lang="ko" data-brand="${esc(document.documentElement.dataset.brand || "momo")}" data-season="${esc(document.documentElement.dataset.season || "winter")}"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>모모의 답변</title>${css}</head>
       <body class="answer-page"><main class="answer-main"><div class="bub rich">${cleanHtml(html)}</div></main></body></html>`;
     const url = URL.createObjectURL(new Blob([page], { type: "text/html;charset=utf-8" }));
     window.open(url, "_blank", "noopener");
@@ -617,12 +622,12 @@
         <div id="st-more-b" class="st-fold-b"${S.moreOpen ? "" : " hidden"}>
           <div class="st-grid2">
             <label class="st-in"><span>출발지 (시·군·구)</span><input type="text" data-st="origin" value="${esc(S.origin)}" placeholder="예) 서울 강남구, 판교동" maxlength="30" autocomplete="off"${geoAttrs("origin")}></label>
-            <label class="st-in"><span>출발 시각</span><input type="time" data-st="depart_time" value="${esc(S.depart_time)}"></label>
+            <div class="st-in"><span>출발 시각</span>${tpTrigger("st-depart", "depart", S.depart_time)}</div>
           </div>
           <div class="opts">${(OPT.origins || DEFAULT_OPTIONS.origins).map((o) => pickChip("st-origin", optLabel(o), esc(optLabel(o)), S.origin === optLabel(o), ' data-size="sm"')).join("")}</div>
           <div class="st-grid2">
             <label class="st-in"><span>여행 후 도착지</span><input type="text" data-st="end_location" value="${esc(S.end_location)}" placeholder="${esc(S.origin ? S.origin + " (출발지와 같아요)" : "출발지와 같아요")}" maxlength="30" autocomplete="off"${geoAttrs("end")}></label>
-            <label class="st-in"><span>도착 희망 시각</span><input type="time" data-st="arrive_time" value="${esc(S.arrive_time)}"></label>
+            <div class="st-in"><span>도착 희망 시각</span>${tpTrigger("st-arrive", "arrive", S.arrive_time)}</div>
           </div></div></div>`;
     const ints = (OPT.intensities || []).map((o) => { const v = optLabel(o); return `<button type="button" class="int-c${S.intensity === v ? " on" : ""}" aria-pressed="${S.intensity === v}" data-act="st-int" data-v="${esc(v)}" data-fid="int:${esc(v)}"><b>${esc(v)}</b><span>${esc(o.desc || "")}</span></button>`; }).join("");
     const budgets = (OPT.budget_presets || []).map((b) => pickChip("st-budget", optLabel(b), esc(optLabel(b)), S.budget === optLabel(b))).join("") + pickChip("st-budget", "custom", "직접 입력", S.budget === "custom");
@@ -822,7 +827,7 @@
     const t = inp.dataset.geo;
     if (t === "origin") { S.origin = it.label; S.origin_place = it; const end = $('[data-st="end_location"]'); if (end) end.placeholder = `${it.label} (출발지와 같아요)`; }
     else if (t === "end") { S.end_location = it.label; S.end_place = it; }
-    else if (t === "cond") condPlace[inp.dataset.key] = it;
+    else if (t === "cond") { condPlace[inp.dataset.key] = it; if (inp.dataset.key === ARR.key) ARR.label = it.label; }
     geoClose();
     inp.focus();
   }
@@ -935,13 +940,24 @@
     const id = `ed-${esc(c.key)}`;
     const hint = c.hint ? `<p class="hint">${esc(c.hint)}</p>` : "";
     let body = "";
-    if (c.input === "date" || c.input === "time") {
-      const val = c.input === "date" ? (c.iso || "") : (c.iso || (/^\d{2}:\d{2}$/.test(c.value || "") ? c.value : ""));
+    const pend = state.pending[c.key];
+    if (c.key === "arrival") {
+      // 도착: 장소(자동완성)와 시각(TimePicker)을 따로
+      if (ARR.key !== c.key) arrInit(c);
+      body = `<form class="ed-form arr-form" data-form="arrival" data-key="${esc(c.key)}">
+        <label class="st-in"><span>여행 후 도착지</span><input type="text" name="place" value="${esc(ARR.label)}" placeholder="출발지와 같아요" maxlength="40" autocomplete="off"${geoAttrs("cond", c.key)}></label>
+        <div class="st-in"><span>도착 희망 시각</span>${tpTrigger("arr-time", "arrive", ARR.time)}</div>
+        <button class="btn sm primary">변경 예정에 넣기</button></form>`;
+    } else if (c.input === "time" || c.key === "depart_time") {
+      const kind = /arriv|end|도착/.test(c.key + c.label) ? "arrive" : "depart";
+      body = `<div class="ed-time">${tpTrigger("cond:" + c.key, kind, pend ? hhmm(pend.value) : condCurrent(c))}</div>`;
+    } else if (c.input === "date") {
+      const val = pend ? pend.value : (c.iso || "");
       body = `<form class="ed-form" data-form="set" data-key="${esc(c.key)}"><label class="sr" for="in-${id}">${esc(c.label)}</label>
-        <input id="in-${id}" type="${c.input}" name="v" value="${esc(val)}" required><button class="btn sm primary">바꾸기</button></form>`;
-    } else if (c.input === "text") {
+        <input id="in-${id}" type="date" name="v" value="${esc(val)}" required><button class="btn sm primary">바꾸기</button></form>`;
+    } else if (c.input === "text" || !(c.options || []).length) {
       body = `<form class="ed-form" data-form="set" data-key="${esc(c.key)}"><label class="sr" for="in-${id}">${esc(c.label)}</label>
-        <input id="in-${id}" type="text" name="v" value="${esc(c.status === "confirmed" ? c.value || "" : "")}" placeholder="${esc(c.value || "직접 적어 주세요")}" autocomplete="off" maxlength="60" required${GEO_KEYS.indexOf(c.key) >= 0 ? geoAttrs("cond", c.key) : ""}>
+        <input id="in-${id}" type="text" name="v" value="${esc(pend ? pend.value : (c.status === "confirmed" ? c.value || "" : ""))}" placeholder="${esc(c.value || "직접 적어 주세요")}" autocomplete="off" maxlength="60" required${GEO_KEYS.indexOf(c.key) >= 0 ? geoAttrs("cond", c.key) : ""}>
         <button class="btn sm primary">바꾸기</button></form>
         ${(c.options || []).length ? `<div class="opts" role="group" aria-label="추천 값">${c.options.map((o) => `<button type="button" class="chip sm" data-act="cond-sugg" data-key="${esc(c.key)}" data-v="${esc(o)}">${esc(o)}</button>`).join("")}</div>` : ""}`;
     } else {
@@ -953,12 +969,178 @@
     return `<div class="cond-ed" id="${id}">${hint}${body}</div>`;
   }
 
+  /* ───────── 시각 고르기 (공용 TimePicker) ─────────
+   * 트리거 버튼 → 팝오버(모바일은 바텀시트): 빠른 선택 · 시 그리드 · 분 칩 · 선택 안 함 · 확인
+   * 값은 항상 "HH:MM" 또는 "" (선택 안 함). 다시 열면 현재 값(변경 예정 포함)이 선택돼 있다.
+   */
+  const TP_CFG = {
+    depart: { quick: ["06:00", "07:00", "08:00", "09:00", "10:00"], from: 5, to: 12, word: "출발", title: "출발 시각", ph: "출발 시각 선택(선택)" },
+    arrive: { quick: ["18:00", "19:00", "20:00", "21:00", "22:00"], from: 14, to: 23, word: "도착", title: "도착 희망 시각", ph: "도착 시각 선택(선택)" },
+  };
+  const TP_MIN = ["00", "10", "20", "30", "40", "50"];
+  const TP = { target: null, kind: "depart", h: null, m: null, trigger: null };
+  const hhmm = (v) => { const m = /(\d{1,2}):(\d{2})/.exec(String(v || "")); return m ? `${pad2(Number(m[1]))}:${m[2]}` : ""; };
+  function tpTrigger(target, kind, value) {
+    const cfg = TP_CFG[kind];
+    return `<button type="button" class="tp-trigger${value ? " has" : ""}" data-act="tp-open" data-tp="${esc(target)}" data-kind="${kind}" data-fid="tp:${esc(target)}"
+      aria-haspopup="dialog" aria-expanded="false" aria-label="${esc(cfg.title)}: ${value ? esc(value) : "선택 안 함"} — 눌러서 고르기">
+      ${ico("ico-clock")}<span class="tp-v">${value ? `<b>${esc(value)}</b> ${cfg.word}` : esc(cfg.ph)}</span>${ico("ico-chev", "ico chev")}</button>`;
+  }
+  function condCurrent(c) {
+    if (!c) return "";
+    if (c.input === "date") return c.iso || "";
+    if (c.input === "time") return c.iso || hhmm(c.value);
+    return c.value || "";
+  }
+  function tpGet(target) {
+    if (target === "st-depart") return S.depart_time || "";
+    if (target === "st-arrive") return S.arrive_time || "";
+    if (target === "arr-time") return ARR.time || "";
+    if (target.indexOf("cond:") === 0) {
+      const key = target.slice(5);
+      if (state.pending[key]) return hhmm(state.pending[key].value);
+      return condCurrent(currentConds().find((x) => x.key === key));
+    }
+    return "";
+  }
+  function tpSet(target, v) {
+    if (target === "st-depart") { S.depart_time = v; renderStarter(); }
+    else if (target === "st-arrive") { S.arrive_time = v; renderStarter(); }
+    else if (target === "arr-time") { ARR.time = v; renderConditions(); const tr = $('[data-tp="arr-time"]'); if (tr) tr.focus(); }
+    else if (target.indexOf("cond:") === 0) sendSet(target.slice(5), v);
+  }
+  function tpPop() {
+    let el = $("#tp-pop");
+    if (!el) {
+      el = document.createElement("div");
+      el.id = "tp-pop"; el.className = "tp-pop"; el.setAttribute("role", "dialog"); el.hidden = true;
+      const back = document.createElement("div"); back.id = "tp-back"; back.className = "tp-back"; back.hidden = true; back.dataset.act = "tp-close";
+      document.body.append(back, el);
+      el.addEventListener("keydown", tpKeydown);
+    }
+    return el;
+  }
+  function tpOpen(btn) {
+    if (TP.trigger && TP.trigger !== btn) tpClose(false);
+    TP.target = btn.dataset.tp; TP.kind = btn.dataset.kind === "arrive" ? "arrive" : "depart"; TP.trigger = btn;
+    const v = tpGet(TP.target);
+    TP.h = v ? v.slice(0, 2) : null; TP.m = v ? v.slice(3, 5) : null;
+    const el = tpPop();
+    el.setAttribute("aria-label", TP_CFG[TP.kind].title + " 고르기");
+    el.hidden = false;
+    btn.setAttribute("aria-expanded", "true");
+    tpRender(true);
+    tpPlace();
+  }
+  function tpRender(focusFirst) {
+    const el = $("#tp-pop");
+    if (!el || el.hidden) return;
+    const cfg = TP_CFG[TP.kind];
+    const fa = document.activeElement && el.contains(document.activeElement) ? document.activeElement.dataset.k : null;
+    const hours = []; for (let h = cfg.from; h <= cfg.to; h++) hours.push(pad2(h));
+    if (TP.h && hours.indexOf(TP.h) < 0) hours.push(TP.h), hours.sort();
+    const mins = TP_MIN.slice(); if (TP.m && mins.indexOf(TP.m) < 0) mins.push(TP.m), mins.sort();
+    const cur = TP.h ? `${TP.h}:${TP.m || "00"}` : "";
+    const b = (act, v, label, on, extra = "") => `<button type="button" class="tp-b${on ? " on" : ""}" data-act="${act}" data-v="${v}" data-k="${act}:${v}" aria-pressed="${on}"${extra}>${label}</button>`;
+    el.innerHTML = `<div class="tp-head"><p class="tp-title">${esc(cfg.title)}</p><p class="tp-now" aria-live="polite">${cur ? `<b>${cur}</b> ${cfg.word}` : "아직 안 골랐어요"}</p>
+        <button type="button" class="x" data-act="tp-close" data-k="close" aria-label="닫기">×</button></div>
+      <div class="tp-sec"><p class="tp-l" id="tp-l1">빠른 선택</p><div class="tp-g tp-quick" role="group" aria-labelledby="tp-l1">${cfg.quick.map((q) => b("tp-quick", q, q, q === cur)).join("")}</div></div>
+      <div class="tp-sec"><p class="tp-l" id="tp-l2">시</p><div class="tp-g tp-hours" role="group" aria-labelledby="tp-l2" data-cols="4">${hours.map((h) => b("tp-h", h, `${Number(h)}시`, h === TP.h, ` aria-label="${Number(h)}시"`)).join("")}</div></div>
+      <div class="tp-sec"><p class="tp-l" id="tp-l3">분</p><div class="tp-g tp-mins" role="group" aria-labelledby="tp-l3">${mins.map((m) => b("tp-m", m, `${m}분`, TP.h != null && m === (TP.m || "00"))).join("")}</div></div>
+      <div class="tp-foot"><button type="button" class="btn sm ghost" data-act="tp-clear" data-k="clear">선택 안 함</button>
+        <button type="button" class="btn sm primary" data-act="tp-ok" data-k="ok"${TP.h ? "" : " disabled"}>확인</button></div>`;
+    const want = fa ? el.querySelector(`[data-k="${cssEsc(fa)}"]`) : null;
+    if (want) want.focus();
+    else if (focusFirst) (el.querySelector(".tp-b.on") || el.querySelector(".tp-b")).focus();
+  }
+  function tpPlace() {
+    const el = $("#tp-pop"), back = $("#tp-back");
+    if (!el || el.hidden || !TP.trigger) return;
+    const sheet = window.innerWidth < 640;
+    el.classList.toggle("sheet", sheet);
+    back.hidden = !sheet;
+    if (sheet) { el.style.left = el.style.top = ""; return; }
+    const r = TP.trigger.getBoundingClientRect();
+    const w = el.offsetWidth, h = el.offsetHeight;
+    let top = r.bottom + 6;
+    if (top + h > window.innerHeight - 8) top = Math.max(8, r.top - h - 6);
+    el.style.left = Math.max(8, Math.min(r.left, window.innerWidth - w - 8)) + "px";
+    el.style.top = top + "px";
+  }
+  function tpClose(refocus) {
+    const el = $("#tp-pop"), back = $("#tp-back");
+    if (el) el.hidden = true;
+    if (back) back.hidden = true;
+    const t = TP.trigger;
+    if (t) { t.setAttribute("aria-expanded", "false"); if (refocus && t.isConnected) t.focus(); }
+    TP.trigger = null;
+    return t;
+  }
+  function tpCommit(v) {
+    const target = TP.target;
+    tpClose(true);
+    tpSet(target, v);
+  }
+  function tpClick(t, act) {
+    const v = t.dataset.v;
+    if (act === "tp-open") { if (TP.trigger === t) tpClose(true); else tpOpen(t); return; }
+    if (act === "tp-close") { tpClose(true); return; }
+    if (act === "tp-quick") { TP.h = v.slice(0, 2); TP.m = v.slice(3, 5); }
+    else if (act === "tp-h") { TP.h = v; if (!TP.m) TP.m = "00"; }
+    else if (act === "tp-m") { TP.m = v; if (!TP.h) TP.h = pad2(TP_CFG[TP.kind].from + 2); }
+    else if (act === "tp-clear") { tpCommit(""); return; }
+    else if (act === "tp-ok") { if (TP.h) tpCommit(`${TP.h}:${TP.m || "00"}`); return; }
+    tpRender(false);
+  }
+  function tpKeydown(e) {
+    if (e.key === "Escape") { e.preventDefault(); tpClose(true); return; }
+    const t = e.target;
+    const g = t.closest && t.closest(".tp-g");
+    if (!g || ["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End"].indexOf(e.key) < 0) return;
+    e.preventDefault();
+    const items = $$(".tp-b", g), i = items.indexOf(t), cols = Number(g.dataset.cols) || items.length;
+    let n = i;
+    if (e.key === "ArrowLeft") n = i - 1; else if (e.key === "ArrowRight") n = i + 1;
+    else if (e.key === "ArrowUp") n = cols < items.length ? i - cols : i - 1; else if (e.key === "ArrowDown") n = cols < items.length ? i + cols : i + 1;
+    else if (e.key === "Home") n = 0; else if (e.key === "End") n = items.length - 1;
+    n = Math.max(0, Math.min(items.length - 1, n));
+    items[n].focus();
+  }
+
+  /* 도착(장소 + 시각) 편집 초안 */
+  const ARR = { key: null, label: "", time: "", origLabel: "", origTime: "" };
+  function arrInit(c) {
+    const p = state.pending[c.key];
+    const src = p ? p.parts : null;
+    const val = String(c.value || "");
+    const origTime = hhmm(val);
+    const origLabel = val.replace(/\s*\d{1,2}:\d{2}\s*(까지)?\s*$/, "").replace(/\s*\d{1,2}:\d{2}\s*/, " ").replace(/[\s·,]+$/, "").trim();
+    Object.assign(ARR, { key: c.key, origLabel, origTime, label: src ? src.label : origLabel, time: src ? src.time : origTime });
+  }
+  function arrSubmit(f) {
+    const c = currentConds().find((x) => x.key === f.dataset.key);
+    if (!c) return;
+    const label = (f.querySelector("input[name=place]").value || "").trim();
+    const placeChanged = label !== ARR.origLabel || !!condPlace[c.key];
+    const timeChanged = ARR.time !== ARR.origTime;
+    if (!placeChanged && !timeChanged) { delete state.pending[c.key]; state.openCond = null; renderConditions(); renderActions(); return; }
+    let value;
+    if (placeChanged) value = ARR.time ? `${label} ${ARR.time}까지` : label;
+    else value = ARR.time ? `${ARR.time}까지` : label;
+    state.pending[c.key] = { value, place: condPlace[c.key] || null, label: c.label, parts: { label, time: ARR.time } };
+    state.openCond = null;
+    renderConditions(); renderActions();
+    const b = $(`.pill-b[data-key="${cssEsc(c.key)}"]`); if (b) b.focus();
+  }
+
   /* 조건 변경은 바로 보내지 않고 '변경 예정'으로 모았다가 한 번에 보낸다 */
   const condPlace = {}; // 자동완성으로 고른 장소 객체 (key별)
   function sendSet(key, value) {
     const c = currentConds().find((x) => x.key === key);
     const v = String(value);
-    if (c && String(c.input) === "date" ? (c.iso === v) : (c && c.value === v && !condPlace[key])) delete state.pending[key];
+    // 서버 값과 같으면 '변경 예정'에서 뺀다(같은 형식끼리 비교: 날짜=iso, 시각=HH:MM)
+    const same = c && condCurrent(c) === v && !condPlace[key];
+    if (same) delete state.pending[key];
     else state.pending[key] = { value: v, place: condPlace[key] || null, label: c ? c.label : key };
     state.openCond = null;
     renderConditions();
@@ -966,7 +1148,7 @@
     const b = $(`.pill-b[data-key="${cssEsc(key)}"]`); if (b) b.focus();
   }
   const pendingCount = () => Object.keys(state.pending).length;
-  const pendingShow = (key, v) => { const c = currentConds().find((x) => x.key === key); return c && c.input === "date" ? fmtDate(v) : v; };
+  const pendingShow = (key, v) => { if (v === "") return "선택 안 함"; const c = currentConds().find((x) => x.key === key); return c && c.input === "date" ? fmtDate(v) : v; };
   function applyPending() {
     const keys = Object.keys(state.pending);
     if (!keys.length) return;
@@ -1213,8 +1395,23 @@
     if (R.error) return `<p class="muted small">${esc(R.error)}</p>`;
     const list = R.results || [];
     const fallback = `<p class="ps-none">원하는 곳이 없나요? <button type="button" class="linkish" data-act="ps-name" data-q="${esc(R.q)}">'${esc(R.q)}' 이름 그대로 모모에게 찾아 달라고 하기</button></p>`;
-    if (!list.length) return `<p class="muted small">'${esc(R.q)}'와 비슷한 곳을 찾지 못했어요.</p>${fallback}`;
-    return `${R.note ? `<p class="muted small">${esc(R.note)}</p>` : ""}<ul class="ps-list">${list.map((r, i) => {
+    const vars = (R.variants || []).filter((v) => v && v !== R.q);
+    const varLine = vars.length ? `<p class="ps-var">찾은 이름 변형: ${vars.map(esc).join(" · ")}</p>` : "";
+    // 여행 지역에서 먼 곳만 찾았을 때: 모모가 포함할지 묻는 확인 카드
+    const far = R.farDismissed ? [] : (R.far || []);
+    const farCard = (R.far_message && !R.farDismissed) || (!list.length && far.length) ? `<div class="ps-far" role="group" aria-label="먼 곳 확인">
+        <div class="avatar">${bird()}</div>
+        <div class="ps-far-b"><p class="ps-far-msg">${esc(R.far_message || "여행 지역에서 먼 곳만 찾았어요. 일정에 포함할까요?")}</p>
+        ${far.length ? `<ul class="ps-list">${far.map((r, i) => `<li class="ps-item far">
+          <div class="ps-img">${r.image ? `<img src="${esc(r.image)}" alt="" loading="lazy">` : bird("bird")}</div>
+          <div class="ps-body"><p class="ps-name"><b>${esc(r.name)}</b><span class="badge warn">약 ${esc(Number(r.distance_km || 0).toFixed(0))}km · 직선</span>${r.source ? `<span class="tag">${esc(r.source)}</span>` : ""}</p>
+            ${r.address ? `<p class="ps-meta">${esc(r.address)}</p>` : ""}</div>
+          <div class="ps-add"><label class="sr" for="pf-d-${i}">넣을 날</label>${daySelect(days, "pf-d-" + i, true).replace('class="sel xs"', 'class="sel xs ps-far-day"')}
+            <button type="button" class="btn xs primary" data-act="ps-add-far" data-i="${i}">포함할게요</button>
+            <button type="button" class="btn xs ghost" data-act="ps-far-no">아니요</button></div></li>`).join("")}</ul>` : ""}
+        </div></div>` : "";
+    if (!list.length) return farCard ? farCard + varLine : `<p class="muted small">'${esc(R.q)}'와 비슷한 곳을 찾지 못했어요.</p>${varLine}${fallback}`;
+    return `${farCard}${R.note ? `<p class="muted small">${esc(R.note)}</p>` : ""}<ul class="ps-list">${list.map((r, i) => {
       const osm = /openstreetmap|osm/i.test(r.source || "") || String(r.key || "").indexOf("osm:") === 0;
       return `<li class="ps-item">
         <div class="ps-img">${r.image ? `<img src="${esc(r.image)}" alt="" loading="lazy">` : bird("bird")}</div>
@@ -1223,7 +1420,7 @@
           ${osm ? `<p class="ps-warn">지도 정보라 운영시간 확인이 필요해요</p>` : ""}</div>
         <div class="ps-add"><label class="sr" for="ps-d-${i}">넣을 날</label>${daySelect(days, "ps-d-" + i, true)}
           <button type="button" class="btn xs primary" data-act="ps-add" data-i="${i}">넣기</button></div></li>`;
-    }).join("")}</ul>${fallback}`;
+    }).join("")}</ul>${varLine}${fallback}`;
   }
   let psTimer = 0, psSeq = 0;
   function placeSearch(q, immediate) {
@@ -1250,7 +1447,8 @@
           if (!r.ok) throw new Error((j && j.answer) || "검색하지 못했어요");
         }
         if (seq !== psSeq) return;
-        state.search = { q, results: ((j && j.results) || []).slice().sort((a, b) => (a.distance_km == null ? 1e9 : a.distance_km) - (b.distance_km == null ? 1e9 : b.distance_km)), note: j && j.note, loading: false };
+        state.search = { q, results: ((j && j.results) || []).slice().sort((a, b) => (a.distance_km == null ? 1e9 : a.distance_km) - (b.distance_km == null ? 1e9 : b.distance_km)), note: j && j.note, loading: false,
+          far: (j && j.far) || [], far_message: (j && j.far_message) || "", variants: (j && j.variants) || [], radius_km: j && j.radius_km };
       } catch (e) {
         if (seq !== psSeq) return;
         state.search = { q, results: [], loading: false, error: e.message || "검색하지 못했어요. 잠시 후 다시 해 주세요." };
@@ -1468,6 +1666,7 @@
   }
   function onPackChange(e) {
     const t = e.target;
+    if (t.classList && t.classList.contains("ps-far-day")) { const b = t.parentNode.querySelector('[data-act="ps-add-far"]'); if (b) b.textContent = t.value ? `포함할게요(${t.value}일차)` : "포함할게요"; return; }
     if (!t.dataset || !t.dataset.pk) return;
     const it = packItems(state.plan && state.plan.packing).find((x) => String(x.id) === t.dataset.pk);
     packOp({ op: "toggle", id: t.dataset.pk, checked: t.checked }, `${it ? it.label : t.dataset.pk} ${t.checked ? "챙김" : "해제"}`);
@@ -1707,7 +1906,7 @@
   function showSearchMarkers() {
     if (!M.map || !window.L) return;
     if (M.search) { M.map.removeLayer(M.search); M.search = null; }
-    const list = (state.search.results || []).filter((r) => r.lat != null && r.lng != null);
+    const list = (state.search.results || []).concat(state.search.farDismissed ? [] : (state.search.far || [])).filter((r) => r.lat != null && r.lng != null);
     if (!list.length) return;
     M.search = L.layerGroup();
     list.forEach((r, i) => {
@@ -1877,16 +2076,21 @@
 
   /* ───────── 이벤트(위임) ───────── */
   function onClick(e) {
+    const pop = $("#tp-pop");
+    if (pop && !pop.hidden && !e.target.closest("#tp-pop") && !e.target.closest(".tp-trigger") && !e.target.closest("#tp-back")) tpClose(false);
     const t = e.target.closest("[data-act]");
     if (!t) return;
     const act = t.dataset.act;
+    if (/^tp-/.test(act)) { tpClick(t, act); return; }
     if (/^(st-|cal-)/.test(act)) { if (!t.disabled) starterClick(t, act); return; }
     switch (act) {
       case "qr": if (!READ_ONLY) send({ question: t.dataset.q }, "chat", t.dataset.q); break;
       case "cond": {
         const k = t.dataset.key;
         state.openCond = state.openCond === k ? null : k;
+        if (state.openCond === "arrival") ARR.key = null; // 열 때마다 현재 값(변경 예정 포함)으로 초안을 새로
         renderConditions();
+        if (state.openCond) { const tr = $(`#ed-${cssEsc(k)} .ed-time .tp-trigger`); if (tr) { tpOpen(tr); break; } }
         const ed = document.getElementById("ed-" + k);
         if (ed) { const f = ed.querySelector("input, button.chip"); if (f) f.focus(); }
         else { const b = $(`.pill-b[data-key="${cssEsc(k)}"]`); if (b) b.focus(); }
@@ -1968,6 +2172,19 @@
       case "share-link": shareLink(VIEW || READ_ONLY ? location.href.split("?")[0] : fullViewUrl()); break;
       case "print": if (DEMO_VIEW) { document.documentElement.classList.add("print-mode"); window.print(); } else location.href = location.pathname + "?print=1"; break;
       case "cost-del": sendCost({ op: "remove", id: t.dataset.id }, t.dataset.name || ""); break;
+      case "ps-far-no": state.search.farDismissed = true; paintSearch(); break;
+      case "ps-add-far": {
+        if (!canEdit()) return;
+        const r = (state.search.far || [])[Number(t.dataset.i)];
+        if (!r) return;
+        const sel = t.parentNode.querySelector("select");
+        const edit = { op: "add", candidate: r };
+        if (sel && sel.value) edit.day = Number(sel.value);
+        state.search = { q: "", results: [], loading: false };
+        showSearchMarkers();
+        sendEdit(edit, `${r.name} 추가(먼 곳)${edit.day ? ` (${edit.day}일차)` : ""}`);
+        break;
+      }
       case "ps-add": {
         if (!canEdit()) return;
         const r = (state.search.results || [])[Number(t.dataset.i)];
@@ -2030,6 +2247,9 @@
       const edit = { op: "add", name };
       if (day) edit.day = Number(day);
       sendEdit(edit, `${name} 추가${day ? ` (${day}일차)` : ""}`);
+    } else if (kind === "arrival") {
+      if (Geo.items.length && Geo.active >= 0) return;
+      arrSubmit(f);
     } else if (kind === "pk-add") {
       const fd = new FormData(f);
       const label = String(fd.get("label") || "").trim();
@@ -2203,6 +2423,7 @@
   /* ───────── 시작 ───────── */
   function init() {
     document.body.insertAdjacentHTML("afterbegin", SPRITE);
+    if (BRAND_SPRITE !== "momo-bird") $$('use[href="#momo-bird"]').forEach((u) => u.setAttribute("href", "#" + BRAND_SPRITE));
     document.documentElement.dataset.season = document.documentElement.dataset.season || "winter";
     document.addEventListener("click", onClick);
     document.addEventListener("submit", onSubmit);
@@ -2216,7 +2437,8 @@
     }, true);
     const onMq = () => { placePanels(); observeStops(); };
     if (MQ_PC.addEventListener) MQ_PC.addEventListener("change", onMq); else MQ_PC.addListener(onMq);
-    window.addEventListener("resize", () => { clearTimeout(init._r); init._r = setTimeout(refitMap, 150); });
+    window.addEventListener("resize", () => { clearTimeout(init._r); init._r = setTimeout(refitMap, 150); tpPlace(); });
+    document.addEventListener("scroll", () => { if (TP.trigger) { if (TP.trigger.isConnected) tpPlace(); else tpClose(false); } }, true);
 
     document.addEventListener("change", onPackChange);
     if (!VIEW) initSplit();
@@ -2241,6 +2463,7 @@
       starterInput(e);
       const t = e.target;
       if (t.dataset && t.dataset.geo) geoOnInput(t);
+      if (t.name === "place" && t.closest && t.closest(".arr-form")) ARR.label = t.value;
       if (t.dataset && t.dataset.psearch) placeSearch(t.value);
     });
     document.addEventListener("keydown", geoKeydown);
