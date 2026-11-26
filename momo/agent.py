@@ -199,7 +199,7 @@ def plan_node(state: State) -> State:
     elif not dep:
         notes.append("출발지를 말씀하지 않아 오가는 시간은 빼고 현지 09~20시 기준으로 계산했어요")
     else:
-        notes.append(f"출발지는 {dep} 기준으로 오가는 시간을 대략 추정했어요")
+        notes.append(f"출발지는 {_dep_label(p.departure)} 기준으로 쓰고, 오가는 시간은 {dep} 대표 지점에서 대략 추정했어요")
     transport = p.transport or "자차"
     if not p.transport:
         notes.append("이동수단은 자차로 계산했어요(기본값 적용)")
@@ -231,13 +231,13 @@ def plan_node(state: State) -> State:
 
 
 def _run_plan(state: State, spec: planner.TripSpec, request: str, notes: list[str], base: list | None,
-              locked: dict | None = None) -> State:
+              locked: dict | None = None, prefix: dict | None = None, indoor: bool = False) -> State:
     tr = list(state.get("trace") or [])
     token = tools.CONTEXTS.set([])
     try:
         w = tools.weather(spec.region, spec.days)
         tr.append({"step": "tool:get_weather", "input": f"{spec.region} {spec.start}", "output": w["text"]})
-        res = planner.build_plan(spec, request, base=base, trace=tr, locked=locked)
+        res = planner.build_plan(spec, request, base=base, trace=tr, locked=locked, prefix=prefix, indoor=indoor)
         items = res["itinerary"]
         for it in items:
             p = data.places(spec.region).get(it.get("place_id") or "")
@@ -299,8 +299,26 @@ def modify_node(state: State) -> State:
                                        stay_minutes=hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
                                        reason=it["reason"])
                               for it in base if it["date"] == d.isoformat() and it.get("place_id")]
+    # '오후'만 바꾸라면 대상 날의 오전 항목과 점심은 고정
+    prefix = {}
+    if target and re.search(r"오후", state["question"]):
+        for di, d in enumerate(spec.days, 1):
+            if di in target:
+                prefix[di] = [PickItem(place_id=it["place_id"], role=_role(it),
+                                       stay_minutes=hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
+                                       reason=it["reason"])
+                              for it in base if it["date"] == d.isoformat() and it.get("place_id") and it["type"] != "stay"
+                              and (hours.parse_hm(it["start_time"]) < 12 * 60 or _role(it) == "lunch")]
+    indoor = "실내" in state["question"] or any("실내" in x for x in p.preferences)
     request = f"{state.get('last_request', '')}\n[수정 요청] {instr}"
-    return _run_plan(state, spec, request, notes, base=base, locked=locked)
+    return _run_plan(state, spec, request, notes, base=base, locked=locked, prefix=prefix, indoor=indoor)
+
+
+def _dep_label(text: str | None) -> str:
+    """출발지 표기: 시·도 + 시·군·구까지만(마스킹 자리표시자·상세 주소 제거)."""
+    t = re.sub(r"\[[^\]]*\]", "", text or "").strip()
+    parts = [w for w in t.split() if re.search(r"(특별시|광역시|자치시|도|시|군|구)$", w)][:2]
+    return " ".join(parts) or (t.split()[0] if t else "")
 
 
 def _role(it: dict) -> str:
@@ -316,7 +334,7 @@ def _region_reply(state: State, why: str, p: ParsedRequest) -> State:
     if p.send_request:
         pre = "문자·메일로 직접 보내 드리는 건 할 수 없어요. 일정을 확정하면 공유 링크와 캘린더 파일(.ics)을 드릴게요. "
     if p.departure and data.norm_sido(p.departure):
-        pre += f"출발지는 {p.departure.split()[0] if p.departure else ''} 정도로만 기억해 둘게요. "
+        pre += f"출발지는 {_dep_label(p.departure)} 기준으로만 쓸게요(상세 주소는 저장하지 않아요). "
     if why == "missing":
         return {"status": "되묻기", "answer": pre + "좋아요, 어디로 날아가 볼까요? 지금은 경주와 순천/구례 일정을 꼼꼼히 짜 드릴 수 있어요. "
                 "가고 싶은 지역과 함께, 당일치기인지 1박 2일인지, 어디서 출발하시는지도 같이 알려 주시면 바로 정리해 드릴게요!",
@@ -423,7 +441,8 @@ def approve_chat_node(state: State) -> State:
         return {"status": "정보", "answer": "아직 확정할 일정이 없어요. 먼저 가고 싶은 지역과 날짜를 알려 주시면 일정을 짜 드릴게요!",
                 "trace": _t(state, "approve_guard", "채팅 승인 요구", "초안 없음")}
     return {"status": "승인 대기", "answer": "저장하고 공유하는 건 꼭 직접 확인을 받은 뒤에만 할 수 있어요. 채팅 말씀만으로는 저장·공유하지 않아요. "
-            "일정을 한 번 더 살펴보시고 괜찮으시면 화면의 '확정할게요' 버튼을 눌러 주세요. 그러면 공유 링크와 캘린더 파일(.ics)을 만들어 드릴게요!",
+            "일정을 한 번 더 살펴보시고 괜찮으시면 화면의 '확정할게요' 버튼을 눌러 주세요. 그러면 공유 링크와 캘린더 파일(.ics)을 만들어 드릴게요!"
+            "\n(일정 속 장소·운영시간 정보 출처: 한국관광공사 TourAPI)",
             "extra": {"draft_version": state.get("draft_version")},
             "trace": _t(state, "approve_guard", "채팅으로 확정·저장·공유 요구", "저장 안 함 · 승인 버튼 안내(save_plan 미호출)")}
 

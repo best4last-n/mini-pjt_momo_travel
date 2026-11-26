@@ -7,6 +7,7 @@ SERVICE.md 3-4b·3-4c·3-4e·5절 규칙 검사(하드 게이트):
 from __future__ import annotations
 
 import math
+import re
 from dataclasses import dataclass, field
 from datetime import date
 
@@ -78,6 +79,16 @@ def meal_required(win: tuple[int, int], meal: tuple[int, int]) -> bool:
 
 # ---------- 후보 ----------
 
+INDOOR_WORDS = re.compile(r"(박물관|미술관|전시관|전시실|기념관|과학관|체험관|공방|실내|식물원|온실|아쿠아|도서관|내부\s*관람|내부를\s*공개|키즈카페)")
+
+
+def is_indoor(p: dict) -> bool:
+    """실내 장소 여부: 문화시설(14)·음식점·숙박이거나 제목·요약에 실내 시설 단어."""
+    if p.get("kind") in ("restaurant", "lodging") or p.get("contenttypeid") == "14":
+        return True
+    return bool(INDOOR_WORDS.search(f"{p.get('title', '')} {p.get('summary') or ''}"))
+
+
 def candidates(spec: TripSpec, query: str) -> dict[str, dict]:
     """LLM에 보여 줄 후보(= '검색 결과'). 모든 날 휴무인 곳은 뺀다."""
     region = spec.region
@@ -91,6 +102,10 @@ def candidates(spec: TripSpec, query: str) -> dict[str, dict]:
     for pid, p in pl.items():           # 대표 명소는 항상 후보에
         if p.get("must_include") and p["kind"] == "attraction" and pid not in picked:
             picked[pid] = {"doc_id": pid, "text": "", "metadata": {"title": p["title"], "kind": p["kind"]}}
+    if any("실내" in x for x in spec.preferences):   # 실내 요청이면 실내 관광지를 모두 후보에
+        for pid, p in pl.items():
+            if p["kind"] == "attraction" and is_indoor(p):
+                picked.setdefault(pid, {"doc_id": pid})
     for pid in spec.waypoint_ids:
         if pid in pl:
             picked[pid] = {"doc_id": pid, "text": "", "metadata": {"title": pl[pid]["title"], "kind": pl[pid]["kind"]}}
@@ -122,7 +137,8 @@ def candidate_lines(spec: TripSpec, cands: dict[str, dict]) -> str:
                 per_day.append(f"{i}일차 {hours.fmt(info.open)}~{hours.fmt(info.close)}"
                                + (f"(휴게 {','.join(hours.fmt(a) + '~' + hours.fmt(b) for a, b in info.breaks)})" if info.breaks else ""))
         summ = (p.get("summary") or "")[:90]
-        lines.append(f"- id={pid} | {p['title']} | {KIND_KO[p['kind']]} | 좌표 {p.get('lat', 0):.3f},{p.get('lng', 0):.3f} "
+        tag = " [실내]" if p["kind"] == "attraction" and is_indoor(p) else ""
+        lines.append(f"- id={pid} | {p['title']}{tag} | {KIND_KO[p['kind']]} | 좌표 {p.get('lat', 0):.3f},{p.get('lng', 0):.3f} "
                      f"| {' / '.join(per_day)} | {summ}")
     return "\n".join(lines)
 
@@ -143,7 +159,7 @@ PICK_SYSTEM = MOMO_PERSONA + """
 
 
 def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | None = None,
-         base: list[dict] | None = None) -> PlanPick:
+         base: list[dict] | None = None, indoor: bool = False) -> PlanPick:
     wins = windows(spec)
     day_lines = []
     for i, (d, w) in enumerate(zip(spec.days, wins), 1):
@@ -163,6 +179,8 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
         msg.append("현재 일정(수정 요청과 무관한 항목은 그대로 같은 순서로 유지):\n" + "\n".join(
             f"- {it['date']} {it['start_time']} {it['place_name']} (id={it.get('place_id')}, role={it['type']})"
             for it in base if it["type"] != "move"))
+    if indoor:
+        msg.append("수정하는 구간의 관광지는 반드시 [실내] 표시가 있는 후보만 쓴다(야외 유적·공원 금지). 수정 대상이 아닌 항목은 그대로 둔다.")
     if feedback:
         msg.append(f"직전 초안의 규칙 위반(반드시 고칠 것):\n{feedback}")
     msg.append(f"후보 목록 <data>\n{candidate_lines(spec, cands)}\n</data>")
@@ -395,14 +413,16 @@ def _role_of(it: dict) -> str:
 # ---------- 전체 루프 ----------
 
 def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, trace: list | None = None,
-               locked: dict | None = None) -> dict:
-    """locked: {일차: [PickItem]} — 수정 대상이 아닌 날은 기존 선택 그대로 고정."""
+               locked: dict | None = None, prefix: dict | None = None, indoor: bool = False) -> dict:
+    """locked: {일차: [PickItem]} — 수정 대상이 아닌 날은 기존 선택 그대로 고정.
+    prefix: {일차: [PickItem]} — 수정 대상 날의 앞부분(예: '오후만' 수정 시 오전·점심) 고정.
+    indoor: 수정 구간의 관광지는 실내만 허용(코드로 강제)."""
     trace = trace if trace is not None else []
     cands = candidates(spec, request)
     for w in spec.user_waypoints:
         cands.setdefault(w["place_id"], w)
     pl = data.places(spec.region)
-    for picks in (locked or {}).values():
+    for picks in [*(locked or {}).values(), *(prefix or {}).values()]:
         for pk in picks:
             if pk.place_id in pl:
                 cands.setdefault(pk.place_id, pl[pk.place_id])
@@ -410,7 +430,23 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
     trace.append({"step": "retrieve", "input": request[:200], "output": f"후보 {len(cands)}곳: " + ", ".join(p["title"] for p in list(cands.values())[:15])})
     feedback, items, viol, regen = None, [], [], 0
     for attempt in range(MAX_REGEN + 1):
-        picked = pick(spec, cands, request, feedback, base)
+        picked = pick(spec, cands, request, feedback, base, indoor=indoor)
+        if prefix or indoor:
+            from .schemas import DayPick
+            new_days = []
+            for d in range(1, spec.nights + 2):
+                cur = next((x for x in picked.days if x.day == d), DayPick(day=d, items=[]))
+                if locked and d in locked:
+                    new_days.append(cur)
+                    continue
+                pre = (prefix or {}).get(d, [])
+                pre_ids = {x.place_id for x in pre}
+                has_lunch = any(x.role == "lunch" for x in pre)
+                rest = [x for x in cur.items if x.place_id not in pre_ids and not (has_lunch and x.role == "lunch")]
+                if indoor:
+                    rest = [x for x in rest if x.role != "place" or is_indoor(cands.get(x.place_id) or pl.get(x.place_id) or {})]
+                new_days.append(DayPick(day=d, items=pre + rest))
+            picked.days = new_days
         if locked:
             from .schemas import DayPick
             picked.days = [DayPick(day=d, items=locked[d]) if d in locked else
