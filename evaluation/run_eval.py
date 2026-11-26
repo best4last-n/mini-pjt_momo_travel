@@ -83,7 +83,7 @@ def collect(rnd: int) -> None:
     from app.main import app
     from momo import store
 
-    c = TestClient(app)
+    c = TestClient(app, raise_server_exceptions=False)   # 서버 오류는 응답(500)으로 받고 수집을 멈춤
     out = load(path(rnd, "responses"), {})
 
     def ask(q, sid=None, **kw):
@@ -123,6 +123,9 @@ def collect(rnd: int) -> None:
             os.environ.pop("LIFEGALAXY_ADDON", None)
         else:
             runs.append(ask(q))
+        if any(x["_http"] >= 500 for x in runs):
+            print(f"[중단] #{cid} 서버 오류(Bedrock 한도 등) — 저장하지 않음. 다시 실행하면 #{cid}부터 이어서 수집", flush=True)
+            return
         out[cid] = {"id": cid, "question": q, "runs": runs}
         save(path(rnd, "responses"), out)
         print(f"#{cid} 수집 {[x.get('status') for x in runs]} {[x['_sec'] for x in runs]}s", flush=True)
@@ -391,4 +394,7 @@ if __name__ == "__main__":
     a = ap.parse_args()
     for st, fn in (("collect", collect), ("judge", judge), ("ragas", ragas_eval), ("report", report)):
         if a.stage in (st, "all"):
+            if st != "collect" and len(load(path(a.round, "responses"), {})) < len(load_rows()):
+                print(f"[대기] 응답 수집이 끝나지 않아 {st} 단계를 건너뜀 — collect부터 다시 실행")
+                break
             fn(a.round)

@@ -400,3 +400,11 @@
   - SERVICE.md: contexts 결정, 수원 수집 기록, RAGAS 제외·한계·재채점 규칙.
   - 화면 시안 Artifact(https://claude.ai/artifact/SLqTTUqEExzEJAsS2PZerC): 현재 1열 카드형(PC 가운데 칼럼/모바일 사진 위), 연기된 PC 2단+고정 지도·모바일 접이식 지도, 계절 테마·승차권/엽서 카드, 구현 상태 표.
 - **다음 할 일**: 1차 재채점 결과 확인 → 2차 평가(수원 포함, 단독 실행) → round2 리포트.
+
+### [2026-11-26] 1차 RAGAS 재채점 완료 · 음성 입력 · 2차 평가 시작
+- **사용자 요청**: 음성 입력(특히 모바일, 구글 연동 여부 추천) → 재채점 끝나면 음성 입력 적용 + 2차 평가. 다른 여행지 데이터 수집 계획 문의.
+- **Claude 작업**:
+  - 재채점 두 번째 실패 원인: run_eval이 .env를 직접 읽지 않아 `--stage ragas` 단독 실행 시 NoCredentialsError(동시 실행 경합 아님). load_dotenv 추가(1c19186) 후 재채점 성공 — 1차 RAGAS faithfulness 0.318 · answer_relevancy 0.443 · context_precision 0.548 · context_recall 0.248, 10/10건 산출(#12·#15·#17 포함). 커밋 effa67c.
+  - 음성 입력 추천: Google Cloud STT 대신 브라우저 내장 Web Speech API(Android Chrome은 내부적으로 Google 인식, iOS Safari 14.5+). 키·과금·서버 음성 업로드 없음. 인식 결과는 입력창에 채워 확인 후 전송, 미지원 브라우저는 키보드 받아쓰기 안내, 권한·오인식 안내, 폰 시연은 HTTPS 필요. SERVICE.md 3-5에 결정 기록, index.html·style.css 반영(555c891).
+  - 다른 여행지 계획 답변: PJT 범위는 3개 지역, 그 밖은 '준비 안 된 지역' 안내. 추가 절차(regions.json → 수집 → 요약 → 색인, 지역당 ~30분, 코드 수정 없음), 제약(TourAPI 개발 계정 1,000건/일 ≈ 6개 지역/일, Bedrock 일일 한도, 대도시는 구·권역 분할), 2차 전 지역 추가는 #11 기준 정답과 충돌하므로 제출 이후로.
+  - 2차 평가 단독 실행 시작(응답 수집 커밋 555c891).
