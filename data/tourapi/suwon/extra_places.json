@@ -1,0 +1,73 @@
+[
+ {
+  "contentid": "4054880",
+  "title": "정지영커피로스터즈 행궁본점",
+  "kind": "restaurant",
+  "contenttypeid": "39",
+  "region": "suwon",
+  "sigungu": "수원 팔달구",
+  "must_include": false,
+  "addr": "경기도 수원시 팔달구 신풍로 42 (신풍동)",
+  "lat": 37.2848962630143,
+  "lng": 127.014416125317,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/15/4054015_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "수원화성 행궁 앞 골목에서 시작해 수원을 대표하는 로컬 커피 브랜드로 성장한 곳이다. 정지영커피로스터즈는 행궁동 1세대 카페로 출발해 현재 수원 내 8개 지점을 운영하는 스페셜티 커피 브랜드로, 로스팅룸·아카데미·카페가 함께 어우러진 행궁본점은 브랜드의 철학과 시스템이 가장 집약된 공간이다. 지하 1층부터 루프탑까지 이어지는 다층 구조로, 각 층마다 다른 분위기를 경험할 수 있으며 루프탑에서는 화성행궁 일대의 경관을 한눈에 조망할 수 있다. 지하 1층 주문 공간에는 수원 축구단·야구단 굿즈를 비롯한 로컬 소품과 원두를 판매하고 있어 구경하는 재미도 더한다. 코코넛라떼와 플랫화이트가 대표 메뉴로 손꼽히며, 베이커리와 함께 즐기기 좋다. 카페를 단순한 음료 공간이 아닌 로컬 문화를 기획하고 이끄는 공간으로 바라보는 브랜드 철학이 공간 곳곳에 담겨 있다. 수원화성·화성행궁과 인접해 행궁동 나들이 코스로 함께 즐기기 좋다.",
+  "homepage": "",
+  "intro": {
+   "contentid": "4054880",
+   "contenttypeid": "39",
+   "seat": "",
+   "kidsfacility": "0",
+   "firstmenu": "코코넛커피",
+   "treatmenu": "플랫화이트 / 아메리카노 / 핸드드립 등",
+   "smoking": "",
+   "packing": "",
+   "infocenterfood": "070-7537-0091",
+   "scalefood": "",
+   "parkingfood": "불가능",
+   "opendatefood": "",
+   "opentimefood": "11:00~22:00 (마지막 주문 21:50)",
+   "restdatefood": "연중무휴",
+   "discountinfofood": "",
+   "chkcreditcardfood": "",
+   "reservationfood": "",
+   "lcnsno": "20200269887"
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "수원화성 행궁 앞 골목에서 시작해 수원을 대표하는 로컬 커피 브랜드로 성장한 곳이다. 정지영커피로스터즈는 행궁동 1세대 카페로 출발해 현재 수원 내 8개 지점을 운영하는 스페셜티 커피 브랜드로, 로스팅룸·아카데미·카페가 함께 어우러진 행궁본점은 브랜드의 철학과 시스템이 가장 집약된 공간이다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/15/4054015_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/17/4054017_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/17/4054017_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/16/4054016_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/16/4054016_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/14/4054014_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/14/4054014_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ]
+ }
+]

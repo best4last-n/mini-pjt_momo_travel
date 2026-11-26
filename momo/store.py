@@ -42,6 +42,21 @@ def _econn() -> sqlite3.Connection:
     return c
 
 
+def save_answer(session_id: str, html_frag: str, title: str) -> None:
+    """최신 답변 HTML(새 창으로 보기용)."""
+    with _conn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS answers (session_id TEXT PRIMARY KEY, html TEXT, title TEXT, updated TEXT)")
+        c.execute("INSERT OR REPLACE INTO answers VALUES (?,?,?,?)",
+                  (session_id, html_frag, title, datetime.now(KST).isoformat(timespec="seconds")))
+
+
+def get_answer(session_id: str) -> tuple[str, str] | None:
+    with _conn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS answers (session_id TEXT PRIMARY KEY, html TEXT, title TEXT, updated TEXT)")
+        row = c.execute("SELECT html, title FROM answers WHERE session_id=?", (session_id,)).fetchone()
+    return (row[0], row[1]) if row else None
+
+
 def _tconn() -> sqlite3.Connection:
     c = _conn()
     c.execute("""CREATE TABLE IF NOT EXISTS trips (
@@ -76,7 +91,7 @@ def list_trips(ids: list[str]) -> list[dict]:
     return [dict(zip(keys, r)) for r in rows]
 
 
-EXPENSE_CATEGORIES = ["장거리 교통", "현지 교통", "유류비", "통행료", "렌터카", "식비", "입장료", "숙박", "기타"]
+from .options import EXPENSE_CATEGORIES  # noqa: E402  (정산 분류는 options에서 관리)
 
 
 def list_expenses(plan_id: str) -> list[dict]:

@@ -23,6 +23,7 @@ BUS_PER_KM = 90          # 원/km (도로거리 기준)
 RENT_PER_DAY = 70000
 TRANSIT_PER_LEG = 1500
 MEAL = {"lunch": 12000, "dinner": 15000}
+CAFE_PER_PERSON_DAY = 6000   # 카페·디저트·음료 1인 1일 추정
 ROOM_PER_NIGHT = 100000
 DEFAULT_PEOPLE = 2
 
@@ -68,9 +69,33 @@ def parse_fee(text: str | None) -> int | None:
         return None
 
 
+def _car(spec) -> dict:
+    """차량 정보 → 연비·단가·통행료/주차 할인 배수와 설명."""
+    from . import options as O
+    v = spec.vehicle or {}
+    vtype, fuel = v.get("type") or "중형", v.get("fuel") or "휘발유"
+    eff = float(v.get("efficiency_kmpl") or O.efficiency(vtype, fuel))
+    price = O.FUEL_PRICES.get(fuel, FUEL_PRICE)
+    unit = O.FUEL_UNIT.get(fuel, "L")
+    return {"type": vtype, "fuel": fuel, "eff": eff, "price": price, "unit": unit,
+            "toll_km": O.TOLL_PER_KM.get(vtype, TOLL_PER_KM),
+            "toll_mul": O.TOLL_DISCOUNTS.get(v.get("toll_discount") or "없음", 1.0),
+            "park_mul": O.PARKING_DISCOUNTS.get(v.get("parking_discount") or "없음", 1.0),
+            "toll_label": v.get("toll_discount") or "없음", "park_label": v.get("parking_discount") or "없음",
+            "given": bool(spec.vehicle)}
+
+
+def _fuel_cost(km: float, car: dict) -> tuple[int, str]:
+    amount = _r100(km / car["eff"] * car["price"])
+    basis = (f"{km:,.0f}km ÷ 연비 {car['eff']:g}km/{car['unit']} × {car['price']:,}원/{car['unit']} "
+             f"({car['type']} · {car['fuel']}{'' if car['given'] else ', 차량 정보 없어 중형 휘발유 기준'})")
+    return amount, basis
+
+
 def estimate(spec, plan: dict) -> dict:
     people = spec.companion_count or DEFAULT_PEOPLE
     items = []
+    car = _car(spec)
 
     def add(cat, label, amount, basis, unknown=False):
         items.append({"category": cat, "label": label, "amount": None if unknown else int(amount),
@@ -78,7 +103,8 @@ def estimate(spec, plan: dict) -> dict:
 
     # 장거리
     if spec.departure and spec.departure in data.SIDO_COORDS:
-        a, b = data.SIDO_COORDS[spec.departure], data.region_center(spec.region)
+        a = tuple(spec.origin_coords) if getattr(spec, "origin_coords", None) else data.SIDO_COORDS[spec.departure]
+        b = data.region_center(spec.region)
         straight = travel.km(a, b)
         road = straight * 1.3
         trip = f"{spec.origin_label or spec.departure}↔{data.region_label(spec.region)}"
@@ -91,20 +117,21 @@ def estimate(spec, plan: dict) -> dict:
             add("장거리 교통", f"고속·시외버스 {trip} 왕복 {people}명", one * 2 * people,
                 f"1인 편도 약 {one:,}원 × 2회 × {people}명 (거리 기준 추정)")
         else:
-            fuel = _r100(road * 2 / FUEL_EFF * FUEL_PRICE)
-            toll = _r100(road * 2 * TOLL_PER_KM)
-            add("유류비", f"자차 {trip} 왕복 약 {road * 2:,.0f}km", fuel,
-                f"{road * 2:,.0f}km ÷ 연비 {FUEL_EFF}km/L × {FUEL_PRICE:,}원/L")
+            fuel, basis = _fuel_cost(road * 2, car)
+            add("유류비", f"자차 {trip} 왕복 약 {road * 2:,.0f}km", fuel, basis)
+            toll = _r100(road * 2 * car["toll_km"] * car["toll_mul"])
             add("통행료", f"고속도로 통행료(하이패스) {trip} 왕복", toll,
-                f"도로거리 {road * 2:,.0f}km × 약 {TOLL_PER_KM}원/km (1종 승용 추정)")
+                f"도로거리 {road * 2:,.0f}km × 약 {car['toll_km']}원/km"
+                + (f" × 할인({car['toll_label']})" if car["toll_mul"] != 1.0 else "") + " (추정)")
     # 현지
     local_km = plan.get("totals", {}).get("local", {}).get("distance_km") or 0
     n_days = spec.nights + 1
     if spec.local_transport == "렌터카":
         add("렌터카", f"렌터카 {n_days}일", RENT_PER_DAY * n_days, f"하루 {RENT_PER_DAY:,}원 × {n_days}일 (보험 포함 기준가 추정)")
     if spec.local_transport in ("자차", "렌터카") and local_km:
-        add("유류비", f"현지 이동 약 {local_km:,.0f}km", _r100(local_km / FUEL_EFF * FUEL_PRICE),
-            f"{local_km:,.0f}km ÷ {FUEL_EFF}km/L × {FUEL_PRICE:,}원/L")
+        amount, basis = _fuel_cost(local_km, car if spec.local_transport == "자차" else {**car, "type": "중형", "fuel": "휘발유",
+                                                                                          "eff": 12, "price": FUEL_PRICE, "unit": "L", "given": True})
+        add("유류비", f"현지 이동 약 {local_km:,.0f}km" + (" (렌터카)" if spec.local_transport == "렌터카" else ""), amount, basis)
     if spec.local_transport == "대중교통":
         legs = sum(len(d.get("legs") or []) for d in plan.get("itinerary", []))
         add("현지 교통", f"버스 등 {legs}구간 × {people}명", legs * TRANSIT_PER_LEG * people,
@@ -112,6 +139,7 @@ def estimate(spec, plan: dict) -> dict:
     # 식비·입장료·숙박
     places = {p["id"]: p for p in plan.get("places", [])}
     pl = data.places(spec.region)
+    parking_items: list = []
     for d in plan.get("itinerary", []):
         for s in d.get("stops", []):
             if s["type"] == "meal":
@@ -120,6 +148,13 @@ def estimate(spec, plan: dict) -> dict:
                     f"1인 {MEAL[kind]:,}원 × {people}명 (평균 단가 추정)")
             elif s["type"] == "place" and s.get("place_id"):
                 p = pl.get(s["place_id"]) or {}
+                if spec.local_transport in ("자차", "렌터카"):
+                    ptxt = hours.clean((p.get("intro") or {}).get("parking") or "")
+                    if "무료" not in ptxt and "불가" not in ptxt and "없음" not in ptxt:
+                        from .options import PARKING_PER_PLACE
+                        fee_p = _r100(PARKING_PER_PLACE * car["park_mul"])
+                        if fee_p:
+                            parking_items.append((s["name"], fee_p))
                 fee = parse_fee((p.get("intro") or {}).get("usefee") or (p.get("intro") or {}).get("usefeeleports"))
                 if fee is None:
                     if p.get("kind") == "attraction" and "상시" not in (places.get(s["place_id"], {}).get("hours") or ""):
@@ -130,6 +165,16 @@ def estimate(spec, plan: dict) -> dict:
                 rooms = math.ceil(people / 4)
                 add("숙박", f"{s['name']} 1박 {rooms}실", ROOM_PER_NIGHT * rooms,
                     f"1박 객실 {ROOM_PER_NIGHT:,}원 기준가 × {rooms}실 (실제 요금은 예약 시 확인)")
+    if parking_items:
+        add("주차비", f"관광지 주차 {len(parking_items)}곳", sum(x[1] for x in parking_items),
+            f"1곳 약 {PARKING_ESTIMATE_TXT(car)} (공영주차장 기준 추정, 관광공사 정보에 '무료'면 제외)"
+            + ": " + ", ".join(x[0] for x in parking_items[:4]) + ("…" if len(parking_items) > 4 else ""))
+    n_days = spec.nights + 1
+    add("카페·디저트", f"카페·디저트·음료 {n_days}일 × {people}명", CAFE_PER_PERSON_DAY * n_days * people,
+        f"1인 1일 {CAFE_PER_PERSON_DAY:,}원 (추정)")
+    for c in getattr(spec, "custom_costs", []) or []:
+        items.append({"category": c["category"], "label": c["label"], "amount": int(c["amount"]),
+                      "basis": "직접 추가한 비용", "estimated": False, "unknown": False, "custom": True, "id": c["id"]})
     total = sum(i["amount"] for i in items if not i["unknown"])
     budget = spec.budget
     if budget and spec.budget_per_person:
@@ -141,6 +186,12 @@ def estimate(spec, plan: dict) -> dict:
         "note": "모든 금액은 추정이에요. 입장료는 관광공사 요금 정보에 금액이 있을 때만 넣었고, 없으면 '확인 필요'로 두었어요."
                 + ("" if spec.companion_count else f" 인원을 말씀하지 않아 {DEFAULT_PEOPLE}명 기준으로 계산했어요."),
     }
+
+
+def PARKING_ESTIMATE_TXT(car: dict) -> str:
+    from .options import PARKING_PER_PLACE
+    base = f"{PARKING_PER_PLACE:,}원"
+    return base + (f" × 할인({car['park_label']})" if car["park_mul"] != 1.0 else "")
 
 
 def by_category(planned: dict | None, actual: list[dict]) -> dict:

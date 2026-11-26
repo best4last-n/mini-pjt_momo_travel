@@ -42,6 +42,52 @@ def _summary(overview: str) -> str | None:
     return (out.strip() or ov[:180]) + " (관광공사 소개 인용)"
 
 
+def search_candidates(name: str, region: str, limit: int = 8) -> list[dict]:
+    """관광공사 키워드 검색 원본 목록(상세 호출 없음) — 지역 시군구 먼저, 없으면 전국."""
+    cfg = data.regions_config().get(region) or {"sigungu": []}
+    tour = _client()
+    hits = []
+    for sg in cfg["sigungu"]:
+        try:
+            hits += tour.call("searchKeyword2", keyword=name, lDongRegnCd=sg["regn"], lDongSignguCd=sg["signgu"],
+                              numOfRows=10, pageNo=1)
+        except Exception:
+            continue
+    if not hits:
+        try:
+            hits = tour.call("searchKeyword2", keyword=name, numOfRows=10, pageNo=1)
+        except Exception:
+            hits = []
+    return [h for h in hits if h.get("contenttypeid") in KIND][:limit]
+
+
+def fetch(cid: str, region: str) -> dict | None:
+    """contentid로 상세를 받아 정식 장소로 편입(이미 있으면 그대로)."""
+    pl = data.places(region)
+    if cid in pl:
+        return pl[cid]
+    tour = _client()
+    common = tour.call("detailCommon2", contentId=cid)
+    if not common:
+        return None
+    c = common[0]
+    ctype = c.get("contenttypeid")
+    intro = tour.call("detailIntro2", contentId=cid, contentTypeId=ctype) if ctype else []
+    p = {
+        "contentid": cid, "title": c.get("title"), "kind": KIND.get(ctype, "attraction"), "contenttypeid": ctype,
+        "region": region, "sigungu": "", "must_include": False,
+        "addr": " ".join(x for x in (c.get("addr1"), c.get("addr2")) if x),
+        "lat": float(c["mapy"]) if c.get("mapy") else None, "lng": float(c["mapx"]) if c.get("mapx") else None,
+        "tel": c.get("tel"), "image_url": c.get("firstimage") or None, "image_license": c.get("cpyrhtDivCd"),
+        "overview": c.get("overview"), "homepage": c.get("homepage"), "intro": intro[0] if intro else {},
+        "event_start": None, "event_end": None, "source": "한국관광공사 TourAPI", "added_by_user": True,
+    }
+    p["summary"] = _summary(p["overview"])
+    _enrich(p)
+    save_extra(region, p)
+    return p
+
+
 def lookup(name: str, region: str) -> dict | None:
     """지역 안에서 이름으로 관광공사 장소를 찾아 정식 장소 dict로 돌려준다(없으면 None)."""
     cfg = data.regions_config().get(region)

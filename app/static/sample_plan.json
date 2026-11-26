@@ -1,14 +1,14 @@
 {
  "trip": {
-  "title": "순천/구례 1박 2일",
+  "title": "순천/구례 2박 3일",
   "regions": [
    "순천/구례"
   ],
   "region_id": "suncheon_gurye",
   "start_date": "2026-12-12",
-  "nights": 1,
-  "days": 2,
-  "origin": "서울 강남구",
+  "nights": 2,
+  "days": 3,
+  "origin": "경기 성남시 분당구 판교동",
   "transport": {
    "long_distance": "KTX·SRT",
    "local": "렌터카",
@@ -51,19 +51,21 @@
    {
     "key": "length",
     "label": "여행 길이",
-    "value": "1박 2일",
+    "value": "2박 3일",
     "status": "confirmed",
     "input": "select",
     "options": [
      "당일치기",
-     "1박 2일"
+     "1박 2일",
+     "2박 3일",
+     "3박 4일"
     ],
-    "hint": "지금은 당일~1박 2일까지 꼼꼼히 검증해요."
+    "hint": "최대 3박 4일까지 휴무일·운영시간을 검증해요."
    },
    {
     "key": "origin",
     "label": "출발지",
-    "value": "서울 강남구",
+    "value": "경기 성남시 분당구 판교동",
     "status": "confirmed",
     "input": "text",
     "options": [
@@ -129,9 +131,45 @@
     "hint": "노약자는 계단·경사 적은 곳, 어린이는 체험·넓은 야외를 우선해요."
    },
    {
+    "key": "depart_time",
+    "label": "출발 시각",
+    "value": "07:30",
+    "status": "confirmed",
+    "input": "time",
+    "options": [
+     "06:30",
+     "07:00",
+     "08:00",
+     "09:00"
+    ],
+    "hint": "출발 시각으로 첫날 현지 도착과 일정 시작을 맞춰요."
+   },
+   {
+    "key": "arrival",
+    "label": "여행 후 도착",
+    "value": "경기 성남시 분당구 판교동 · 21:00까지",
+    "status": "confirmed",
+    "input": "text",
+    "options": [
+     "출발지로",
+     "21:00까지",
+     "20:00까지"
+    ],
+    "hint": "도착지·희망 시각에 맞춰 마지막 날 일정을 끝내요."
+   },
+   {
+    "key": "vehicle",
+    "label": "차량",
+    "value": "미입력(중형 휘발유 기준)",
+    "status": "optional",
+    "input": "vehicle",
+    "options": [],
+    "hint": "차종·연료·연비·할인으로 유류비·통행료·주차비를 계산해요."
+   },
+   {
     "key": "budget",
     "label": "최대 예산",
-    "value": "100만 원",
+    "value": "120만 원",
     "status": "confirmed",
     "input": "text",
     "options": [
@@ -161,15 +199,21 @@
    }
   ],
   "progress": {
-   "percent": 78,
-   "confirmed": 7,
-   "total": 9,
+   "percent": 82,
+   "confirmed": 9,
+   "total": 11,
    "assumed": [
     "현지 이동",
     "여행 강도"
    ],
    "missing": [],
-   "label": "78% 진행 중"
+   "label": "82% 진행 중"
+  },
+  "route": {
+   "optimized": false,
+   "saved_min": 0,
+   "user_ordered_days": [],
+   "note": ""
   }
  },
  "places": [
@@ -533,7 +577,7 @@
    "lat": 34.9060616206,
    "lng": 127.3417276358,
    "tour_content_id": "127931",
-   "in_itinerary": false,
+   "in_itinerary": true,
    "reason": "조선 읍성 마을, 평지 산책",
    "summary": "낙안읍성은 조선 태조 6년(1397) 토성으로 축조된 후 인조 4년(1626) 임경업 장군이 군수로 부임하여 현재의 석성으로 중수한 곳으로, 높이 4m, 총길이 1,410m의 성곽이 400년 가까이 원형을 유지하고 있다. 성과 동헌, 객사, 초가 등이 원형대로 보존되어 성과 마을이 함께 국내 최초로 사적에 지정되었으며, 지금도 많은 세대가 실제 생활하고 있는 민속 전통마을이다.",
    "highlights": [
@@ -904,7 +948,7 @@
    "lng": 127.3437302284,
    "tour_content_id": "3444492",
    "in_itinerary": true,
-   "reason": "벌교 꼬막 전문",
+   "reason": "벌교 꼬막 정식",
    "summary": "최대감벌교꼬막은 다양한 꼬막 요리를 한 자리에서 즐길 수 있는 꼬막 전문 식당입니다. 꼬막 정식으로 잘 알려져 있으며, 전라도식의 푸짐하고 정갈한 한상차림이 특징입니다.",
    "highlights": [],
    "guide_tips": "",
@@ -967,7 +1011,7 @@
    "lng": 127.5077431163,
    "tour_content_id": "2050523",
    "in_itinerary": true,
-   "reason": "순천 시내 숙소",
+   "reason": "이틀째 숙소",
    "summary": "순천만민속한옥펜션은 순천만 인근 높은 지대에 위치해 순천만생태공원을 한눈에 조망할 수 있는 숙소입니다. 객실은 원룸과 독채로 구성되어 있으며, 황토 바닥과 국산 소나무 마감으로 건강하게 머무를 수 있습니다. 순천만자연생태공원과 용산전망대를 도보로 이동할 수 있으며, 남도 가정식을 맛볼 수 있습니다.",
    "highlights": [],
    "guide_tips": "",
@@ -1090,6 +1134,75 @@
      "distance_km": 2.6,
      "place_id": "126767",
      "note": "당몰샘은 전국 최장수 마을로 꼽히는 상사 마을의 식수원으로, 지리산 약초 뿌리가 녹아든다는 말이 전해질 정도"
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "2906086",
+   "rank": null,
+   "name": "구례역대합실",
+   "category": "음식점",
+   "address": "전남광주통합특별시 구례군 구례읍 섬진강로 23",
+   "lat": 35.166688,
+   "lng": 127.453659,
+   "tour_content_id": "2906086",
+   "in_itinerary": true,
+   "reason": "구례에서 저녁까지 여는 식당",
+   "summary": "구례역대합실은 지리산흑돼지안심돈까스, 다슬기오일파스타, 지리산 버섯 크림 리조또 등 다양한 브런치 메뉴를 판매하는 곳입니다. 빨간 벽돌 건물의 이국적인 외관과 널찍한 실내 공간이 특징이며, 창가 자리에서는 강변을 바라볼 수 있습니다. 곡성섬진강천문대, 섬진강 대나무 숲길 등이 주변에 있어 연계 관광하기 좋습니다.",
+   "highlights": [],
+   "guide_tips": "",
+   "stay_min": null,
+   "hours": "11:00~22:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "0507-1316-0048",
+   "companion_notes": "",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/60/4058360_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/63/4058363_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/63/4058363_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/77/2906077_image2_1.JPG",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/77/2906077_image2_1.JPG",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/62/4058362_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/62/4058362_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "사성암(구례)",
+     "distance_km": 2.9,
+     "place_id": "317559",
+     "note": "사성암은 구례읍에서 약 2㎞ 남쪽인 죽마리 오산 꼭대기에 위치해 있다. 이곳은 원래 오산암이라 불렀는데, 성"
+    },
+    {
+     "name": "오산(구례)",
+     "distance_km": 2.9,
+     "place_id": "126637",
+     "note": "오산은 해발 531m의 산으로 지리산을 마주하고 있으며, 예부터 '소금강'이라 불릴 만큼 빼어난 바위 형상과"
     }
    ],
    "foods": [],
@@ -1327,6 +1440,34 @@
      "lat": 35.1801260865484,
      "lng": 127.480604895138,
      "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 4,
+     "place_id": "2906086",
+     "name": "구례역대합실",
+     "type": "meal",
+     "arrive": "18:00",
+     "depart": "19:00",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "구례에서 저녁까지 여는 식당",
+     "lat": 35.166688,
+     "lng": 127.453659,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 5,
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "type": "stay",
+     "arrive": "20:05",
+     "depart": "20:05",
+     "stay_min": 0,
+     "hours_status": "확인됨",
+     "reason": "이틀째 숙소",
+     "lat": 34.8913154256,
+     "lng": 127.5077431163,
+     "source": "한국관광공사 TourAPI"
     }
    ],
    "legs": [
@@ -1389,32 +1530,152 @@
        127.480604895138
       ]
      ]
+    },
+    {
+     "from": "317559",
+     "from_name": "사성암(구례)",
+     "to": "2906086",
+     "to_name": "구례역대합실",
+     "mode": "자동차",
+     "distance_km": 3.7,
+     "duration_min": 10,
+     "estimated": true,
+     "path": [
+      [
+       35.1801260865484,
+       127.480604895138
+      ],
+      [
+       35.166688,
+       127.453659
+      ]
+     ]
+    },
+    {
+     "from": "2906086",
+     "from_name": "구례역대합실",
+     "to": "2050523",
+     "to_name": "순천만민속한옥펜션",
+     "mode": "자동차",
+     "distance_km": 40.3,
+     "duration_min": 55,
+     "estimated": true,
+     "path": [
+      [
+       35.166688,
+       127.453659
+      ],
+      [
+       34.8913154256,
+       127.5077431163
+      ]
+     ]
     }
    ],
-   "day_distance_km": 63.8,
-   "day_travel_min": 100
+   "day_distance_km": 107.8,
+   "day_travel_min": 165
+  },
+  {
+   "day": 3,
+   "date": "2026-12-14",
+   "weekday": "월",
+   "theme": "순천 권역",
+   "stops": [
+    {
+     "order": 1,
+     "place_id": "127931",
+     "name": "순천 낙안읍성",
+     "type": "place",
+     "arrive": "09:35",
+     "depart": "11:05",
+     "stay_min": 90,
+     "hours_status": "확인됨",
+     "reason": "조선 읍성 마을, 평지 산책",
+     "lat": 34.9060616206,
+     "lng": 127.3417276358,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 2,
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "type": "meal",
+     "arrive": "12:00",
+     "depart": "13:00",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "벌교 꼬막 정식",
+     "lat": 34.9049513051,
+     "lng": 127.3437302284,
+     "source": "한국관광공사 TourAPI"
+    }
+   ],
+   "legs": [
+    {
+     "from": "2050523",
+     "from_name": "순천만민속한옥펜션",
+     "to": "127931",
+     "to_name": "순천 낙안읍성",
+     "mode": "자동차",
+     "distance_km": 19.8,
+     "duration_min": 35,
+     "estimated": true,
+     "path": [
+      [
+       34.8913154256,
+       127.5077431163
+      ],
+      [
+       34.9060616206,
+       127.3417276358
+      ]
+     ]
+    },
+    {
+     "from": "127931",
+     "from_name": "순천 낙안읍성",
+     "to": "3444492",
+     "to_name": "최대감벌교꼬막",
+     "mode": "자동차",
+     "distance_km": 0.3,
+     "duration_min": 5,
+     "estimated": true,
+     "path": [
+      [
+       34.9060616206,
+       127.3417276358
+      ],
+      [
+       34.9049513051,
+       127.3437302284
+      ]
+     ]
+    }
+   ],
+   "day_distance_km": 20.1,
+   "day_travel_min": 40
   }
  ],
  "totals": {
   "local": {
-   "distance_km": 130.9,
-   "travel_min": 225
+   "distance_km": 195.0,
+   "travel_min": 330
   },
   "long_distance": {
    "outbound": {
     "mode": "KTX·SRT",
-    "label": "서울 → 순천/구례",
-    "depart": "08:00",
-    "arrive": "10:50",
-    "duration_min": 170,
+    "label": "경기 → 순천/구례",
+    "depart": "07:30",
+    "arrive": "10:10",
+    "duration_min": 160,
     "estimated": true
    },
    "inbound": {
     "mode": "KTX·SRT",
-    "label": "순천/구례 → 서울",
-    "depart": "14:30",
-    "arrive": "17:20",
-    "duration_min": 170,
+    "label": "순천/구례 → 경기 성남시 분당구 판교동",
+    "depart": "13:00",
+    "arrive": "15:40",
+    "duration_min": 160,
     "estimated": true
    }
   }
@@ -1422,7 +1683,8 @@
  "warnings": [
   "2일차 순천만민속한옥펜션 → 화엄사 이동이 약 70분으로 '보통' 강도 권장(60분)보다 길어요",
   "화엄사: 일주문부터 보제루, 각황전까지 경사와 계단이 있고 효대 언덕의 4사자 3층석탑은 별도 언덕에 위치하므로 체력 안배가 필요합니다. 주차장에서 경내까지 거리와 구체적인 경사도는 현장 확인이 필요합니다.",
-  "사성암(구례): 오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요."
+  "사성암(구례): 오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요.",
+  "순천 낙안읍성: 넓은 평야 지대에 조성된 성곽으로 급경사는 없으나, 성곽 위를 걷는 구간은 높이 4m 정도이며 1,410m 거리를 도보로 이동해야 하므로 체력 안배가 필요합니다. 주차장 위치와 성문까지 거리는 현장 확인이 필요합니다."
  ],
  "costs": {
   "currency": "KRW",
@@ -1431,25 +1693,25 @@
   "items": [
    {
     "category": "장거리 교통",
-    "label": "KTX·SRT 서울 강남구↔순천/구례 왕복 4명",
-    "amount": 323200,
-    "basis": "1인 편도 약 40,400원 × 2회 × 4명 (거리 기준 추정)",
+    "label": "KTX·SRT 경기 성남시 분당구 판교동↔순천/구례 왕복 4명",
+    "amount": 299200,
+    "basis": "1인 편도 약 37,400원 × 2회 × 4명 (거리 기준 추정)",
     "estimated": true,
     "unknown": false
    },
    {
     "category": "렌터카",
-    "label": "렌터카 2일",
-    "amount": 140000,
-    "basis": "하루 70,000원 × 2일 (보험 포함 기준가 추정)",
+    "label": "렌터카 3일",
+    "amount": 210000,
+    "basis": "하루 70,000원 × 3일 (보험 포함 기준가 추정)",
     "estimated": true,
     "unknown": false
    },
    {
     "category": "유류비",
-    "label": "현지 이동 약 131km",
-    "amount": 18500,
-    "basis": "131km ÷ 12km/L × 1,700원/L",
+    "label": "현지 이동 약 195km (렌터카)",
+    "amount": 27600,
+    "basis": "195km ÷ 연비 12km/L × 1,700원/L (중형 · 휘발유)",
     "estimated": true,
     "unknown": false
    },
@@ -1516,11 +1778,69 @@
     "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
     "estimated": true,
     "unknown": true
+   },
+   {
+    "category": "식비",
+    "label": "2일차 저녁 · 구례역대합실",
+    "amount": 60000,
+    "basis": "1인 15,000원 × 4명 (평균 단가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "숙박",
+    "label": "순천만민속한옥펜션 1박 1실",
+    "amount": 100000,
+    "basis": "1박 객실 100,000원 기준가 × 1실 (실제 요금은 예약 시 확인)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "입장료",
+    "label": "순천 낙안읍성",
+    "amount": null,
+    "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
+    "estimated": true,
+    "unknown": true
+   },
+   {
+    "category": "식비",
+    "label": "3일차 점심 · 최대감벌교꼬막",
+    "amount": 48000,
+    "basis": "1인 12,000원 × 4명 (평균 단가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "주차비",
+    "label": "관광지 주차 5곳",
+    "amount": 10000,
+    "basis": "1곳 약 2,000원 (공영주차장 기준 추정, 관광공사 정보에 '무료'면 제외): 순천만국가정원, 순천만습지, 화엄사, 사성암(구례)…",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "카페·디저트",
+    "label": "카페·디저트·음료 3일 × 4명",
+    "amount": 72000,
+    "basis": "1인 1일 6,000원 (추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "기념품",
+    "label": "순천 특산물",
+    "amount": 40000,
+    "basis": "직접 추가한 비용",
+    "estimated": false,
+    "unknown": false,
+    "custom": true,
+    "id": "c1"
    }
   ],
-  "total": 737700,
-  "per_person": 184400,
-  "budget": 1000000,
+  "total": 1122800,
+  "per_person": 280700,
+  "budget": 1200000,
   "over_budget": false,
   "over_by": 0,
   "note": "모든 금액은 추정이에요. 입장료는 관광공사 요금 정보에 금액이 있을 때만 넣었고, 없으면 '확인 필요'로 두었어요."

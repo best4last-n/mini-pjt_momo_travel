@@ -38,6 +38,15 @@ class TripSpec:
     assumptions: list[str] = field(default_factory=list)
     user_ordered_days: list[int] = field(default_factory=list)   # 사용자가 순서를 정한 날(1부터) — 최적화하지 않음
     route_saved_min: int = 0
+    vehicle: dict | None = None             # {type, fuel, efficiency_kmpl, toll_discount, parking_discount}
+    origin_coords: list | None = None       # 출발지 좌표(약 1km 반올림) — 있으면 시·도 대표 좌표 대신 사용
+    end_coords: list | None = None
+    end_location: str | None = None         # 여행 후 도착지(시·도), 없으면 출발지
+    end_label: str | None = None
+    arrive_time: int | None = None          # 도착 희망 시각(분), 없으면 22:00 상한
+    custom_costs: list[dict] = field(default_factory=list)
+    preset: str | None = None
+    given: list[str] = field(default_factory=list)      # 사용자가 직접 준 선택 항목(depart_time 등)
     budget: int | None = None               # 최대 예산(원)
     budget_per_person: bool = False
     budget_label: str | None = None
@@ -68,32 +77,46 @@ def local_mode(spec: TripSpec) -> str:
 def one_way_minutes(spec: TripSpec) -> int | None:
     if not spec.departure or spec.departure not in data.SIDO_COORDS:
         return None
-    return travel.intercity_minutes(data.SIDO_COORDS[spec.departure], data.region_center(spec.region),
-                                    spec.long_transport)
+    a = tuple(spec.origin_coords) if spec.origin_coords else data.SIDO_COORDS[spec.departure]
+    return travel.intercity_minutes(a, data.region_center(spec.region), spec.long_transport)
+
+
+def return_minutes(spec: TripSpec) -> int | None:
+    """여행 지역 → 여행 후 도착지(없으면 출발지)."""
+    coords = spec.end_coords or (None if spec.end_location else spec.origin_coords)
+    dest = spec.end_location or spec.departure
+    if not coords and (not dest or dest not in data.SIDO_COORDS):
+        return None
+    b = tuple(coords) if coords else data.SIDO_COORDS[dest]
+    return travel.intercity_minutes(data.region_center(spec.region), b, spec.long_transport)
+
+
+def home_limit(spec: TripSpec) -> int:
+    return spec.arrive_time if spec.arrive_time else HOME_LIMIT
 
 
 def windows(spec: TripSpec) -> list[tuple[int, int]]:
     ow = one_way_minutes(spec)
+    rw = return_minutes(spec)
     out = []
     n = spec.nights + 1
     s0, e0, _, _ = INTENSITY.get(spec.intensity, INTENSITY["보통"])
     for i in range(n):
         s, e = s0, e0
-        if ow is not None:
-            if i == 0:
-                s = max(s0, spec.depart_time + ow + BUFFER_MIN)
-            if i == n - 1:
-                e = min(e0, HOME_LIMIT - ow)
+        if ow is not None and i == 0:
+            s = max(s0, spec.depart_time + ow + BUFFER_MIN)
+        if rw is not None and i == n - 1:
+            e = min(e0, home_limit(spec) - rw)
         out.append((_ceil5(s), e))
     return out
 
 
 def meal_windows(spec: TripSpec) -> list[tuple[int, int]]:
     """식사용 시간 창: 관광 시간대가 끝난 뒤에도 저녁(~20:00)은 둘 수 있다. 귀가 상한이 걸린 마지막 날은 예외."""
-    ow = one_way_minutes(spec)
+    rw = return_minutes(spec)
     out = []
     for i, (s, e) in enumerate(windows(spec)):
-        last_capped = ow is not None and i == len(spec.days) - 1
+        last_capped = rw is not None and i == len(spec.days) - 1
         out.append((s, e if last_capped else max(e, DINNER[1])))
     return out
 
@@ -132,7 +155,9 @@ def candidates(spec: TripSpec, query: str) -> dict[str, dict]:
     region = spec.region
     q = " ".join([query, spec.companions or "", *spec.preferences]).strip()
     picked: dict[str, dict] = {}
-    for kinds, k in ((["attraction", "festival"], 18), (["restaurant"], 12), (["lodging"], 5 if spec.nights else 0)):
+    n_att = 18 + 7 * max(0, spec.nights - 1)
+    n_food = 12 + 4 * max(0, spec.nights - 1)
+    for kinds, k in ((["attraction", "festival"], n_att), (["restaurant"], n_food), (["lodging"], 5 if spec.nights else 0)):
         if k:
             for d in retrieve.search(q, region, kinds, k=k):
                 picked[d["doc_id"]] = d
@@ -189,7 +214,7 @@ PICK_SYSTEM = MOMO_PERSONA + """
 - 하루 관광지 3~5곳(많이 원해도 최대 7곳), 가까운 곳끼리 묶어 이동을 줄인다(좌표 참고).
 - 하루 시간 창 안에서 점심(role=lunch, 12~14시)·저녁(role=dinner, 18~20시)이 필요하다고 주어지면 음식점을 넣는다.
 - 점심·저녁은 식사가 되는 음식점으로 고른다(카페·베이커리·디저트 전문점은 식사 자리에 넣지 않는다).
-- 1박이면 1일차 마지막에 숙박(role=stay) 1곳.
+- N박이면 1~N일차 마지막에 숙박(role=stay)을 하루 1곳씩(같은 숙소 연박 가능, 다음 날 동선 쪽 숙소면 더 좋음). 마지막 날은 숙박 없음.
 - 해당 일차에 '휴무'인 곳은 그날 넣지 않는다. '운영시간 확인 필요'는 하루 최대 1곳, 식사·마지막 자리에 두지 않는다.
 - 운영시간이 짧은 곳(예: 17시 마감)은 그날 앞쪽에 둔다. 체류시간은 관광지 60~120분, 식사 60분.
 - reason은 후보 정보(요약·종류)에 근거한 한 줄. 지어내지 않는다.
@@ -244,6 +269,30 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
 def _pcoord(spec: TripSpec, pid: str):
     p = data.places(spec.region).get(pid) or next((w for w in spec.user_waypoints if w["place_id"] == pid), None)
     return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
+
+
+def ensure_waypoints(spec: TripSpec, picked: PlanPick) -> PlanPick:
+    """사용자가 꼭 가겠다고 한 장소가 빠졌으면 코드가 넣는다: 관광지가 가장 적은 날의 저녁·숙박 앞(그다음 동선 최적화)."""
+    from .schemas import DayPick, PickItem
+    want = [*spec.waypoint_ids, *[w["place_id"] for w in spec.user_waypoints]]
+    have = {x.place_id for d in picked.days for x in d.items}
+    missing = [w for w in want if w not in have]
+    if not missing:
+        return picked
+    days = {d.day: list(d.items) for d in picked.days}
+    for d in range(1, spec.nights + 2):
+        days.setdefault(d, [])
+    wins = windows(spec)
+
+    def spare(k):   # 그날 남는 관광 시간(분) ≈ 시간 창 − 관광지×100분 − 점심 80분
+        w = wins[k - 1]
+        return (w[1] - w[0]) - 100 * sum(1 for x in days[k] if x.role == "place") - (80 if meal_required(w, LUNCH) else 0)
+    for wid in missing:
+        to = max(days, key=spare)
+        row = days[to]
+        idx = next((i for i, x in enumerate(row) if x.role in ("dinner", "stay")), len(row))
+        row.insert(idx, PickItem(place_id=wid, role="place", stay_minutes=75, reason="꼭 가고 싶다고 하신 곳"))
+    return PlanPick(days=[DayPick(day=k, items=v) for k, v in sorted(days.items())], ranked=picked.ranked, note=picked.note)
 
 
 def optimize_day(spec: TripSpec, row: list, start=None) -> list:
@@ -373,9 +422,11 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             cursor, prev = end, p
             if typ == "stay":
                 last_stay = p
-        if ow is not None and di == len(spec.days) - 1:
+        rw = return_minutes(spec)
+        if rw is not None and di == len(spec.days) - 1:
             back = max(cursor, w[0])
-            items.append(_move(d, f"{data.region_label(spec.region)} → {spec.departure}", back, back + ow, "귀가"))
+            dest = spec.end_label or spec.end_location or spec.departure
+            items.append(_move(d, f"{data.region_label(spec.region)} → {dest}", back, back + rw, "귀가"))
     for i, it in enumerate(items, 1):
         it["seq"] = i
     return items
@@ -468,8 +519,8 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
             if meal_required(mw, (a, b)) and not any(a - 30 <= m < b for m in meals):
                 v.append({"type": "식사 누락", "seq": None, "place_name": "", "date": ds,
                           "detail": f"{ds} {label}({hours.fmt(a)}~{hours.fmt(b)}) 식사 항목 없음"})
-        if spec.nights and di == 0 and (not day or day[-1]["type"] != "stay"):
-            v.append({"type": "숙박 누락", "seq": None, "place_name": "", "date": ds, "detail": "1일차 마지막에 숙박 없음"})
+        if di < spec.nights and (not day or day[-1]["type"] != "stay"):
+            v.append({"type": "숙박 누락", "seq": None, "place_name": "", "date": ds, "detail": f"{di + 1}일차 마지막에 숙박 없음"})
     return v
 
 
@@ -501,11 +552,11 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
                  for it in day if it["type"] != "stay"]
         stay = [PickItem(place_id=it["place_id"], role="stay", stay_minutes=0, reason=it["reason"])
                 for it in day if it["type"] == "stay"][:1]
-        if spec.nights and di == 0 and not stay:
+        if di < spec.nights and not stay:
             lodg = next((p for p in (cands or {}).values() if p.get("kind") == "lodging"), None)
             if lodg:
                 stay = [PickItem(place_id=lodg["contentid"], role="stay", stay_minutes=0, reason="동선이 가까운 숙소예요")]
-        if not (spec.nights and di == 0):
+        if di >= spec.nights:
             stay = []
         # 빠진 식사 자리표시자: 점심은 시간 순서상 정오 무렵, 저녁은 맨 뒤
         for role, win in (("lunch", LUNCH), ("dinner", DINNER)):
@@ -526,11 +577,15 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
         bad = next(it for it in out if it["seq"] == v[0]["seq"])
         di = [d.isoformat() for d in spec.days].index(bad["date"])
         row = days[di]
-        hit = next((i for i, pk in enumerate(row) if pk.role == "place" and pk.place_id == bad.get("place_id")), None)
+        keep = set(spec.waypoint_ids) | {w["place_id"] for w in spec.user_waypoints}   # 사용자가 지정한 곳은 보호
+        hit = next((i for i, pk in enumerate(row) if pk.role == "place" and pk.place_id == bad.get("place_id")
+                    and pk.place_id not in keep), None)
+        if hit is None and bad.get("place_id") in keep:   # 지정 장소가 밀렸으면 그날 다른 관광지를 뺌
+            hit = max((i for i, pk in enumerate(row) if pk.role == "place" and pk.place_id not in keep), default=None)
         if hit is None:      # 식사·숙소가 밀림 → 그 앞의 마지막 관광지
             key = bad.get("place_id") or MEAL_ID
             pos = next((i for i, pk in enumerate(row) if pk.place_id == key), len(row))
-            hit = max((i for i, pk in enumerate(row[:pos]) if pk.role == "place"), default=None)
+            hit = max((i for i, pk in enumerate(row[:pos]) if pk.role == "place" and pk.place_id not in keep), default=None)
         if hit is None:
             break
         row.pop(hit)
@@ -565,6 +620,7 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
     for attempt in range(MAX_REGEN + 1):
         picked = pick(spec, cands, request, feedback, base, indoor=indoor)
         last_ranked = picked.ranked or last_ranked
+        picked = ensure_waypoints(spec, picked)
         if prefix or indoor:
             from .schemas import DayPick
             new_days = []

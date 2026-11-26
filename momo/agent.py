@@ -58,6 +58,8 @@ class State(TypedDict, total=False):
     # 4단계 상담·브로셔·편집 (SERVICE.md 3-6)
     edit: dict | None
     set_req: dict | None
+    start_req: dict | None
+    cost_req: dict | None
     pending: dict | None        # intake 중 모은 조건(다음 턴에 합침)
     plan: dict | None           # 최신 브로셔 plan (세션 유지)
     ranked: list                # 추천 1~10위 [(place_id, reason)]
@@ -235,22 +237,27 @@ def plan_node(state: State) -> State:
     if nights is None:
         nights = 1
         notes.append("여행 길이를 말씀하지 않아 1박 2일로 짰어요(기본값 적용)")
-    elif nights > 1:
-        notes.append(f"{nights}박 {nights + 1}일은 아직 지원하지 않아요. 저는 당일~1박 2일까지 꼼꼼히 검증할 수 있어서, "
-                     "우선 1박 2일로 줄여 제안드려요. 나머지 날은 나눠서 한 번 더 계획해 보시는 걸 추천해요")
-        nights = 1
+    elif nights > 3:
+        notes.append(f"{nights}박 {nights + 1}일은 아직 지원하지 않아요. 저는 최대 3박 4일까지 꼼꼼히 검증할 수 있어서, "
+                     "우선 3박 4일로 줄여 제안드려요. 나머지 날은 나눠서 한 번 더 계획해 보시는 걸 추천해요")
+        nights = 3
     assumed = []
     if not (p.month and p.day) and not p.relative_date:
         assumed.append("date")
     if p.nights is None:
         assumed.append("length")
     dep = data.norm_sido(p.departure)
+    oloc = None
+    if p.departure:
+        from . import geo
+        oloc = geo.locate(p.departure)
+        dep = (oloc or {}).get("sido") or dep
     if p.departure and not dep:
         notes.append("출발지를 알아보지 못해 오가는 시간은 빼고 현지 도착 기준으로 짰어요")
     elif not dep:
         notes.append("출발지를 말씀하지 않아 오가는 시간은 빼고 현지 도착 기준으로 계산했어요(오른쪽 '출발지'를 눌러 알려 주세요)")
     else:
-        notes.append(f"출발지는 {_dep_label(p.departure)} 기준으로 쓰고, 오가는 시간은 {dep} 대표 지점에서 대략 추정했어요")
+        notes.append(f"출발지는 {_dep_label(p.departure) or p.departure} 기준으로 쓰고, 오가는 시간은 {dep} 대표 지점에서 대략 추정했어요")
     long_t = p.long_transport or ("KTX·SRT" if p.transport == "대중교통" and re.search(r"KTX|SRT|기차|열차", q) else
                                   "고속·시외버스" if p.transport == "대중교통" and "버스" in q else "자차")
     local_t = p.local_transport or ("대중교통" if p.transport == "대중교통" else ("렌터카" if long_t != "자차" else "자차"))
@@ -281,7 +288,8 @@ def plan_node(state: State) -> State:
                             transport=transport, companions=p.companions, preferences=p.preferences,
                             many_places=p.many_places, intensity=intensity, long_transport=long_t,
                             local_transport=local_t, companion_type=ctype, companion_count=p.companion_count,
-                            origin_label=_dep_label(p.departure) if dep else None, assumptions=assumed,
+                            origin_label=(oloc or {}).get("label") or (_dep_label(p.departure) if dep else None),
+                            origin_coords=[oloc["lat"], oloc["lng"]] if oloc else None, assumptions=assumed,
                             budget=budget, budget_per_person=per, budget_label=p.budget_text if budget else None)
     if p.waypoints:
         ids, users, wnotes = resolve_waypoints(p.waypoints, region)
@@ -432,8 +440,9 @@ def _intake_reply(state: State, p: ParsedRequest, region: str) -> State:
     """확정 요소가 부족할 때: 한 번에 2~3개만, 선택지 + 지역 맞춤 가이드(가이드 3절)."""
     label = data.region_label(region)
     qs, chips = [], []
-    qs.append("**언제, 며칠** 다녀오실까요? 지금은 당일치기부터 1박 2일까지 휴무일·운영시간을 꼼꼼히 맞춰 드려요.")
-    chips += ["이번 주말 1박 2일", "다음 주말 당일치기"]
+    qs.append("**언제, 며칠** 다녀오실까요? 당일치기부터 3박 4일까지 휴무일·운영시간을 꼼꼼히 맞춰 드려요. "
+              "위쪽 '여행 시작' 카드의 달력에서 고르셔도 돼요.")
+    chips += ["이번 주말 1박 2일", "다음 주말 2박 3일", "당일치기"]
     if not p.departure:
         qs.append("**어디서 출발**하세요? 오가는 시간을 계산해 첫날·마지막 날 일정을 맞춰요.")
         chips += ["서울에서 출발", "대전에서 출발"]
@@ -602,6 +611,25 @@ def edit_node(state: State) -> State:
             spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {di + 1})
             changes.append(f"{di + 1}일차에서 {name}의 순서를 바꿨어요(직접 정한 순서를 최우선으로 지켜요)")
     elif op == "add":
+        cand = e.get("candidate") if isinstance(e.get("candidate"), dict) else None
+        if not pid and cand:      # 장소 찾기에서 고른 후보
+            if cand.get("place_id"):
+                pid = str(cand["place_id"])
+                if pid not in data.places(spec.region):
+                    from . import tourlive
+                    try:
+                        tourlive.fetch(pid, spec.region)
+                    except Exception:
+                        pass
+                if pid not in data.places(spec.region):
+                    return {"status": "승인 대기", "answer": "관광공사 자료를 불러오지 못했어요. 잠시 후 다시 시도해 주세요.",
+                            "trace": _t(state, "edit", e, "관광공사 상세 실패")}
+            else:
+                from . import placesearch
+                up = placesearch.user_place_from_candidate(cand)
+                spec.user_waypoints = [w for w in spec.user_waypoints if w["place_id"] != up["place_id"]] + [up]
+                pid = up["place_id"]
+            pl = data.places(spec.region)
         if not pid and e.get("name"):
             ids, users, notes = resolve_waypoints([e["name"]], spec.region)
             if users:
@@ -652,110 +680,292 @@ def _josa(word: str, pair: str) -> str:
     return word + (pair[0] if has else pair[1])
 
 
-SET_LABEL = {"region": "여행 지역", "start_date": "출발일", "length": "여행 길이", "origin": "출발지",
+def _hm(v) -> int | None:
+    m = re.search(r"(\d{1,2})\s*[:시]\s*(\d{2})?", str(v or ""))
+    return int(m.group(1)) * 60 + int(m.group(2) or 0) if m else None
+
+
+def start_node(state: State) -> State:
+    """선택형 '여행 시작' 카드(SERVICE.md 3-6 (14)) — 구조화된 조건으로 바로 계획(자연어 해석 없이)."""
+    s = state.get("start_req") or {}
+    rid = s.get("region")
+    if rid not in data.available_regions():
+        rid = next((r for k, r in data.REGION_ALIASES.items() if k in str(rid or "")), None)
+    if not rid or rid not in data.available_regions():
+        return {"status": "되묻기", "stage": "intake", "answer": f"어느 지역으로 갈까요? 지금은 {supported_label()} 일정을 짤 수 있어요.",
+                "extra": {"chips": [data.region_label(r) for r in data.available_regions()]},
+                "trace": _t(state, "start", s, "지역 없음")}
+    try:
+        d0 = date.fromisoformat(s.get("start_date"))
+    except (TypeError, ValueError):
+        return {"status": "되묻기", "stage": "intake", "answer": "출발일을 달력에서 골라 주세요.",
+                "trace": _t(state, "start", s, "날짜 없음")}
+    try:
+        d1 = date.fromisoformat(s.get("end_date") or s.get("start_date"))
+    except ValueError:
+        d1 = d0
+    notes, assumed, given = [], [], []
+    nights = max(0, (d1 - d0).days)
+    if nights > 3:
+        notes.append("최대 3박 4일까지 검증할 수 있어 3박 4일로 줄였어요")
+        nights = 3
+    from . import geo
+    origin = s.get("origin")
+    oloc = geo.locate(origin, s.get("origin_place")) if (origin or s.get("origin_place")) else None
+    dep = oloc["sido"] if oloc else None
+    if (origin or s.get("origin_place")) and not oloc:
+        notes.append(f"출발지 '{origin}'의 위치를 찾지 못해 오가는 시간은 빼고 계산했어요. '여행 조건'에서 동·역 이름으로 다시 알려 주세요")
+    elif not dep:
+        notes.append("출발지가 없어 오가는 시간은 빼고 현지 도착 기준으로 계산했어요")
+    eloc = geo.locate(s.get("end_location"), s.get("end_place")) if (s.get("end_location") or s.get("end_place")) else None
+    long_t = s.get("long_transport") or "자차"
+    local_t = s.get("local_transport") or ("렌터카" if long_t != "자차" else "자차")
+    if not s.get("long_transport"):
+        assumed.append("long_transport")
+    if not s.get("local_transport"):
+        assumed.append("local_transport")
+    comp = s.get("companions") or {}
+    if not comp.get("type"):
+        assumed.append("companions")
+    if not s.get("intensity"):
+        assumed.append("intensity")
+    dt = _hm(s.get("depart_time"))
+    if dt is not None:
+        given.append("depart_time")
+    end_loc = s.get("end_location")
+    budget, per = costs.parse_budget(s.get("budget"))
+    spec = planner.TripSpec(
+        region=rid, start=d0, nights=nights, departure=dep, depart_time=dt if dt is not None else DEFAULT_DEPART,
+        transport="대중교통" if local_t == "대중교통" else "자차", companions=comp.get("note") or None,
+        preferences=list(s.get("interests") or []), intensity=s.get("intensity") or "보통",
+        long_transport=long_t, local_transport=local_t, companion_type=comp.get("type") or "보통",
+        companion_count=comp.get("count"), origin_label=oloc["label"] if oloc else None,
+        origin_coords=[oloc["lat"], oloc["lng"]] if oloc else None,
+        end_coords=[eloc["lat"], eloc["lng"]] if eloc else None,
+        assumptions=assumed, budget=budget, budget_per_person=per, budget_label=s.get("budget") if budget else None,
+        vehicle=s.get("vehicle") or None, end_location=eloc["sido"] if eloc else None,
+        end_label=eloc["label"] if eloc else None, arrive_time=_hm(s.get("arrive_time")), preset=s.get("preset"), given=given)
+    if s.get("waypoints"):
+        ids, users, wnotes = resolve_waypoints([w for w in s["waypoints"] if w], rid)
+        spec.waypoint_ids, spec.user_waypoints = ids, users
+        notes += wnotes
+    if assumed:
+        lab = {"long_transport": "장거리 이동", "local_transport": "현지 이동", "companions": "동반자", "intensity": "여행 강도"}
+        notes.append(", ".join(lab[a] for a in assumed) + "은(는) 기본값으로 정했어요. 오른쪽 '여행 조건'에서 바꿀 수 있어요")
+    preset = next((p for p in __import__("momo.options", fromlist=["x"]).STYLE_PRESETS if p["label"] == s.get("preset")), None)
+    request = (state.get("question") or "").strip() or f"{data.region_label(rid)} 여행"
+    if preset:
+        request += f" · 여행 스타일: {preset['label']}({preset['desc']})"
+    if nights == 0 and dep:
+        w = planner.windows(spec)[0]
+        if w[1] - w[0] < 60:
+            return {"status": "정보", "stage": "intake", "answer": f"{dep}에서 {data.region_label(rid)}까지 오가는 시간이 길어서 당일치기로는 "
+                    "현지에 머물 시간이 1시간도 안 돼요. 더 이른 출발이나 1박 어때요?", "trace": _t(state, "start", s, "시간 창 부족")}
+    return _run_plan(state, spec, request, notes, base=None)
+
+
+def cost_node(state: State) -> State:
+    """계획 경비에 비용을 직접 추가·삭제(식사·디저트·기념품 등) — 일정은 그대로, 경비만 다시 계산."""
+    c = state.get("cost_req") or {}
+    if not state.get("spec") or not state.get("itinerary"):
+        return {"status": "오류", "answer": "앗, 비용을 붙일 일정이 아직 없어요.", "trace": _t(state, "cost", c, "초안 없음")}
+    spec = spec_from_dict(state["spec"])
+    if c.get("op") == "add":
+        try:
+            amount = int(str(c.get("amount", "")).replace(",", ""))
+            assert 0 <= amount <= 100_000_000
+        except (ValueError, AssertionError):
+            return {"status": "승인 대기", "answer": "금액을 숫자로 알려 주세요(예: 30000).", "trace": _t(state, "cost", c, "금액 오류")}
+        from .options import EXPENSE_CATEGORIES
+        cat = c.get("category") if c.get("category") in EXPENSE_CATEGORIES else "기타"
+        label = guardrails.mask_pii(str(c.get("label") or cat)[:60])[0]
+        spec.custom_costs = [*spec.custom_costs, {"id": uuid.uuid4().hex[:8], "category": cat, "label": label, "amount": amount}]
+        change = f"{label} {amount:,}원을 예상 경비에 넣었어요"
+    elif c.get("op") == "remove":
+        before = len(spec.custom_costs)
+        spec.custom_costs = [x for x in spec.custom_costs if x["id"] != c.get("id")]
+        change = "직접 넣은 비용을 뺐어요" if len(spec.custom_costs) < before else "그 비용 항목을 찾지 못했어요"
+    else:
+        return {"status": "오류", "answer": "앗, 모르는 비용 요청이에요.", "trace": _t(state, "cost", c, "알 수 없는 op")}
+    items = state["itinerary"]
+    viol = state.get("violations") or []
+    notes = list((state.get("plan") or {}).get("trip", {}).get("assumptions") or [])
+    plan = brochure.build(spec, items, state.get("ranked") or [], viol, notes)
+    total = plan["costs"]["total"]
+    answer = f"{change}. 예상 경비는 이제 약 {total:,}원(1인 약 {plan['costs']['per_person']:,}원)이에요."
+    return {"status": "승인 대기", "stage": "refine", "answer": answer, "spec": spec_to_dict(spec), "plan": plan,
+            "plan_out": plan, "conditions": plan["trip"]["checklist"], "changes": [change],
+            "extra": {"draft_version": state.get("draft_version")},
+            "trace": _t(state, "cost", c, f"경비 합계 {total:,}원")}
+
+
+SET_LABEL = {"depart_time": "출발 시각", "arrival": "여행 후 도착", "vehicle": "차량",
+             "region": "여행 지역", "start_date": "출발일", "length": "여행 길이", "origin": "출발지",
              "long_transport": "장거리 이동", "local_transport": "현지 이동", "intensity": "여행 강도",
              "companions": "동반자", "budget": "최대 예산", "interests": "관심사"}
 
 
-def set_node(state: State) -> State:
-    """오른쪽 정보창에서 확정 요소를 직접 바꿈 → 가정값이 '확정'이 되고 계획을 다시 맞춘다."""
-    sreq = state.get("set_req") or {}
-    key, value = sreq.get("key"), str(sreq.get("value") or "").strip()
-    if not state.get("spec"):
-        pend = dict(state.get("pending") or {})
-        if key == "region":
-            pend["region_text"] = value
-        elif key == "start_date":
-            try:
-                d = date.fromisoformat(value)
-                pend.update(month=d.month, day=d.day)
-            except ValueError:
-                pass
-        elif key == "length":
-            pend["nights"] = 0 if "당일" in value else 1
-        elif key == "origin":
-            pend["departure"] = value
-        elif key in ("long_transport", "local_transport", "intensity"):
-            pend[key] = value
-        elif key == "companions":
-            pend["companion_type"] = value
-        elif key == "budget":
-            pend["budget_text"] = value
-        return {"pending": pend, "status": "되묻기", "stage": "intake",
-                "answer": f"{_josa(SET_LABEL.get(key, key), '을를')} {_josa(chr(39) + value + chr(39), '으로로')} 기억해 둘게요. 남은 조건을 알려 주시거나 '알아서 짜 줘'를 눌러 주세요.",
-                "extra": {"chips": ["알아서 짜 줘"]}, "trace": _t(state, "set", sreq, "intake 조건 저장")}
-    spec = spec_from_dict(state["spec"])
-    a = set(spec.assumptions)
-    replan, label = True, SET_LABEL.get(key, key)
+def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: dict | None):
+    """조건 하나를 spec에 반영. (spec, 다시 계획 필요?, 표시 값, 오류 문구)"""
+    from . import geo
+    label = SET_LABEL.get(key, key)
     if key == "region":
         rid = next((r for k, r in data.REGION_ALIASES.items() if k in value), None)
         if not rid or rid not in data.available_regions():
-            return {"status": "승인 대기", "answer": f"'{value}'은(는) 아직 준비된 지역이 아니에요. 지금은 {supported_label()}을 짤 수 있어요.",
-                    "trace": _t(state, "set", sreq, "지원 밖 지역")}
-        spec = planner.TripSpec(**{**spec.__dict__, "region": rid, "waypoint_ids": [], "user_waypoints": []})
-    elif key == "start_date":
+            return spec, False, value, f"'{value}'은(는) 아직 준비된 지역이 아니에요. 지금은 {supported_label()}을 짤 수 있어요."
+        return planner.TripSpec(**{**spec.__dict__, "region": rid, "waypoint_ids": [], "user_waypoints": []}), True, value, None
+    if key == "start_date":
         try:
             spec.start = date.fromisoformat(value)
         except ValueError:
-            return {"status": "승인 대기", "answer": "날짜 형식을 알아보지 못했어요(예: 2026-12-12).", "trace": _t(state, "set", sreq, "형식 오류")}
+            return spec, False, value, "날짜 형식을 알아보지 못했어요(예: 2026-12-12)."
         a.discard("date")
-    elif key == "length":
-        spec.nights = 0 if "당일" in value else 1
+        return spec, True, value, None
+    if key == "end_date":
+        try:
+            spec.nights = max(0, min(3, (date.fromisoformat(value) - spec.start).days))
+        except ValueError:
+            return spec, False, value, "날짜 형식을 알아보지 못했어요(예: 2026-12-14)."
         a.discard("length")
-    elif key == "origin":
-        dep = data.norm_sido(value)
-        if not dep:
-            return {"status": "승인 대기", "answer": f"'{value}'의 위치를 알아보지 못했어요. 시·도나 시·군·구 이름으로 알려 주세요(예: 서울 강남구).",
-                    "trace": _t(state, "set", sreq, "출발지 모름")}
-        spec.departure, spec.origin_label = dep, _dep_label(value) or value
+        return spec, True, value, None
+    if key == "length":
+        m = re.search(r"(\d)\s*박", value)
+        spec.nights = 0 if "당일" in value else min(3, int(m.group(1))) if m else 1
+        a.discard("length")
+        return spec, True, value, None
+    if key == "origin":
+        loc = geo.locate(value, place)
+        if not loc:
+            return spec, False, value, f"'{value}'의 위치를 찾지 못했어요. 동·구 이름이나 역 이름으로 알려 주세요(예: 판교동, 수원역)."
+        spec.departure, spec.origin_label, spec.origin_coords = loc["sido"], loc["label"], [loc["lat"], loc["lng"]]
         a.discard("origin")
-        replan = False
-    elif key in ("long_transport", "local_transport"):
+        return spec, False, loc["label"], None
+    if key in ("long_transport", "local_transport"):
         opts = brochure.CHECK_OPTIONS[key]
         if value not in opts:
-            return {"status": "승인 대기", "answer": f"{label}은(는) {', '.join(opts)} 중에서 골라 주세요.", "trace": _t(state, "set", sreq, "선택지 밖")}
+            return spec, False, value, f"{label}은(는) {', '.join(opts)} 중에서 골라 주세요."
         setattr(spec, key, value)
         if key == "local_transport":
             spec.transport = "대중교통" if value == "대중교통" else "자차"
         a.discard(key)
-        replan = False
-    elif key == "intensity":
+        return spec, False, value, None
+    if key == "intensity":
         if value not in brochure.CHECK_OPTIONS["intensity"]:
-            return {"status": "승인 대기", "answer": "여행 강도는 빡빡·보통·여유 중에서 골라 주세요.", "trace": _t(state, "set", sreq, "선택지 밖")}
+            return spec, False, value, "여행 강도는 빡빡·보통·여유 중에서 골라 주세요."
         spec.intensity = value
         a.discard("intensity")
-    elif key == "companions":
+        return spec, True, value, None
+    if key == "companions":
         spec.companion_type = value if value in brochure.CHECK_OPTIONS["companions"] else _infer_companion(value)
         m = re.search(r"(\d+)\s*명", value)
         if m:
             spec.companion_count = int(m.group(1))
         a.discard("companions")
-    elif key == "budget":
+        return spec, True, value, None
+    if key == "budget":
         b, per = costs.parse_budget(value)
         if not b:
-            return {"status": "승인 대기", "answer": "예산 금액을 알아보지 못했어요(예: 60만 원, 1인 20만 원).", "trace": _t(state, "set", sreq, "금액 없음")}
+            return spec, False, value, "예산 금액을 알아보지 못했어요(예: 60만 원, 1인 20만 원)."
         spec.budget, spec.budget_per_person, spec.budget_label = b, per, value
-        replan = False
-    elif key == "interests":
+        return spec, False, value, None
+    if key == "interests":
         spec.preferences = [x.strip() for x in re.split(r"[,·/]", value) if x.strip()]
-    else:
-        return {"status": "오류", "answer": "앗, 모르는 항목이에요.", "trace": _t(state, "set", sreq, "알 수 없는 key")}
+        return spec, True, value, None
+    if key == "depart_time":
+        t = _hm(value)
+        if t is None:
+            return spec, False, value, "출발 시각을 알아보지 못했어요(예: 07:30)."
+        spec.depart_time = t
+        spec.given = sorted(set(spec.given) | {"depart_time"})
+        return spec, False, value, None
+    if key == "arrival":
+        t = _hm(value)
+        where = re.sub(r"\d{1,2}\s*[:시]\s*(\d{2})?\s*(까지|분)?", "", value).replace("출발지로", "").strip(" ·,")
+        if t is not None:
+            spec.arrive_time = t
+        if where or place:
+            loc = geo.locate(where, place)
+            if not loc:
+                return spec, False, value, f"'{where}'의 위치를 찾지 못했어요. 동·구 이름이나 역 이름으로 알려 주세요."
+            spec.end_location, spec.end_label, spec.end_coords = loc["sido"], loc["label"], [loc["lat"], loc["lng"]]
+        elif "출발지" in value:
+            spec.end_location, spec.end_label, spec.end_coords = None, None, None
+        return spec, False, value, None
+    if key == "vehicle":
+        try:
+            v = json.loads(value) if value.startswith("{") else {"type": value}
+        except json.JSONDecodeError:
+            v = {"type": value}
+        spec.vehicle = {k: v.get(k) for k in ("type", "fuel", "efficiency_kmpl", "toll_discount", "parking_discount") if v.get(k) not in (None, "")}
+        return spec, False, brochure._vehicle_label(spec.vehicle), None
+    return spec, False, value, "앗, 모르는 항목이에요."
+
+
+def set_node(state: State) -> State:
+    """오른쪽 정보창에서 확정 요소를 바꿈 — 여러 건을 모아 한 번에(changes 배열) 반영하고 계획을 한 번만 다시 세운다."""
+    sreq = state.get("set_req") or {}
+    changes_in = sreq.get("changes") or ([{"key": sreq.get("key"), "value": sreq.get("value"), "place": sreq.get("place")}]
+                                          if sreq.get("key") else [])
+    changes_in = [{"key": c.get("key"), "value": str(c.get("value") or "").strip(), "place": c.get("place")} for c in changes_in if c.get("key")]
+    if not changes_in:
+        return {"status": "오류", "answer": "바꿀 조건이 없어요.", "trace": _t(state, "set", sreq, "변경 없음")}
+    if not state.get("spec"):
+        pend = dict(state.get("pending") or {})
+        for c in changes_in:
+            key, value = c["key"], c["value"]
+            if key == "region":
+                pend["region_text"] = value
+            elif key == "start_date":
+                try:
+                    d = date.fromisoformat(value)
+                    pend.update(month=d.month, day=d.day)
+                except ValueError:
+                    pass
+            elif key == "length":
+                m = re.search(r"(\d)\s*박", value)
+                pend["nights"] = 0 if "당일" in value else min(3, int(m.group(1))) if m else 1
+            elif key == "origin":
+                pend["departure"] = value
+            elif key in ("long_transport", "local_transport", "intensity"):
+                pend[key] = value
+            elif key == "companions":
+                pend["companion_type"] = value
+            elif key == "budget":
+                pend["budget_text"] = value
+        return {"pending": pend, "status": "되묻기", "stage": "intake",
+                "answer": "말씀하신 조건을 기억해 둘게요. 남은 조건을 알려 주시거나 '알아서 짜 줘'를 눌러 주세요.",
+                "extra": {"chips": ["알아서 짜 줘"]}, "trace": _t(state, "set", sreq, "intake 조건 저장")}
+    spec = spec_from_dict(state["spec"])
+    a = set(spec.assumptions)
+    replan, done, errors = False, [], []
+    for c in changes_in:
+        spec, need, shown, err = _apply_change(spec, a, c["key"], c["value"], c.get("place"))
+        if err:
+            errors.append(err)
+            continue
+        replan = replan or need
+        done.append(f"{_josa(SET_LABEL.get(c['key'], c['key']), '을를')} {_josa(chr(39) + shown + chr(39), '으로로')}")
     spec.assumptions = sorted(a)
-    change = f"{_josa(label, '을를')} {_josa(chr(39) + value + chr(39), '으로로')} 바꿨어요"
+    if not done:
+        return {"status": "승인 대기", "answer": " ".join(errors), "changes": errors[:2], "trace": _t(state, "set", sreq, "반영 0건")}
+    change = ", ".join(done) + " 바꿨어요"
     if replan:
         notes = [change]
-        out = _run_plan(state, spec, f"{state.get('last_request', '')}\n[조건 변경] {label}: {value}", notes, base=None)
-        out["changes"] = [change + " — 일정을 새로 맞췄어요"]
+        out = _run_plan(state, spec, f"{state.get('last_request', '')}\n[조건 변경] {change}", notes, base=None)
+        out["changes"] = [change + " — 일정을 새로 맞췄어요", *errors][:3]
         out["stage"] = "refine"
         return out
-    return _reschedule(state, spec, _day_picks(spec, state["itinerary"]), [change], "set", repair=True)
+    out = _reschedule(state, spec, _day_picks(spec, state["itinerary"]), [change], "set", repair=True)
+    out["changes"] = [*out["changes"], *errors][:3]
+    return out
 
 
 def _dep_label(text: str | None) -> str:
     """출발지 표기: 시·도 + 시·군·구까지만(마스킹 자리표시자·상세 주소 제거)."""
     t = re.sub(r"\[[^\]]*\]", "", text or "").strip()
-    parts = [w for w in t.split() if re.search(r"(특별시|광역시|자치시|도|시|군|구)$", w)][:2]
-    return " ".join(parts) or (t.split()[0] if t else "")
+    words = t.split()
+    keep = [w for w in words if re.search(r"(특별시|광역시|자치시|도|시|군|구)$", w) or data.norm_sido(w) == w]
+    return " ".join(keep[:2]) or (words[0] if words else "")
 
 
 def _role(it: dict) -> str:
@@ -909,7 +1119,7 @@ def approve_node(state: State) -> State:
                 "extra": {"draft_version": state.get("draft_version"), "violations": viol},
                 "trace": _t(state, "approve", "approve", f"위반 {len(viol)}건 → 승인 거부")}
     spec = state["spec"]
-    payload = {"title": f"{data.region_label(spec['region'])} {'당일치기' if spec['nights'] == 0 else '1박 2일'} · 모모 여행 일정",
+    payload = {"title": f"{data.region_label(spec['region'])} {'당일치기' if spec['nights'] == 0 else str(spec['nights']) + '박 ' + str(spec['nights'] + 1) + '일'} · 모모 여행 일정",
                "region": spec["region"], "region_label": data.region_label(spec["region"]),
                "departure_sido": spec.get("departure"), "nights": spec["nights"], "start": spec["start"],
                "itinerary": items, "draft_version": state["draft_version"], "plan": state.get("plan")}
@@ -953,13 +1163,15 @@ def build_graph(checkpointer=None):
     g.add_node("approve", approve_node)
     g.add_node("edit", edit_node)
     g.add_node("setcond", set_node)
+    g.add_node("start", start_node)
+    g.add_node("cost", cost_node)
     g.add_node("guard_out", guard_out)
     g.add_edge(START, "guard_in")
     g.add_conditional_edges("guard_in", lambda s: "guard_out" if s.get("status") == "거절"
-                            else {"approve": "approve", "edit": "edit", "set": "setcond"}.get(s.get("action") or "", "parse"))
+                            else {"approve": "approve", "edit": "edit", "set": "setcond", "start": "start", "cost": "cost"}.get(s.get("action") or "", "parse"))
     g.add_conditional_edges("parse", route_parsed, {"plan": "plan", "modify": "modify", "info": "info",
                                                     "approve_chat": "approve_chat", "reject": "reject"})
-    for n in ("plan", "modify", "info", "approve_chat", "reject", "approve", "edit", "setcond"):
+    for n in ("plan", "modify", "info", "approve_chat", "reject", "approve", "edit", "setcond", "start", "cost"):
         g.add_edge(n, "guard_out")
     g.add_edge("guard_out", END)
     return g.compile(checkpointer=checkpointer)
@@ -977,7 +1189,8 @@ def graph():
 
 
 def handle_query(question: str, session_id: str | None = None, action: str | None = None,
-                 draft_version: str | None = None, edit: dict | None = None, set_req: dict | None = None) -> dict:
+                 draft_version: str | None = None, edit: dict | None = None, set_req: dict | None = None,
+                 start_req: dict | None = None, cost_req: dict | None = None) -> dict:
     """POST /query 본체. 질문은 그래프에 들어가기 전에 마스킹(LangSmith 업로드 전 포함)."""
     new_session = not session_id
     sid = session_id or uuid.uuid4().hex
@@ -988,7 +1201,8 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     if set_req and isinstance(set_req.get("value"), str):
         set_req = {**set_req, "value": guardrails.mask_pii(set_req["value"])[0]}
     out = graph().invoke({"question": masked, "action": action, "draft_version_in": draft_version,
-                          "session_id": sid, "edit": edit, "set_req": set_req}, cfg)
+                          "session_id": sid, "edit": edit, "set_req": set_req, "start_req": start_req,
+                          "cost_req": cost_req}, cfg)
     answer = out.get("answer", "")
     if found:
         answer = "개인정보(" + ", ".join(found) + ")는 가려 두었어요. 출발지는 시·구 단위로만 쓸게요.\n\n" + answer
@@ -1000,6 +1214,12 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
             "progress": brochure.progress(out["conditions"]) if out.get("conditions") else None}
     resp.update(out.get("extra") or {})
     resp["quick_replies"] = resp.get("quick_replies") or resp.get("chips") or []
+    from . import richtext
+    if out.get("plan_out"):
+        resp["answer_html"] = richtext.plan_html(out["plan_out"], answer, out.get("changes") or [], out.get("status") or "")
+    else:
+        resp["answer_html"] = richtext.md_to_html(answer)
+    store.save_answer(sid, resp["answer_html"], (out.get("plan") or {}).get("trip", {}).get("title") or "모모의 답변")
     if out.get("plan") and (out.get("plan_out") or out.get("status") == "확정"):
         store.upsert_trip(sid, out["plan"], out.get("status") or "", out.get("plan_id") if out.get("status") == "확정" else None)
     if new_session:

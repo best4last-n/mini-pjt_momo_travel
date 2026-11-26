@@ -95,6 +95,18 @@ TRANSPORT_HINT = {
 }
 
 
+def _vehicle_label(v: dict | None) -> str:
+    if not v:
+        return "미입력(중형 휘발유 기준)"
+    from .options import efficiency
+    eff = v.get("efficiency_kmpl") or efficiency(v.get("type"), v.get("fuel"))
+    parts = [v.get("type") or "중형", v.get("fuel") or "휘발유", f"{eff:g}km/{'kWh' if v.get('fuel') == '전기' else 'L'}"]
+    for k in ("toll_discount", "parking_discount"):
+        if v.get(k) and v[k] != "없음":
+            parts.append(("통행료 " if k == "toll_discount" else "주차 ") + v[k])
+    return " · ".join(parts)
+
+
 def _status(key: str, assumed: set, missing: bool = False) -> str:
     """신호등: confirmed(초록, 사용자가 말함) / assumed(노랑, 기본값) / missing(빨강, 결과에 영향이 큰데 비어 있음)."""
     if missing:
@@ -116,7 +128,7 @@ def checklist(spec) -> list[dict]:
          "status": _status("date", a), "input": "date", "options": [],
          "hint": "날짜에 따라 휴무일·운영시간·축제가 달라져요."},
         {"key": "length", "label": "여행 길이", "value": length, "status": _status("length", a), "input": "select",
-         "options": ["당일치기", "1박 2일"], "hint": "지금은 당일~1박 2일까지 꼼꼼히 검증해요."},
+         "options": ["당일치기", "1박 2일", "2박 3일", "3박 4일"], "hint": "최대 3박 4일까지 휴무일·운영시간을 검증해요."},
         {"key": "origin", "label": "출발지", "value": spec.origin_label or spec.departure or "미정",
          "status": _status("origin", a, missing=no_origin), "input": "text",
          "options": ["서울", "경기 수원", "대전", "광주", "부산", "대구"],
@@ -135,6 +147,17 @@ def checklist(spec) -> list[dict]:
          + (f" · {spec.companions}" if spec.companions else ""), "status": _status("companions", a),
          "input": "select", "options": CHECK_OPTIONS["companions"],
          "hint": "노약자는 계단·경사 적은 곳, 어린이는 체험·넓은 야외를 우선해요."},
+        {"key": "depart_time", "label": "출발 시각", "value": hours.fmt(spec.depart_time),
+         "status": "confirmed" if "depart_time" in spec.given else "optional", "input": "time", "options": ["06:30", "07:00", "08:00", "09:00"],
+         "hint": "출발 시각으로 첫날 현지 도착과 일정 시작을 맞춰요."},
+        {"key": "arrival", "label": "여행 후 도착", "value": (spec.end_label or spec.end_location or spec.origin_label or spec.departure or "출발지")
+         + (f" · {hours.fmt(spec.arrive_time)}까지" if spec.arrive_time else " · 22:00까지"),
+         "status": "confirmed" if (spec.end_location or spec.arrive_time) else "optional", "input": "text",
+         "options": ["출발지로", "21:00까지", "20:00까지"], "hint": "도착지·희망 시각에 맞춰 마지막 날 일정을 끝내요."},
+        *([{"key": "vehicle", "label": "차량", "value": _vehicle_label(spec.vehicle),
+            "status": "confirmed" if spec.vehicle else "optional", "input": "vehicle", "options": [],
+            "hint": "차종·연료·연비·할인으로 유류비·통행료·주차비를 계산해요."}]
+          if "자차" in (spec.long_transport, spec.local_transport) or spec.local_transport == "렌터카" else []),
         {"key": "budget", "label": "최대 예산", "value": spec.budget_label or "미정",
          "status": "confirmed" if spec.budget else "missing", "input": "text",
          "options": ["30만 원", "50만 원", "100만 원", "1인 20만 원"],

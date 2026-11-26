@@ -1,0 +1,114 @@
+{
+ "query": "사성",
+ "near": {
+  "lat": 35.072398806940164,
+  "lng": 127.46794397484388
+ },
+ "results": [
+  {
+   "source": "관광공사(수집)",
+   "name": "사성암(구례)",
+   "lat": 35.1801260865484,
+   "lng": 127.480604895138,
+   "address": "전남광주통합특별시 구례군 문척면 사성암길 303",
+   "distance_km": 12.0,
+   "similarity": 0.97,
+   "place_id": "317559",
+   "image": "https://tong.visitkorea.or.kr/cms/resource/54/4054454_image2_1.jpg",
+   "category": "attraction",
+   "key": "tour:317559"
+  },
+  {
+   "source": "OpenStreetMap",
+   "name": "사성암",
+   "lat": 35.1795586,
+   "lng": 127.4797213,
+   "address": "전라남도 문척면 Jugyeon 사성암길",
+   "distance_km": 12.0,
+   "similarity": 0.97,
+   "osm_ref": "N6089362847",
+   "image": null,
+   "category": "attraction",
+   "key": "osm:N6089362847"
+  },
+  {
+   "source": "OpenStreetMap",
+   "name": "사성암길",
+   "lat": 35.1781739,
+   "lng": 127.4809607,
+   "address": "전라남도 문척면 Jugyeon",
+   "distance_km": 11.8,
+   "similarity": 0.95,
+   "osm_ref": "W1235829746",
+   "image": null,
+   "category": "attraction",
+   "key": "osm:W1235829746"
+  },
+  {
+   "source": "OpenStreetMap",
+   "name": "사성암카페",
+   "lat": 35.1796756,
+   "lng": 127.4794041,
+   "address": "전라남도 문척면 Jugyeon 사성암길",
+   "distance_km": 12.0,
+   "similarity": 0.94,
+   "osm_ref": "W1253493084",
+   "image": null,
+   "category": "attraction",
+   "key": "osm:W1253493084"
+  },
+  {
+   "source": "OpenStreetMap",
+   "name": "사성암 인증센터",
+   "lat": 35.1822788,
+   "lng": 127.4695431,
+   "address": "전라남도 문척면 Jugyeon 섬진강 자전거길",
+   "distance_km": 12.2,
+   "similarity": 0.93,
+   "osm_ref": "N5247713096",
+   "image": null,
+   "category": "attraction",
+   "key": "osm:N5247713096"
+  },
+  {
+   "source": "관광공사(수집)",
+   "name": "오산(구례)",
+   "lat": 35.1801334136,
+   "lng": 127.480605665,
+   "address": "전남광주통합특별시 구례군 문척면 사성암길 303",
+   "distance_km": 12.0,
+   "similarity": 0.45,
+   "place_id": "126637",
+   "image": "https://tong.visitkorea.or.kr/cms/resource/89/3569889_image2_1.jpg",
+   "category": "attraction",
+   "key": "tour:126637"
+  },
+  {
+   "source": "관광공사(수집)",
+   "name": "남녘들밥상",
+   "lat": 34.9404037998,
+   "lng": 127.5067937306,
+   "address": "전남광주통합특별시 순천시 하풍동길 21 (풍덕동, 오션팰리스)",
+   "distance_km": 15.1,
+   "similarity": 0.45,
+   "place_id": "2858584",
+   "image": "https://tong.visitkorea.or.kr/cms/resource/74/2858574_image2_1.jpg",
+   "category": "restaurant",
+   "key": "tour:2858584"
+  },
+  {
+   "source": "관광공사(수집)",
+   "name": "순천 낙안읍성",
+   "lat": 34.9060616206,
+   "lng": 127.3417276358,
+   "address": "전남광주통합특별시 순천시 낙안면 충민길 30",
+   "distance_km": 21.8,
+   "similarity": 0.45,
+   "place_id": "127931",
+   "image": "https://tong.visitkorea.or.kr/cms/resource/81/4099881_image2_1.jpg",
+   "category": "attraction",
+   "key": "tour:127931"
+  }
+ ],
+ "note": "가까운 순으로 보여 드려요. 거리는 직선거리예요. 사진: 한국관광공사 또는 위키미디어 공용(있을 때만)."
+}

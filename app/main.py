@@ -55,20 +55,20 @@ async def query(request: Request):
     q = (body.get("question") or "").strip()
     action = body.get("action") or None
     sid = body.get("session_id") or None
-    if action not in (None, "approve", "edit", "set"):
+    if action not in (None, "approve", "edit", "set", "start", "cost"):
         raise InvalidRequest("알 수 없는 action", "앗, 모르는 요청이에요. 확정은 화면의 '확정할게요' 버튼으로 해 주세요.", summary=str(action))
     if len(q) > MAX_QUESTION_CHARS:
         raise InvalidRequest("길이 초과", f"앗, 편지가 너무 길어서 가방에 안 들어가요. {MAX_QUESTION_CHARS}자 안으로 줄여서 다시 보내 주실래요?",
                              code=413, summary=f"{len(q)}자")
-    if action in ("edit", "set") and not isinstance(body.get(action), dict):
+    if action in ("edit", "set", "start", "cost") and not isinstance(body.get(action), dict):
         raise InvalidRequest("형식 오류", "앗, 바꿀 내용을 알아보지 못했어요. 화면에서 다시 눌러 주실래요?", summary=f"{action} 본문 없음")
-    if action in ("approve", "edit", "set"):
+    if action in ("approve", "edit", "set", "cost"):
         if not sid:
             raise InvalidRequest("세션 없음", "앗, 어떤 일정을 확정할지 몰라요. 일정을 먼저 만들어 볼까요?", summary="approve without session")
         state = agent.graph().get_state({"configurable": {"thread_id": sid}}).values
         if not state:
             raise InvalidRequest("없는 세션", "앗, 그 상담 기록을 찾지 못했어요. 일정을 새로 만들어 볼까요?", summary="unknown session")
-    elif not q:
+    elif not q and action != "start":
         raise InvalidRequest("빈 질문", "앗, 질문이 비어 있어서 편지를 쓸 수 없었어요. 가고 싶은 지역이랑 날짜를 담아 다시 보내 주실래요?",
                              summary="empty")
     notice = None
@@ -76,10 +76,58 @@ async def query(request: Request):
         notice = "이전 상담 기록을 찾지 못해 새 상담으로 시작했어요."
     resp = agent.handle_query(q, sid, action, body.get("draft_version"),
                               edit=body.get("edit") if action == "edit" else None,
-                              set_req=body.get("set") if action == "set" else None)
+                              set_req=body.get("set") if action == "set" else None,
+                              start_req=body.get("start") if action == "start" else None,
+                              cost_req=body.get("cost") if action == "cost" else None)
     if notice:
         resp["answer"] = notice + "\n\n" + resp["answer"]
     return resp
+
+
+@app.get("/options")
+async def options():
+    """선택형 입력 옵션(지역·기간·스타일 프리셋·동반자·이동 조합·차량·강도·관심사·예산)."""
+    from momo import options as O
+    return O.all_options()
+
+
+@app.get("/answer/{session_id}", response_class=HTMLResponse)
+async def answer_page(session_id: str):
+    """최신 모모 답변을 새 창으로(서식 있는 HTML)."""
+    from momo import richtext
+    a = store.get_answer(session_id)
+    if not a:
+        return HTMLResponse("<p>답변을 찾지 못했어요.</p>", status_code=404)
+    return richtext.page(a[0], a[1] + " · 모모의 답변")
+
+
+@app.get("/places/search")
+async def places_search(q: str = "", region: str = "", session_id: str = ""):
+    """장소 찾기(유사 이름·가까운 순·거리·주소·사진 미리보기)."""
+    from momo import placesearch
+    near = None
+    if session_id:
+        st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values
+        if st and st.get("spec"):
+            region = region or st["spec"]["region"]
+            pts = [(it["lat"], it["lng"]) for it in st.get("itinerary") or [] if it.get("lat")]
+            if pts:
+                near = (sum(a for a, _ in pts) / len(pts), sum(b for _, b in pts) / len(pts))
+    if region not in data_regions():
+        return JSONResponse(status_code=400, content={"error": "지역을 알려 주세요", "results": []})
+    return placesearch.search(q[:40], region, near)
+
+
+def data_regions():
+    from momo import data
+    return data.available_regions()
+
+
+@app.get("/geo/search")
+async def geo_search(q: str = ""):
+    """출발지·도착지 자동완성(동·역·구 이름)."""
+    from momo import geo
+    return {"results": geo.search(q[:40])}
 
 
 @app.get("/trips")
@@ -115,8 +163,9 @@ def _expenses(plan_id: str, payload: dict) -> dict:
     from momo import costs
     actual = store.list_expenses(plan_id)
     planned = (payload.get("plan") or {}).get("costs")
+    from momo.options import EXPENSE_CATEGORIES
     return {"planned": planned, "actual": actual, "summary": costs.by_category(planned, actual),
-            "categories": store.EXPENSE_CATEGORIES}
+            "categories": EXPENSE_CATEGORIES}
 
 
 @app.get("/plan/{plan_id}.docx")
