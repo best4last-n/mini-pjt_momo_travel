@@ -13,79 +13,79 @@
   "20"
  ],
  "average": {
-  "faithfulness": 0.324,
-  "answer_relevancy": 0.451,
-  "context_precision": 0.522,
-  "context_recall": 0.282
+  "faithfulness": 0.318,
+  "answer_relevancy": 0.443,
+  "context_precision": 0.548,
+  "context_recall": 0.248
  },
  "per_case": [
   {
    "id": "1",
-   "faithfulness": 0.034,
-   "answer_relevancy": 0.419,
-   "context_precision": 0.262,
-   "context_recall": 0.333
+   "faithfulness": 0.212,
+   "answer_relevancy": 0.439,
+   "context_precision": 0.427,
+   "context_recall": 0.0
   },
   {
    "id": "2",
-   "faithfulness": 0.393,
-   "answer_relevancy": 0.581,
+   "faithfulness": 0.311,
+   "answer_relevancy": 0.585,
    "context_precision": 1.0,
    "context_recall": 0.4
   },
   {
    "id": "5",
    "faithfulness": 0.0,
-   "answer_relevancy": 0.202,
+   "answer_relevancy": 0.229,
    "context_precision": 0.226,
    "context_recall": 0.25
   },
   {
    "id": "6",
-   "faithfulness": 0.41,
-   "answer_relevancy": 0.281,
+   "faithfulness": 0.389,
+   "answer_relevancy": 0.233,
    "context_precision": 0.0,
    "context_recall": 0.0
   },
   {
    "id": "7",
    "faithfulness": 0.714,
-   "answer_relevancy": 0.62,
+   "answer_relevancy": 0.596,
    "context_precision": 1.0,
    "context_recall": 0.333
   },
   {
    "id": "9",
-   "faithfulness": 0.081,
-   "answer_relevancy": 0.373,
+   "faithfulness": 0.25,
+   "answer_relevancy": 0.374,
    "context_precision": 0.796,
    "context_recall": 1.0
   },
   {
    "id": "10",
-   "faithfulness": 0.636,
-   "answer_relevancy": 0.792,
+   "faithfulness": 0.5,
+   "answer_relevancy": 0.773,
    "context_precision": 1.0,
    "context_recall": 0.5
   },
   {
    "id": "12",
-   "faithfulness": null,
-   "answer_relevancy": 0.558,
+   "faithfulness": 0.207,
+   "answer_relevancy": 0.561,
    "context_precision": 0.0,
    "context_recall": 0.0
   },
   {
    "id": "15",
-   "faithfulness": null,
-   "answer_relevancy": 0.47,
-   "context_precision": 0.683,
+   "faithfulness": 0.298,
+   "answer_relevancy": 0.446,
+   "context_precision": 0.778,
    "context_recall": 0.0
   },
   {
    "id": "17",
-   "faithfulness": null,
-   "answer_relevancy": 0.209,
+   "faithfulness": 0.301,
+   "answer_relevancy": 0.196,
    "context_precision": 0.25,
    "context_recall": 0.0
   }

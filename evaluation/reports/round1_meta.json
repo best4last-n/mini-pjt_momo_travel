@@ -1,0 +1,6 @@
+{
+ "responses_commit": "c4472f5",
+ "notes": [
+  "채점 장치 버그(RAGAS 출력 파싱 실패로 #12·#15·#17 faithfulness 누락) 수정 후 같은 장치로 1차 응답을 재채점함 — SERVICE.md 5절 규칙. 케이스 통과 판정(규칙 게이트·Judge)은 변경 없음"
+ ]
+}

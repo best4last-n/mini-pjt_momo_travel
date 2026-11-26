@@ -14,14 +14,18 @@
   },
   "rule_violations_total": 2,
   "csv_sha256": "1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4",
-  "commit": "c4472f5",
+  "commit": "1c19186",
+  "responses_commit": "c4472f5",
+  "notes": [
+   "채점 장치 버그(RAGAS 출력 파싱 실패로 #12·#15·#17 faithfulness 누락) 수정 후 같은 장치로 1차 응답을 재채점함 — SERVICE.md 5절 규칙. 케이스 통과 판정(규칙 게이트·Judge)은 변경 없음"
+  ],
   "today": "2026-11-25",
   "judge_model": "us.anthropic.claude-sonnet-4-6",
   "ragas": {
-   "faithfulness": 0.324,
-   "answer_relevancy": 0.451,
-   "context_precision": 0.522,
-   "context_recall": 0.282
+   "faithfulness": 0.318,
+   "answer_relevancy": 0.443,
+   "context_precision": 0.548,
+   "context_recall": 0.248
   },
   "ragas_n": 10,
   "avg_latency_sec": 15.3
