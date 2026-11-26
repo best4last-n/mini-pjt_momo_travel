@@ -1,0 +1,12 @@
+{
+  "layers": [
+    {"id": "osm", "label": "OpenStreetMap", "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", "attribution": "© OpenStreetMap contributors", "max_zoom": 19},
+    {"id": "vw-base", "label": "브이월드 일반", "url": "/tiles/vworld/Base/{z}/{y}/{x}", "attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 19},
+    {"id": "vw-sat", "label": "브이월드 위성", "url": "/tiles/vworld/Satellite/{z}/{y}/{x}", "attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 19},
+    {"id": "vw-hybrid", "label": "위성 + 지명", "url": "/tiles/vworld/Satellite/{z}/{y}/{x}", "overlay_url": "/tiles/vworld/Hybrid/{z}/{y}/{x}", "attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 19},
+    {"id": "vw-white", "label": "브이월드 흰색", "url": "/tiles/vworld/white/{z}/{y}/{x}", "attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 18},
+    {"id": "vw-night", "label": "브이월드 야간", "url": "/tiles/vworld/midnight/{z}/{y}/{x}", "attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 18}
+  ],
+  "default": "osm",
+  "external_3d": {"label": "브이월드 3D로 보기", "url": "https://map.vworld.kr/map/ws3dmap.do"}
+}

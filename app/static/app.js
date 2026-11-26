@@ -98,6 +98,10 @@
 <symbol id="ico-car" viewBox="0 0 16 16"><path d="M2.5 10.5V8.2l1.4-3.4A1.5 1.5 0 0 1 5.3 3.9h5.4a1.5 1.5 0 0 1 1.4.9l1.4 3.4v2.3M2 10.5h12v1.7a.8.8 0 0 1-.8.8H2.8a.8.8 0 0 1-.8-.8zM3.5 8h9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="4.8" cy="11.7" r=".9" fill="currentColor"/><circle cx="11.2" cy="11.7" r=".9" fill="currentColor"/></symbol>
 <symbol id="ico-cam" viewBox="0 0 16 16"><rect x="1.8" y="4.2" width="9" height="7.6" rx="1.3" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M10.8 7 14.2 5v6l-3.4-2" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/><circle cx="4.5" cy="6.6" r=".8" fill="currentColor"/></symbol>
 <symbol id="ico-home" viewBox="0 0 16 16"><path d="M2.5 7.5 8 3l5.5 4.5M4 6.5V13h3V9.8h2V13h3V6.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round" stroke-linecap="round"/></symbol>
+<symbol id="ico-swap" viewBox="0 0 16 16"><path d="M3 5.5h9.5L10 3M13 10.5H3.5L6 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-layers" viewBox="0 0 16 16"><path d="M8 2 14.5 5.5 8 9 1.5 5.5zM1.5 8.5 8 12l6.5-3.5M1.5 11.2 8 14.7l6.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
+<symbol id="ico-expand" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-shrink" viewBox="0 0 16 16"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-pin" viewBox="0 0 16 16"><path d="M8 15s5-4.6 5-8.4A5 5 0 0 0 3 6.6C3 10.4 8 15 8 15z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.6" r="1.8" fill="currentColor"/></symbol>
 </defs></svg>`;
   const bird = (cls = "bird") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${BRAND_SPRITE}"/></svg>`;
@@ -1349,7 +1353,14 @@
       place.address ? `<p class="addr">${esc(place.address)}</p>` : "",
     ].join("");
     const hasDetails = !!details.trim();
-    const edit = canEdit() && s.place_id != null ? `<div class="edit" role="group" aria-label="${esc(name)} 편집">
+    const swapKind = s.swap_kind || (s.type === "meal" ? (/카페|cafe/i.test(place.category || "") ? "카페" : "식당") : s.type === "stay" ? "숙소" : "관광지");
+    const swapHint = s.swap_hint != null ? !!s.swap_hint : (s.type === "meal" || s.type === "stay" || !!place.added_by_user);
+    const swapBtn = canEdit() && s.place_id != null
+      ? (swapHint
+        ? `<button type="button" class="btn sm swap-btn" data-act="swap" data-pid="${esc(s.place_id)}" data-kind="${esc(swapKind)}" data-name="${esc(name)}" aria-haspopup="dialog">${ico("ico-swap")}다른 ${esc(swapKind === "관광지" ? "곳" : swapKind)}으로 바꾸기</button>`
+        : `<button type="button" class="btn xs ghost swap-mini" data-act="swap" data-pid="${esc(s.place_id)}" data-kind="${esc(swapKind)}" data-name="${esc(name)}" aria-haspopup="dialog" aria-label="${esc(name)} 다른 곳으로 바꾸기" title="다른 곳으로 바꾸기">${ico("ico-swap")}바꾸기</button>`)
+      : "";
+    const edit = canEdit() && s.place_id != null ? `<div class="edit" role="group" aria-label="${esc(name)} 편집">${swapHint ? "" : swapBtn}
         <button type="button" class="btn xs ghost" data-act="up" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" ${i === 0 ? "disabled" : ""} aria-label="${esc(name)} 앞으로">▲</button>
         <button type="button" class="btn xs ghost" data-act="down" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" ${i === n - 1 ? "disabled" : ""} aria-label="${esc(name)} 뒤로">▼</button>
         ${(plan.itinerary || []).length > 1 ? `<span class="move-wrap"><label class="sr" for="mv-${id}">옮길 날</label><select id="mv-${id}" class="sel xs">${(plan.itinerary || []).filter((x) => x.day !== d.day).map((x) => `<option value="${esc(x.day)}">${esc(x.day)}일차로</option>`).join("")}</select><button type="button" class="btn xs ghost" data-act="move" data-pid="${esc(s.place_id)}">다른 날로</button></span>` : ""}
@@ -1367,6 +1378,7 @@
             ${hasDetails ? `<button type="button" class="more" data-act="more" aria-expanded="false" aria-controls="${id}-d">자세히${ico("ico-chev", "ico chev")}</button>` : ""}
             <span class="src">출처: ${esc(place.source || s.source || "한국관광공사 TourAPI")}</span>
           </div>
+          ${swapHint ? swapBtn : ""}
           ${edit}
         </div>
       </article></li>`;
@@ -1739,6 +1751,130 @@
     const p = v.play && v.play(); if (p && p.catch) p.catch(() => {});
   }
 
+  /* ───────── 다른 곳으로 바꾸기 (대안 top 20) ───────── */
+  const SW = { pid: null, name: "", kind: "", q: "", sort: "score", openOnly: false, data: null, loading: false, error: "", expanded: {}, seq: 0, last: null };
+  function swapDialog() {
+    let d = $("#swap-dlg");
+    if (!d) {
+      d = document.createElement("dialog");
+      d.id = "swap-dlg"; d.className = "swap-dlg"; d.setAttribute("aria-labelledby", "swap-h");
+      document.body.appendChild(d);
+      d.addEventListener("close", () => { if (SW.last && SW.last.isConnected) SW.last.focus(); });
+      d.addEventListener("click", (e) => { if (e.target === d) closeSwap(); }); // 바깥(backdrop) 클릭
+      d.addEventListener("submit", (e) => {
+        const f = e.target.closest("form[data-form='swap-q']");
+        if (!f) return;
+        e.preventDefault(); e.stopPropagation();
+        SW.q = String(f.querySelector("input").value || "").trim();
+        fetchSwap();
+      });
+    }
+    return d;
+  }
+  function openSwap(pid, name, kind) {
+    if (!canEdit()) return;
+    Object.assign(SW, { pid, name: name || "", kind: kind || "", q: "", sort: "score", openOnly: false, data: null, error: "", expanded: {}, last: document.activeElement });
+    const d = swapDialog();
+    renderSwap();
+    if (d.showModal) d.showModal(); else d.setAttribute("open", "");
+    const inp = $("#swap-q"); if (inp) inp.focus();
+    fetchSwap();
+  }
+  function closeSwap() { const d = $("#swap-dlg"); if (d) { if (d.close) d.close(); else d.removeAttribute("open"); } }
+  async function fetchSwap() {
+    const seq = ++SW.seq;
+    SW.loading = true; SW.error = ""; renderSwap();
+    let j = null;
+    try {
+      if (DEMO) {
+        const r = await fetch("/static/sample_alternatives.json"); j = r.ok ? await r.json() : null;
+        if (j && SW.q) j = Object.assign({}, j, { items: (j.items || []).filter((x) => (x.name + " " + (x.category || "")).indexOf(SW.q) >= 0) });
+        if (j) j = Object.assign({}, j, { target: Object.assign({}, j.target, { place_id: SW.pid, name: SW.name, kind_label: SW.kind || j.target.kind_label }) });
+      } else {
+        const u = `/places/alternatives?session_id=${encodeURIComponent(state.sessionId || "")}&place_id=${encodeURIComponent(SW.pid)}&limit=20${SW.q ? `&q=${encodeURIComponent(SW.q)}` : ""}`;
+        const r = await fetch(u); j = await r.json().catch(() => null);
+        if (!r.ok) throw new Error((j && (j.answer || j.message)) || "대안을 불러오지 못했어요");
+      }
+    } catch (e) { if (seq === SW.seq) { SW.error = e.message || "대안을 불러오지 못했어요. 잠시 후 다시 해 주세요."; } }
+    if (seq !== SW.seq) return;
+    SW.loading = false; SW.data = j; renderSwap();
+  }
+  function swapItems() {
+    const D = SW.data || {};
+    let items = (D.items || []).map((x, i) => Object.assign({ _i: i }, x));
+    if (SW.openOnly) items = items.filter((x) => x.hours_status === "확인됨");
+    const num = (v, d) => (v == null || isNaN(v) ? d : Number(v));
+    const by = {
+      score: (a, b) => num(b.score, -1) - num(a.score, -1),
+      near: (a, b) => num(a.distance_km, 1e9) - num(b.distance_km, 1e9),
+      popular: (a, b) => num(a.popular_rank, 1e9) - num(b.popular_rank, 1e9),
+      reviews: (a, b) => num(b.review_count, -1) - num(a.review_count, -1),
+      rating: (a, b) => num(b.rating, -1) - num(a.rating, -1),
+    }[SW.sort] || (() => 0);
+    return items.sort(by).slice(0, 20);
+  }
+  function renderSwap() {
+    const d = $("#swap-dlg");
+    if (!d) return;
+    const D = SW.data || {};
+    const T = D.target || {};
+    const kind = T.kind_label || SW.kind || "장소";
+    const fa = document.activeElement && d.contains(document.activeElement) ? (document.activeElement.id || document.activeElement.dataset.k) : null;
+    const crit = D.criteria || [];
+    const hasPop = (D.items || []).some((x) => x.popular_rank != null);
+    const sorts = [["score", "추천 점수"], ["near", "가까운 순"]].concat(hasPop ? [["popular", "인기 순"]] : [], D.has_reviews ? [["reviews", "리뷰 많은 순"], ["rating", "평점 순"]] : []);
+    const items = swapItems();
+    const when = [T.day ? `${T.day}일차` : "", T.arrive || ""].filter(Boolean).join(" ");
+    let body;
+    if (SW.loading && !SW.data) body = `<p class="swap-empty">모모가 근처 ${esc(kind)}을(를) 찾는 중이에요…</p>`;
+    else if (SW.error) body = `<p class="swap-empty">${esc(SW.error)}</p>`;
+    else if (!items.length) body = `<div class="swap-empty"><p>${SW.openOnly ? "그날 운영이 확인된 곳이 없어요. ‘그날 운영만’을 꺼 보세요." : "조건에 맞는 곳을 찾지 못했어요. 가게 이름을 적어서 다시 찾아 보세요."}</p>
+        <button type="button" class="linkish" data-act="swap-search" data-k="go-search">장소 찾기 · 직접 추가로 가기</button></div>`;
+    else body = `<ol class="swap-list">${items.map((x, n) => {
+      const i = x._i;
+      const sc = Math.max(0, Math.min(100, Number(x.score) || 0));
+      const hs = x.hours_status === "휴무" ? ["bad", "그날 휴무"] : x.hours_status === "확인됨" ? ["ok", x.hours ? `운영 ${x.hours}` : "그날 운영"] : ["warn", "운영시간 확인 필요"];
+      const open = !!SW.expanded[i];
+      return `<li class="swap-item${x.hours_status === "휴무" ? " closed" : ""}">
+        <span class="swap-rank" aria-label="${n + 1}위">${n + 1}</span>
+        <div class="swap-img">${x.image && /^https:\/\//i.test(x.image) ? `<img src="${esc(x.image)}" alt="" loading="lazy" title="${esc(x.image_source ? "사진: " + x.image_source : "")}">` : bird("bird")}</div>
+        <div class="swap-b">
+          <p class="swap-name"><b>${esc(x.name)}</b>${x.category ? `<span class="tag">${esc(x.category)}</span>` : ""}<span class="badge ${/osm|openstreet/i.test(x.source || "") ? "draft" : "route"}">${esc(x.source || "")}</span></p>
+          <p class="swap-meta">${x.distance_km != null ? `약 ${esc(Number(x.distance_km).toFixed(1))}km` : ""}<span class="badge ${hs[0]}">${esc(hs[1])}</span>${x.popular_rank != null ? `<span class="muted">인기 ${esc(x.popular_rank)}위</span>` : ""}${x.rating != null ? `<span class="muted">평점 ${esc(x.rating)}</span>` : ""}${x.review_count != null ? `<span class="muted">리뷰 ${esc(x.review_count)}</span>` : ""}</p>
+          ${x.why ? `<p class="swap-why">${esc(x.why)}</p>` : ""}
+          <div class="swap-score">
+            <button type="button" class="swap-sc" data-act="swap-parts" data-i="${i}" data-k="parts-${i}" aria-expanded="${open}" aria-controls="sp-${i}" title="점수 구성 보기">
+              <span class="swap-num"><b>${esc(sc)}</b>점</span><span class="swap-bar" aria-hidden="true"><span style="width:${sc}%"></span></span>${ico("ico-chev", "ico chev")}</button>
+            ${open ? `<dl class="swap-parts" id="sp-${i}">${crit.map((c) => { const v = x.parts ? x.parts[c.key] : null; return `<div><dt>${esc(c.label)}</dt><dd><span class="swap-pbar" aria-hidden="true"><span style="width:${c.weight ? Math.round(((v || 0) / c.weight) * 100) : 0}%"></span></span>${v != null ? esc(v) : "-"}/${esc(c.weight)}</dd></div>`; }).join("")}</dl>` : ""}
+          </div>
+        </div>
+        <button type="button" class="btn sm primary swap-go" data-act="swap-pick" data-i="${i}" data-k="pick-${i}"${state.busy ? " disabled" : ""}>이걸로 바꾸기</button></li>`;
+    }).join("")}</ol>`;
+    d.innerHTML = `<div class="swap-head">
+        <h2 id="swap-h">${esc(kind)} 바꾸기 <span>· ${esc(when)}${when ? " " : ""}‘${esc(T.name || SW.name)}’ 대신</span></h2>
+        <button type="button" class="x" data-act="swap-close" data-k="close" aria-label="닫기">×</button></div>
+      <form class="swap-q" data-form="swap-q" role="search"><label class="sr" for="swap-q">이름이나 메뉴로 찾기</label>
+        <input id="swap-q" type="search" value="${esc(SW.q)}" placeholder="이름·메뉴로 다시 찾기 (예: 칼국수)" autocomplete="off" maxlength="40"><button class="btn sm ghost">찾기</button></form>
+      <div class="swap-tools" role="group" aria-label="정렬과 거르기">
+        ${sorts.map(([v, t]) => `<button type="button" class="chip sm${SW.sort === v ? " on" : ""}" aria-pressed="${SW.sort === v}" data-act="swap-sort" data-v="${v}" data-k="sort-${v}">${t}</button>`).join("")}
+        <span class="swap-sep" aria-hidden="true"></span>
+        <button type="button" class="chip sm${SW.openOnly ? " on" : ""}" aria-pressed="${SW.openOnly}" data-act="swap-open" data-k="open">그날 운영만</button>
+        ${SW.loading && SW.data ? `<span class="muted small">다시 찾는 중…</span>` : ""}
+      </div>
+      <div class="swap-body" aria-live="polite">${body}</div>
+      ${D.note ? `<p class="swap-note">${esc(D.note)}</p>` : ""}
+      ${(D.sources || []).length ? `<p class="swap-note">찾아본 곳: ${D.sources.map(esc).join(" · ")}</p>` : ""}`;
+    if (fa) { const el = fa === "swap-q" ? $("#swap-q") : d.querySelector(`[data-k="${cssEsc(fa)}"]`); if (el) el.focus(); }
+  }
+  function chooseSwap(i) {
+    const D = SW.data || {};
+    const x = (D.items || [])[i];
+    if (!x) return;
+    const oldName = (D.target && D.target.name) || SW.name;
+    closeSwap();
+    send({ question: `${oldName} → ${x.name} 바꾸기`, action: "edit", edit: { op: "replace", target: SW.pid, choice: x.choice } }, "edit");
+  }
+
   /* ───────── 준비물 체크리스트 ───────── */
   function packItems(P) {
     if (!P) return [];
@@ -1981,10 +2117,102 @@
     if (!window.L) return null;
     if (M.map) return M.map;
     M.map = L.map("map", { zoomControl: true, scrollWheelZoom: true, attributionControl: true });
-    L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap contributors" }).addTo(M.map);
+    setBaseLayer(MAPL.want || "osm", true);
+    ensureMapCtrl();
     M.map.setView([36.3, 127.8], 7);
     return M.map;
   }
+  /* ───────── 지도 종류 고르기 · 크게 보기 ───────── */
+  const OSM_LAYER = { id: "osm", label: "OpenStreetMap", url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", attribution: "© OpenStreetMap contributors", max_zoom: 19 };
+  const MAPL = { list: [OSM_LAYER], ext3d: null, cur: null, want: null, base: null, over: null, failed: {} };
+  async function loadLayers() {
+    let j = null;
+    try { const r = await fetch(DEMO ? "/static/sample_layers.json" : "/map/layers"); if (r.ok) j = await r.json(); } catch (e) { j = null; }
+    const list = (j && Array.isArray(j.layers) && j.layers.length) ? j.layers.filter((l) => l && l.id && l.url) : [];
+    MAPL.list = list.some((l) => l.id === "osm") ? list : [OSM_LAYER].concat(list);
+    MAPL.ext3d = j && j.external_3d && /^https:\/\//i.test(j.external_3d.url || "") ? j.external_3d : null;
+    let saved = null;
+    try { saved = localStorage.getItem("momo.mapLayer"); } catch (e) { saved = null; }
+    MAPL.want = [saved, j && j.default, "osm"].find((id) => id && MAPL.list.some((l) => l.id === id));
+    if (M.map) setBaseLayer(MAPL.want, true);
+    renderMapCtrl();
+  }
+  function setBaseLayer(id, quiet, fallback) {
+    if (!M.map || !window.L) { MAPL.want = id; return; }
+    const lay = MAPL.list.find((l) => l.id === id) || MAPL.list[0];
+    if (MAPL.base) M.map.removeLayer(MAPL.base);
+    if (MAPL.over) { M.map.removeLayer(MAPL.over); MAPL.over = null; }
+    const opt = (l) => ({ attribution: l.attribution || "", maxZoom: l.max_zoom || 19, minZoom: l.min_zoom || 0, subdomains: "abc" });
+    MAPL.base = L.tileLayer(lay.url, opt(lay));
+    const vw = /^vw/.test(lay.id);
+    if (vw) MAPL.base.on("tileerror", () => onLayerError(lay.id));
+    MAPL.base.addTo(M.map);
+    if (MAPL.base.bringToBack) MAPL.base.bringToBack();
+    if (lay.overlay_url) { MAPL.over = L.tileLayer(lay.overlay_url, Object.assign(opt(lay), { attribution: "" })); if (vw) MAPL.over.on("tileerror", () => onLayerError(lay.id)); MAPL.over.addTo(M.map); }
+    MAPL.cur = lay.id;
+    M.map.getContainer().classList.toggle("map-dark", /sat|hybrid|night/.test(lay.id));
+    M.map.getContainer().classList.toggle("map-vw", vw);
+    if (!quiet && !fallback) { try { localStorage.setItem("momo.mapLayer", lay.id); } catch (e) { /* 저장 불가 */ } }
+    renderMapCtrl();
+  }
+  function onLayerError(id) {
+    if (MAPL.cur !== id || MAPL.failed[id]) return;
+    MAPL.failed[id] = true;
+    setBaseLayer("osm", true, true);
+    toast("브이월드 지도를 불러오지 못해 OpenStreetMap으로 바꿨어요");
+  }
+  function ensureMapCtrl() {
+    const box = $("#map-panel .map-box");
+    if (!box || $(".map-ctrl", box)) return;
+    const c = document.createElement("div");
+    c.className = "map-ctrl";
+    box.appendChild(c);
+    renderMapCtrl();
+  }
+  function renderMapCtrl() {
+    const c = $("#map-panel .map-ctrl");
+    if (!c) return;
+    const cur = MAPL.list.find((l) => l.id === MAPL.cur) || MAPL.list[0];
+    const open = c.dataset.open === "1";
+    const full = $("#map-panel") && $("#map-panel").classList.contains("map-full");
+    c.innerHTML = `<div class="mc-layer">
+        <button type="button" class="mc-btn" data-act="map-layer-menu" aria-haspopup="menu" aria-expanded="${open}" aria-controls="mc-menu" title="지도 종류">${ico("ico-layers")}<span>${esc(cur ? cur.label : "지도")}</span></button>
+        ${open ? `<ul id="mc-menu" class="mc-menu" role="menu" aria-label="지도 종류">${MAPL.list.map((l) => `<li role="none"><button type="button" role="menuitemradio" aria-checked="${l.id === MAPL.cur}" data-act="map-layer" data-id="${esc(l.id)}">${esc(l.label)}${MAPL.failed[l.id] ? ` <small>(불러오기 실패)</small>` : ""}</button></li>`).join("")}
+          ${MAPL.ext3d ? `<li role="none" class="mc-3d"><a role="menuitem" href="${esc(MAPL.ext3d.url)}" target="_blank" rel="noopener">${esc(MAPL.ext3d.label || "3D로 보기")} ↗</a></li>` : ""}</ul>` : ""}
+      </div>
+      ${MAPL.ext3d ? `<a class="mc-btn mc-3dlink" href="${esc(MAPL.ext3d.url)}" target="_blank" rel="noopener" title="${esc(MAPL.ext3d.label || "3D로 보기")}">3D ↗</a>` : ""}
+      <button type="button" class="mc-btn mc-full" data-act="map-full" aria-pressed="${!!full}" title="${full ? "작게 보기(Esc)" : "지도 크게 보기"}">${ico(full ? "ico-shrink" : "ico-expand")}<span>${full ? "닫기" : "크게 보기"}</span></button>`;
+  }
+  const MF = { parent: null, next: null, last: null };
+  function toggleMapFull(on) {
+    const panel = $("#map-panel");
+    if (!panel) return;
+    const isOn = panel.classList.contains("map-full");
+    if (on == null) on = !isOn;
+    if (on === isOn) return;
+    const view = M.map ? { c: M.map.getCenter(), z: M.map.getZoom() } : null;
+    if (on) {
+      MF.parent = panel.parentNode; MF.next = panel.nextSibling; MF.last = document.activeElement;
+      document.body.appendChild(panel); // 컨테이너 쿼리·sticky 조상 밖으로 꺼내야 화면 전체를 덮는다
+      panel.classList.add("map-full");
+      panel.setAttribute("role", "dialog"); panel.setAttribute("aria-modal", "true"); panel.setAttribute("aria-label", "지도 크게 보기");
+      document.body.classList.add("map-full-open");
+    } else {
+      panel.classList.remove("map-full");
+      panel.removeAttribute("role"); panel.removeAttribute("aria-modal"); panel.removeAttribute("aria-label");
+      if (MF.parent && MF.parent.isConnected) MF.parent.insertBefore(panel, MF.next && MF.next.parentNode === MF.parent ? MF.next : null);
+      else placePanels();
+      document.body.classList.remove("map-full-open");
+    }
+    renderMapCtrl();
+    setTimeout(() => {
+      if (M.map) { M.map.invalidateSize(); if (view) M.map.setView(view.c, view.z, { animate: false }); }
+      const b = $("#map-panel .mc-full");
+      if (on && b) b.focus();
+      else if (!on && MF.last && MF.last.isConnected) MF.last.focus();
+    }, 60);
+  }
+
   function coordOf(s, P) {
     if (s.lat != null && s.lng != null) return [Number(s.lat), Number(s.lng)];
     const p = s.place_id != null ? P.get(String(s.place_id)) : null;
@@ -2140,12 +2368,12 @@
   function stashPanels() {
     const side = $("#side");
     if (!side) return;
-    ["#cond-panel", "#cost-panel", "#pack-panel", "#map-panel", "#act-panel"].forEach((s) => { const x = $(s); if (x && x.parentNode !== side) side.appendChild(x); });
+    ["#cond-panel", "#cost-panel", "#pack-panel", "#map-panel", "#act-panel"].forEach((s) => { const x = $(s); if (x && x.parentNode !== side && !x.classList.contains("map-full")) side.appendChild(x); });
   }
   function placePanels() {
     const pc = MQ_PC.matches;
     const side = $("#side");
-    const cond = $("#cond-panel"), mapP = $("#map-panel"), cost = $("#cost-panel"), act = $("#act-panel"), pack = $("#pack-panel");
+    const cond = $("#cond-panel"), mapP0 = $("#map-panel"), mapP = mapP0 && mapP0.classList.contains("map-full") ? null : mapP0, cost = $("#cost-panel"), act = $("#act-panel"), pack = $("#pack-panel");
     if (!side) return;
     if (VIEW) {
       // 전체 화면: 내려받기 줄 → 큰 지도 → 조건·경비·준비물 → 브로셔 (1단)
@@ -2256,6 +2484,8 @@
 
   /* ───────── 이벤트(위임) ───────── */
   function onClick(e) {
+    const mc = $("#map-panel .map-ctrl");
+    if (mc && mc.dataset.open === "1" && !e.target.closest(".mc-layer")) { mc.dataset.open = ""; renderMapCtrl(); }
     const pop = $("#tp-pop");
     if (pop && !pop.hidden && !e.target.closest("#tp-pop") && !e.target.closest(".tp-trigger") && !e.target.closest("#tp-back")) tpClose(false);
     const t = e.target.closest("[data-act]");
@@ -2341,6 +2571,16 @@
         break;
       }
       case "cctv": loadCctv(); break;
+      case "map-layer-menu": { const c = $("#map-panel .map-ctrl"); c.dataset.open = c.dataset.open === "1" ? "" : "1"; renderMapCtrl(); const f = $("#mc-menu [aria-checked=true]"); if (f) f.focus(); break; }
+      case "map-layer": { const c = $("#map-panel .map-ctrl"); c.dataset.open = ""; MAPL.failed[t.dataset.id] = false; setBaseLayer(t.dataset.id); const b = $("#map-panel .mc-layer .mc-btn"); if (b) b.focus(); break; }
+      case "map-full": toggleMapFull(); break;
+      case "swap": openSwap(t.dataset.pid, t.dataset.name, t.dataset.kind); break;
+      case "swap-close": closeSwap(); break;
+      case "swap-sort": SW.sort = t.dataset.v; renderSwap(); break;
+      case "swap-open": SW.openOnly = !SW.openOnly; renderSwap(); break;
+      case "swap-parts": { const k = t.dataset.i; SW.expanded[k] = !SW.expanded[k]; renderSwap(); const b = $(`#swap-dlg [data-act="swap-parts"][data-i="${cssEsc(k)}"]`); if (b) b.focus(); break; }
+      case "swap-pick": chooseSwap(Number(t.dataset.i)); break;
+      case "swap-search": { closeSwap(); const sec = $(".add-name"); if (sec) { sec.scrollIntoView({ behavior: scrollBehavior(), block: "start" }); const inp = $("[data-psearch]", sec); if (inp) inp.focus(); } break; }
       case "cctv-play": playCctv(Number(t.dataset.i)); break;
       case "cctv-close": { const dl = $("#cctv-dlg"); if (dl) { if (dl.close) dl.close(); else dl.removeAttribute("open"); } break; }
       case "m-cond": {
@@ -2649,6 +2889,13 @@
     document.addEventListener("scroll", () => { if (TP.trigger) { if (TP.trigger.isConnected) tpPlace(); else tpClose(false); } }, true);
 
     document.addEventListener("change", onPackChange);
+    document.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const mc = $("#map-panel .map-ctrl");
+      if (mc && mc.dataset.open === "1") { mc.dataset.open = ""; renderMapCtrl(); const b = $("#map-panel .mc-layer .mc-btn"); if (b) b.focus(); e.preventDefault(); return; }
+      if ($("#map-panel.map-full") && !(TP.trigger)) { e.preventDefault(); toggleMapFull(false); }
+    });
+    loadLayers();
     if (!VIEW) initSplit();
     if (READ_ONLY) {
       if (DEMO_VIEW) {

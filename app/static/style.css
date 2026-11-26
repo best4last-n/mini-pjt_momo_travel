@@ -1301,3 +1301,101 @@ body.view-full .app, body.view-full .convo { overflow: visible !important; }
 .man-go { display: flex; gap: var(--space-2); justify-content: flex-end; }
 @media (max-width: 520px) { .man-form { grid-template-columns: 1fr; } }
 .man-form input { flex: none; }
+
+/* ───────── 6차: 지도 컨트롤 · 크게 보기 · 바꾸기 팝업 ───────── */
+.map-ctrl { position: absolute; top: var(--space-2); right: var(--space-2); z-index: 1001; display: flex; gap: 6px; align-items: flex-start; }
+.mc-btn {
+  display: inline-flex; align-items: center; gap: 5px; min-height: var(--control-h-sm); padding: 0 10px;
+  border: 1px solid var(--color-border-strong); background: var(--color-surface); color: var(--color-text); border-radius: var(--radius-m);
+  font-size: var(--text-sm); font-weight: 500; box-shadow: var(--shadow-2); text-decoration: none; white-space: nowrap;
+}
+.mc-btn:hover { border-color: var(--color-brand); color: var(--color-brand); }
+.mc-btn:focus-visible { outline: none; box-shadow: var(--focus-ring); }
+.mc-btn .ico { width: 15px; height: 15px; }
+.mc-full { background: var(--color-brand); color: var(--color-brand-contrast); border-color: var(--color-brand); }
+.mc-full:hover { color: var(--color-brand-contrast); background: color-mix(in srgb, var(--color-brand) 88%, var(--c-black)); }
+.mc-layer { position: relative; }
+.mc-menu {
+  position: absolute; right: 0; top: calc(100% + 4px); list-style: none; min-width: 170px; padding: 4px;
+  background: var(--color-surface); border: 1px solid var(--color-border-strong); border-radius: var(--radius-m); box-shadow: var(--shadow-2);
+}
+.mc-menu button, .mc-menu a {
+  width: 100%; display: flex; align-items: center; gap: 6px; padding: 7px 10px 7px 26px; border: 0; background: transparent; border-radius: var(--radius-s);
+  font-size: var(--text-md); color: var(--color-text); text-align: left; text-decoration: none; position: relative;
+}
+.mc-menu button[aria-checked="true"] { font-weight: 700; color: var(--color-brand); }
+.mc-menu button[aria-checked="true"]::before { content: ""; position: absolute; left: 10px; top: 50%; width: 7px; height: 7px; margin-top: -3.5px; border-radius: 50%; background: var(--color-brand); }
+.mc-menu button:hover, .mc-menu a:hover, .mc-menu button:focus-visible, .mc-menu a:focus-visible { background: var(--state-hover-bg); outline: none; }
+.mc-menu small { color: var(--feedback-danger); font-weight: 400; }
+.mc-3d { border-top: 1px dashed var(--color-border-strong); margin-top: 4px; padding-top: 4px; }
+@media (max-width: 520px) { .mc-btn span { display: none; } .mc-btn { padding: 0 8px; } .mc-3dlink { display: none; } }
+.map-dark .leg-lbl { background: color-mix(in srgb, var(--c-ink-850) 85%, transparent); color: var(--c-white); }
+.map-vw .leaflet-tile-pane { filter: none; }
+
+/* 크게 보기: body 바로 아래로 옮긴 지도 패널이 화면 전체를 덮는다 */
+#map-panel.map-full {
+  position: fixed; inset: 0; z-index: var(--z-modal); margin: 0; border: 0; border-radius: 0;
+  display: flex; flex-direction: column; padding: var(--space-3); background: var(--color-surface);
+}
+#map-panel.map-full .map-box { flex: 1 1 auto; height: auto !important; min-height: 0; border-radius: var(--radius-m); }
+body.map-full-open { overflow: hidden !important; }
+body.map-full-open .composer { visibility: hidden; }
+
+/* 정류장 카드: 바꾸기 */
+.swap-btn { align-self: flex-start; color: var(--color-brand); border-color: color-mix(in srgb, var(--color-brand) 45%, transparent); background: var(--color-brand-soft); }
+.swap-btn .ico, .swap-mini .ico { width: 14px; height: 14px; }
+
+/* 바꾸기 팝업 */
+.swap-dlg {
+  width: min(760px, 96vw); max-height: min(88vh, 900px); border: 0; padding: 0; border-radius: var(--radius-l);
+  background: var(--color-bg); color: var(--color-text); box-shadow: var(--shadow-2); display: none; flex-direction: column;
+}
+.swap-dlg[open] { display: flex; }
+.swap-dlg::backdrop { background: var(--color-overlay); }
+.swap-head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-4) var(--space-4) var(--space-2); background: var(--color-surface); }
+.swap-head h2 { flex: 1; font-size: var(--text-lg); }
+.swap-head h2 span { font-size: var(--text-md); font-weight: 500; color: var(--color-text-muted); }
+.swap-q { display: flex; gap: var(--space-2); padding: 0 var(--space-4) var(--space-2); background: var(--color-surface); }
+.swap-q input { flex: 1; }
+.swap-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0 var(--space-4) var(--space-3); background: var(--color-surface); border-bottom: 1px solid var(--color-border); }
+.swap-sep { width: 1px; height: 18px; background: var(--color-border-strong); margin: 0 2px; }
+.swap-body { overflow-y: auto; padding: var(--space-3) var(--space-4); flex: 1 1 auto; }
+.swap-list { list-style: none; display: flex; flex-direction: column; gap: var(--space-2); }
+.swap-item {
+  display: grid; grid-template-columns: 28px 64px minmax(0, 1fr) auto; gap: var(--space-3); align-items: start;
+  padding: var(--space-3); background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--card-radius); box-shadow: var(--card-shadow);
+}
+.swap-item.closed { opacity: .72; }
+.swap-rank { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: var(--text-sm); background: var(--color-brand-soft); color: var(--color-brand); }
+.swap-list li:nth-child(-n+3) .swap-rank { background: var(--color-brand); color: var(--color-brand-contrast); }
+.swap-img { width: 64px; height: 52px; border-radius: var(--radius-s); overflow: hidden; background: var(--season-soft); display: grid; place-items: center; }
+.swap-img img { width: 100%; height: 100%; object-fit: cover; }
+.swap-img .bird { width: 34px; height: 34px; }
+.swap-b { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.swap-name { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; font-size: var(--text-base); }
+.swap-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: var(--text-sm); color: var(--color-text-muted); }
+.swap-why { font-size: var(--text-md); color: var(--color-text); }
+.swap-sc { display: inline-flex; align-items: center; gap: var(--space-2); border: 0; background: transparent; padding: 2px 0; color: var(--color-text-muted); font-size: var(--text-sm); }
+.swap-sc:focus-visible { outline: none; box-shadow: var(--focus-ring); border-radius: var(--radius-s); }
+.swap-num b { font-size: var(--text-lg); color: var(--color-brand); font-variant-numeric: tabular-nums; }
+.swap-bar, .swap-pbar { display: inline-block; width: 110px; height: 6px; border-radius: var(--radius-pill); background: var(--status-optional-bg); overflow: hidden; }
+.swap-bar span, .swap-pbar span { display: block; height: 100%; background: var(--color-brand); border-radius: inherit; }
+.swap-sc .chev { transition: transform var(--dur-fast); }
+.swap-sc[aria-expanded="true"] .chev { transform: rotate(180deg); }
+.swap-parts { display: grid; gap: 2px; margin: 4px 0 0; font-size: var(--text-sm); }
+.swap-parts div { display: grid; grid-template-columns: 76px auto; gap: var(--space-2); align-items: center; }
+.swap-parts dt { color: var(--color-text-muted); }
+.swap-parts dd { margin: 0; display: flex; align-items: center; gap: 6px; font-variant-numeric: tabular-nums; }
+.swap-pbar { width: 70px; height: 5px; }
+.swap-go { align-self: center; }
+.swap-empty { padding: var(--space-6) var(--space-3); text-align: center; color: var(--color-text-muted); display: grid; justify-items: center; gap: var(--space-2); }
+.swap-note { font-size: var(--text-xs); color: var(--color-text-subtle); padding: 0 var(--space-4) var(--space-2); }
+.swap-note:last-child { padding-bottom: var(--space-4); }
+@media (max-width: 640px) {
+  .swap-dlg { width: 100vw; max-width: 100vw; max-height: 92vh; margin: auto 0 0; border-radius: var(--radius-l) var(--radius-l) 0 0; }
+  .swap-item { grid-template-columns: 26px 52px minmax(0, 1fr); }
+  .swap-img { width: 52px; height: 44px; }
+  .swap-go { grid-column: 1 / -1; justify-self: stretch; }
+}
+@media print { .swap-btn, .swap-mini, .map-ctrl { display: none !important; } }
+.mc-menu { max-height: 220px; overflow-y: auto; }
