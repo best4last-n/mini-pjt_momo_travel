@@ -29,6 +29,10 @@ sys.path.insert(0, str(ROOT))
 os.environ["MOMO_TODAY"] = "2026-11-25"
 os.environ.setdefault("LANGSMITH_TRACING", "false")
 
+from dotenv import load_dotenv  # noqa: E402
+
+load_dotenv(ROOT / ".env")   # 단계별 단독 실행(--stage ragas 등)에서도 Bedrock 자격 증명 사용
+
 from datetime import date  # noqa: E402
 
 from pydantic import BaseModel, Field  # noqa: E402
