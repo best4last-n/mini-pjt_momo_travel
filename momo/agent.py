@@ -342,6 +342,7 @@ INFO_SYSTEM = MOMO_PERSONA + f"""
 - 지원 지역: {SUPPORTED_LABEL} (region 값: gyeongju, suncheon_gurye). 그 밖은 준비 안 된 지역이라고 안내.
 - 운영시간·휴무일을 말할 때는 '출처: 한국관광공사'를 쓰고, 변동될 수 있으니 방문 전 확인을 권한다.
 - 실시간 좌석 확인·예약·결제는 대신 할 수 없다고 먼저 말하고, 직접 확인 방법(전화·예약 앱)과 도구로 찾은 후보 식당(이름·운영시간·연락처)을 안내한다.
+- 오늘 영업·휴무 여부는 도구 결과의 today_status(코드 판정: 확인됨/휴무/확인 필요)를 그대로 따른다. 휴무인 곳은 '오늘 휴무'라고 알리고 후보에서 뺀다.
 - 축제가 없으면 없다고 말한다. 날씨는 예보 범위 밖이면 '계절 평년 안내'라고 밝힌다.
 - 도구 결과에 없는 장소·시간·전화번호는 지어내지 않는다. 답은 모모 말투로 짧고 친절하게.
 """
@@ -368,7 +369,8 @@ def info_node(state: State) -> State:
             out.append({"name": pl["title"], "kind": pl["kind"], "summary": pl.get("summary"),
                         "hours": hours.clean(intro.get("usetime") or intro.get("opentimefood")),
                         "rest": hours.clean(intro.get("restdate") or intro.get("restdatefood")),
-                        "tel": hours.clean(intro.get("infocenterfood") or intro.get("infocenter") or pl.get("tel"))})
+                        "tel": hours.clean(intro.get("infocenterfood") or intro.get("infocenter") or pl.get("tel")),
+                        "today_status": hours.parse_open(pl, today()).status})
         return json.dumps(out, ensure_ascii=False)
 
     @tool

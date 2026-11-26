@@ -26,7 +26,7 @@ def place_doc_text(p: dict) -> str:
     intro = p.get("intro") or {}
     keys = ("usetime", "opentimefood", "checkintime", "restdate", "restdatefood", "infocenter", "infocenterfood")
     info = " / ".join(f"{k}: {hours.clean(intro.get(k))}" for k in keys if hours.clean(intro.get(k)))
-    return f"{p['title']} | {p.get('addr', '')} | {hours.clean(p.get('overview'))[:600]} | {info}"
+    return f"{p['title']} | {p.get('addr', '')} | 운영 정보: {info or '없음'} | 소개: {hours.clean(p.get('overview'))[:600]}"
 
 
 # ---------- 운영 정보 ----------
