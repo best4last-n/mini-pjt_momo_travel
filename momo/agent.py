@@ -166,15 +166,43 @@ def resolve_waypoints(names: list[str], region: str) -> tuple[list[str], list[di
             ids.append(t["contentid"])
             notes.append(f"{_josa(chr(39) + t['title'] + chr(39), '을를')} 한국관광공사 자료에서 찾아 일정에 넣었어요")
             continue
-        g = tools.geocode(n, region)
-        if g:
-            users.append(g)
-            notes.append(f"'{n}'은(는) 관광공사 데이터에 없어 지도(OpenStreetMap)에서 찾은 '사용자 지정' 장소로 넣었어요. "
-                         "운영시간은 확인 필요, 체류시간은 1시간으로 잡았어요(원하시면 바꿔 드릴게요)")
-        else:
-            alts = [x["metadata"]["title"] for x in retrieve.search(n, region, ["attraction"], k=3)]
-            notes.append(f"'{n}'은(는) 찾을 수 없어요. 실제로 있는 곳만 일정에 넣었어요. "
-                         f"비슷한 실제 장소로는 {', '.join(alts)} 어떠세요?")
+        # 관광공사에 없으면: 브이월드(국가 POI, 개인 카페·식당 포함) 우선 → 카카오·네이버(키 있을 때) → OpenStreetMap 마지막
+        from . import placesearch
+        try:
+            res = placesearch.search(n, region, limit=8, expand=True)
+        except Exception:
+            res = {"results": [], "far": []}
+        order = {"관광공사(수집)": 0, "관광공사": 0, "브이월드": 1, "카카오맵": 2, "네이버": 2, "OpenStreetMap": 3}
+        nk = placesearch.name_key(n)
+        pool = [c for c in (res.get("results") or []) + (res.get("far") or [])
+                if (c.get("similarity") or 0) >= 0.8 and (c.get("distance_km") or 0) <= 150]
+        pool.sort(key=lambda c: (placesearch.name_key(c["name"]) != nk, order.get(c["source"], 3),   # 이름이 똑같은 곳 먼저(편의점 'OO점' 뒤로)
+                                 -(c.get("similarity") or 0), c.get("distance_km") or 0))
+        best = pool[0] if pool else None
+        if best and best.get("place_id") and best["source"].startswith("관광공사"):
+            try:
+                from . import tourlive
+                tourlive.fetch(str(best["place_id"]), region)
+            except Exception:
+                pass
+            if str(best["place_id"]) in data.places(region):
+                ids.append(str(best["place_id"]))
+                notes.append(f"'{best['name']}'을(를) 한국관광공사 자료에서 찾아 일정에 넣었어요"
+                             + (f" — 여행 지역에서 약 {best['distance_km']:,.0f}km 떨어져 있어 오가는 이동이 길어요(빼려면 '빼기')"
+                                if (best.get("distance_km") or 0) > placesearch.MAX_KM else ""))
+                continue
+        if best:
+            up = placesearch.user_place_from_candidate(best)
+            users.append(up)
+            far = (best.get("distance_km") or 0) > placesearch.MAX_KM
+            notes.append(f"'{n}' → {best['source']}에서 '{best['name']}'({(best.get('address') or '')[:24]})을(를) 찾아 '사용자 지정' 장소로 넣었어요. "
+                         + (f"여행 지역에서 약 {best['distance_km']:,.0f}km 떨어져 있어 오가는 이동이 길어요(빼려면 '빼기'). " if far else "")
+                         + "운영시간은 확인 필요예요")
+            continue
+        similar = [c["name"] for c in (res.get("results") or []) if (c.get("similarity") or 0) >= 0.5][:3]
+        notes.append(f"'{n}'은(는) 관광공사·브이월드·지도에서 찾지 못했어요. "
+                     + (f"이름이 비슷한 곳: {', '.join(similar)}. " if similar else "")
+                     + "정확한 이름이나 주소를 알려 주시거나, 장소 찾기의 '직접 추가'로 넣어 주세요.")
     return ids, users, notes
 
 

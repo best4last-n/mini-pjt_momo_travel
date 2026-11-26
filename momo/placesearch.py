@@ -242,7 +242,8 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
 
     for c in out:
         d = c["distance_km"] if c["distance_km"] is not None else MAX_KM
-        c["_score"] = min(d, 300) + (1 - c["similarity"]) * 60 + (0 if c["source"].startswith(("관광공사", "브이월드")) else 3)
+        c["_score"] = min(d, 300) + (1 - c["similarity"]) * 60 + (0 if c["source"].startswith(("관광공사", "브이월드")) else
+                                                                  15 if c["source"] == "OpenStreetMap" else 3)   # OSM은 갱신이 늦어 뒤로
     out.sort(key=lambda c: c["_score"])
     dedup = []
     for c in out:
