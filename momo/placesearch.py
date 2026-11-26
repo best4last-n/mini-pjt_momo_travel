@@ -221,9 +221,13 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
 
     want_food = bool(FOOD_WORDS.search(q))
     collect(nationwide=False)
+    for c in vworld_sources(vs, near, False, data.region_label(region).split("/")[-1]) + extra_sources(vs, near, False):
+        push(c, c["key"])
     good = [c for c in out if (c["distance_km"] or 0) <= MAX_KM and c["similarity"] >= 0.8]
     if expand or not good:
         collect(nationwide=True)
+        for c in vworld_sources(vs, near, True) + extra_sources(vs, near, True):
+            push(c, c["key"])
 
     if want_food:   # '카페·식당'을 말했으면 음식점·카페가 아닌 곳은 점수 감점(안경점 '일공공일' 등)
         for c in out:
@@ -235,8 +239,15 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
 
     for c in out:
         d = c["distance_km"] if c["distance_km"] is not None else MAX_KM
-        c["_score"] = min(d, 300) + (1 - c["similarity"]) * 60 + (0 if c["source"].startswith("관광공사") else 3)
+        c["_score"] = min(d, 300) + (1 - c["similarity"]) * 60 + (0 if c["source"].startswith(("관광공사", "브이월드")) else 3)
     out.sort(key=lambda c: c["_score"])
+    dedup = []
+    for c in out:
+        if any(name_key(c["name"]) == name_key(x["name"]) and c.get("lat") and x.get("lat")
+               and travel.km((c["lat"], c["lng"]), (x["lat"], x["lng"])) < 1 for x in dedup):
+            continue
+        dedup.append(c)
+    out = dedup
     local = [c for c in out if (c["distance_km"] is None or c["distance_km"] <= MAX_KM) and ok(c)]
     far = [{**c, "far": True} for c in out if c["distance_km"] is not None and c["distance_km"] > MAX_KM and c["similarity"] >= 0.85]
     far.sort(key=lambda c: (-c["similarity"], c["distance_km"]))
@@ -247,18 +258,174 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
         f = far[0]
         msg = (f"여행 지역 근처({MAX_KM}km 안)에서는 '{q}'와 같은 곳을 찾지 못했어요. "
                f"더 먼 곳에서 '{f['name']}'(약 {f['distance_km']:,.0f}km, {f['address'][:24]})을 찾았어요. 일정에 포함할까요?")
+    # 사진이 없는 상위 후보는 네이버 이미지 검색으로 미리보기(키가 있을 때)
+    if naver_keys():
+        for c in (local[:4] + far[:2]):
+            if not c.get("image"):
+                c["image"] = naver_image(f"{c['name']} {(c.get('address') or '').split(' ')[1] if c.get('address') else ''}".strip())
+                c["image_source"] = "네이버 이미지 검색" if c["image"] else None
+    sources = ["관광공사"] + (["브이월드"] if vworld_key() else []) + ["OpenStreetMap"] + (["카카오맵"] if kakao_key() else []) + (["네이버"] if naver_keys() else [])
     if not local and not far:
-        msg = (f"근처와 전국에서 '{q}'을(를) 찾지 못했어요. 철자를 조금 바꾸거나(예: 영문·한글, 숫자 읽기) "
-               "동·도로 이름과 함께 검색해 보세요.")
-    return {"query": q, "variants": vs, "near": {"lat": near[0], "lng": near[1]}, "radius_km": MAX_KM,
+        msg = (f"근처와 전국에서 '{q}'을(를) 찾지 못했어요(찾아본 곳: {', '.join(sources)}). "
+               "이름과 주소를 직접 넣거나 지도에서 위치를 찍어 '직접 추가'할 수 있어요.")
+
+    return {"query": q, "sources": sources, "manual_add": not local, "variants": vs, "near": {"lat": near[0], "lng": near[1]}, "radius_km": MAX_KM,
             "results": local[:limit], "far": far[:5], "far_message": msg,
             "note": "가까운 순으로 보여 드려요. 거리는 직선거리예요. 사진: 한국관광공사 또는 위키미디어 공용(있을 때만)."}
 
 
 def user_place_from_candidate(c: dict) -> dict:
     """OSM 후보 → 일정에 넣을 '사용자 지정' 장소."""
-    ref = c.get("osm_ref") or c.get("key", "").replace("osm:", "")
-    imgs = [{"url": c["image"], "source": "wikimedia", "license": "Wikimedia Commons", "credit": "위키미디어 공용"}] if c.get("image") else []
-    return {"contentid": f"osm:{ref}", "place_id": f"osm:{ref}", "title": c.get("name") or "사용자 지정 장소",
+    pid = f"osm:{c['osm_ref']}" if c.get("osm_ref") else (c.get("key") or f"user:{abs(hash((c.get('name'), c.get('lat'), c.get('lng')))) % 10**8}")
+    src = {"카카오맵": ("kakao", "카카오맵"), "네이버": ("naver", c.get("image_source") or "네이버 이미지 검색")}.get(c.get("source"),
+                                                                                         ("wikimedia", "위키미디어 공용"))
+    imgs = [{"url": c["image"], "source": src[0], "license": "출처 사이트 이용 조건", "credit": src[1]}] if c.get("image") else []
+    return {"contentid": pid, "place_id": pid, "title": c.get("name") or "사용자 지정 장소", "place_url": c.get("place_url"),
             "lat": c.get("lat"), "lng": c.get("lng"), "kind": "attraction", "source": "사용자 지정",
             "addr": c.get("address") or "", "summary": None, "image_url": c.get("image"), "images": imgs}
+
+
+# ---------------- 선택 연동: 카카오 로컬 · 네이버 검색(키가 있을 때만, 화면 긁기 없음) ----------------
+
+def kakao_key() -> str | None:
+    import os
+    return os.environ.get("KAKAO_REST_API_KEY") or None
+
+
+def naver_keys() -> tuple[str, str] | None:
+    import os
+    i, s = os.environ.get("NAVER_CLIENT_ID"), os.environ.get("NAVER_CLIENT_SECRET")
+    return (i, s) if i and s else None
+
+
+@lru_cache(maxsize=256)
+def kakao_search(q: str, lat: float, lng: float, radius_m: int = 20000) -> tuple:
+    """카카오 로컬 키워드 검색(가까운 순). radius_m=0이면 전국."""
+    key = kakao_key()
+    if not key:
+        return ()
+    params = {"query": q, "x": lng, "y": lat, "sort": "distance" if radius_m else "accuracy", "size": 15}
+    if radius_m:
+        params["radius"] = min(radius_m, 20000)
+    try:
+        r = requests.get("https://dapi.kakao.com/v2/local/search/keyword.json", params=params, timeout=6,
+                         headers={"Authorization": f"KakaoAK {key}"}).json()
+        return tuple(json.dumps(d, ensure_ascii=False) for d in r.get("documents", []))
+    except Exception:
+        return ()
+
+
+@lru_cache(maxsize=256)
+def naver_local(q: str) -> tuple:
+    keys = naver_keys()
+    if not keys:
+        return ()
+    try:
+        r = requests.get("https://openapi.naver.com/v1/search/local.json", params={"query": q, "display": 5}, timeout=6,
+                         headers={"X-Naver-Client-Id": keys[0], "X-Naver-Client-Secret": keys[1]}).json()
+        return tuple(json.dumps(d, ensure_ascii=False) for d in r.get("items", []))
+    except Exception:
+        return ()
+
+
+@lru_cache(maxsize=256)
+def naver_image(q: str) -> str | None:
+    keys = naver_keys()
+    if not keys:
+        return None
+    try:
+        r = requests.get("https://openapi.naver.com/v1/search/image", params={"query": q, "display": 1, "filter": "medium"},
+                         timeout=6, headers={"X-Naver-Client-Id": keys[0], "X-Naver-Client-Secret": keys[1]}).json()
+        it = (r.get("items") or [{}])[0]
+        u = it.get("thumbnail") or it.get("link")
+        return u if u and u.startswith("https://") else None
+    except Exception:
+        return None
+
+
+@lru_cache(maxsize=128)
+def naver_blogs(q: str) -> tuple:
+    """최근 블로그 후기(제목·링크·날짜) — 원문 링크로만 안내."""
+    keys = naver_keys()
+    if not keys:
+        return ()
+    try:
+        r = requests.get("https://openapi.naver.com/v1/search/blog.json", params={"query": q, "display": 3, "sort": "date"},
+                         timeout=6, headers={"X-Naver-Client-Id": keys[0], "X-Naver-Client-Secret": keys[1]}).json()
+        return tuple(json.dumps({"title": re.sub(r"<[^>]+>", "", it.get("title", "")), "link": it.get("link"),
+                                 "date": it.get("postdate"), "blogger": it.get("bloggername")}, ensure_ascii=False)
+                     for it in r.get("items", []))
+    except Exception:
+        return ()
+
+
+def extra_sources(q_variants: list[str], near: tuple, nationwide: bool) -> list[dict]:
+    """카카오·네이버 결과를 공통 후보 형식으로."""
+    out = []
+    for v in q_variants[:2]:
+        for raw in kakao_search(v, round(near[0], 3), round(near[1], 3), 0 if nationwide else 20000):
+            d = json.loads(raw)
+            lat, lng = float(d["y"]), float(d["x"])
+            cat = "restaurant" if any(w in (d.get("category_group_code") or "") for w in ("CE7", "FD6")) else "attraction"
+            out.append(_cand("카카오맵", d["place_name"], lat, lng, d.get("road_address_name") or d.get("address_name"), near, 0,
+                             category=cat, key=f"kakao:{d['id']}", place_url=d.get("place_url"), phone=d.get("phone"),
+                             kakao_category=d.get("category_name")))
+        for raw in naver_local(v):
+            d = json.loads(raw)
+            try:
+                lng, lat = int(d["mapx"]) / 1e7, int(d["mapy"]) / 1e7
+            except (KeyError, ValueError):
+                continue
+            name = re.sub(r"<[^>]+>", "", d.get("title", ""))
+            cat = "restaurant" if re.search(r"(카페|음식|커피|디저트|베이커리)", d.get("category", "")) else "attraction"
+            out.append(_cand("네이버", name, lat, lng, d.get("roadAddress") or d.get("address"), near, 0,
+                             category=cat, key=f"naver:{name}:{round(lat, 4)}", place_url=d.get("link") or None))
+    return out
+
+
+# ---------------- 브이월드 검색(국가 POI·주소, VWORLD_API_KEY) ----------------
+
+def vworld_key() -> str | None:
+    import os
+    return os.environ.get("VWORLD_API_KEY") or None
+
+
+@lru_cache(maxsize=512)
+def vworld_search(q: str, kind: str = "place", lat: float | None = None, lng: float | None = None, deg: float = 0.6,
+                  addr_type: str = "road") -> tuple:
+    """브이월드 검색 2.0 — kind=place(상호·시설) / address(도로명·지번). lat·lng가 있으면 그 주변 bbox로 제한."""
+    key = vworld_key()
+    if not key or not q:
+        return ()
+    params = {"service": "search", "request": "search", "version": "2.0", "crs": "EPSG:4326", "size": 15, "page": 1,
+              "query": q, "type": kind, "format": "json", "errorformat": "json", "key": key}
+    if kind == "address":
+        params["category"] = addr_type
+    if lat is not None:
+        params["bbox"] = f"{lng - deg},{lat - deg},{lng + deg},{lat + deg}"
+    try:
+        r = requests.get("https://api.vworld.kr/req/search", params=params, timeout=8).json()
+        items = (((r.get("response") or {}).get("result") or {}).get("items")) or []
+        return tuple(json.dumps(i, ensure_ascii=False) for i in items)
+    except Exception:
+        return ()
+
+
+def vworld_sources(q_variants: list[str], near: tuple, nationwide: bool, region_label: str = "") -> list[dict]:
+    out = []
+    qs = list(q_variants[:2]) + ([f"{q_variants[-1]} {region_label}"] if region_label and not nationwide else [])
+    for v in qs:
+        rows = vworld_search(v, "place") if nationwide else vworld_search(v, "place", round(near[0], 3), round(near[1], 3))
+        for raw in rows:
+            i = json.loads(raw)
+            pt = i.get("point") or {}
+            try:
+                lat, lng = float(pt["y"]), float(pt["x"])
+            except (KeyError, ValueError):
+                continue
+            addr = (i.get("address") or {}).get("road") or (i.get("address") or {}).get("parcel") or ""
+            catname = i.get("category") or ""
+            cat = "restaurant" if re.search(r"(카페|음식|음료|제과|베이커리|식당|한식|중식|일식|양식|분식|주점)", catname) else "attraction"
+            out.append(_cand("브이월드", i.get("title") or "", lat, lng, addr, near, 0, category=cat,
+                             key=f"vworld:{i.get('id') or (i.get('title'), round(lat, 5))}", vworld_category=catname))
+    return out

@@ -192,6 +192,17 @@ def data_regions():
     return data.available_regions()
 
 
+@app.get("/traffic/cctv")
+async def traffic_cctv(session_id: str = ""):
+    """자차 경로 주변 CCTV(국가교통정보센터). 키가 없으면 안내."""
+    from momo import roads
+    st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values if session_id else None
+    path = (((st or {}).get("plan") or {}).get("transport_guide") or {}).get("route_path")
+    if not path:
+        return {"available": False, "items": [], "message": "자차 경로가 있는 계획에서만 CCTV를 볼 수 있어요."}
+    return roads.cctv_near(path)
+
+
 @app.get("/geo/search")
 async def geo_search(q: str = ""):
     """출발지·도착지 자동완성(동·역·구 이름)."""

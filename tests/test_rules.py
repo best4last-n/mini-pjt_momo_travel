@@ -82,4 +82,5 @@ def test_departure_window_seoul_daytrip():
     spec = _spec(departure="서울")
     (s, e), = planner.windows(spec)
     ow = planner.one_way_minutes(spec)
-    assert s == max(540, 480 + ow + 10) and e == min(1200, 1320 - ow)
+    rw = planner.return_minutes(spec)       # 귀가는 따로 계산(도로 경로·요일 혼잡)
+    assert s == max(540, 480 + ow + 10) and e == min(18 * 60 + 30, 1320 - rw)

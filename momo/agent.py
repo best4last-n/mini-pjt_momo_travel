@@ -614,6 +614,20 @@ def edit_node(state: State) -> State:
             changes.append(f"{di + 1}일차에서 {name}의 순서를 바꿨어요(직접 정한 순서를 최우선으로 지켜요)")
     elif op == "add":
         cand = e.get("candidate") if isinstance(e.get("candidate"), dict) else None
+        man = e.get("manual") if isinstance(e.get("manual"), dict) else None
+        if not pid and not cand and man:      # 검색에 없을 때 직접 추가(이름 + 주소 또는 지도 좌표)
+            from . import geo, placesearch
+            nm = guardrails.mask_pii(str(man.get("name") or "").strip()[:40])[0]
+            lat, lng = man.get("lat"), man.get("lng")
+            if not (lat and lng) and man.get("address"):
+                loc = geo.locate(str(man["address"])[:80])
+                if loc:
+                    lat, lng = loc["lat"], loc["lng"]
+            if not nm or not (lat and lng):
+                return {"status": "승인 대기", "answer": "이름과 위치(주소 또는 지도에서 찍기)가 필요해요.",
+                        "trace": _t(state, "edit", e, "직접 추가 정보 부족")}
+            cand = {"name": nm, "lat": float(lat), "lng": float(lng), "address": str(man.get("address") or "")[:60],
+                    "source": "직접 추가", "key": f"user:{uuid.uuid4().hex[:8]}"}
         if not pid and cand:      # 장소 찾기에서 고른 후보
             if cand.get("place_id"):
                 pid = str(cand["place_id"])

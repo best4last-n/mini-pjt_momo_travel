@@ -87,6 +87,11 @@ def one_way_minutes(spec: TripSpec) -> int | None:
             opts = hubs.rail_options(a, spec.region)
         if opts:
             return opts[0]["total_min"]
+    if spec.long_transport == "자차":      # 실제 도로 경로 + 요일·시간대 혼잡 + 휴게
+        from . import roads
+        dr = roads.drive(a, data.region_center(spec.region), spec.start, spec.depart_time, True)
+        if dr:
+            return dr["total_min"]
     return travel.intercity_minutes(a, data.region_center(spec.region), spec.long_transport)
 
 
@@ -97,6 +102,12 @@ def return_minutes(spec: TripSpec) -> int | None:
     if not coords and (not dest or dest not in data.SIDO_COORDS):
         return None
     b = tuple(coords) if coords else data.SIDO_COORDS[dest]
+    if spec.long_transport == "자차":
+        from . import roads
+        last = spec.days[-1]
+        dr = roads.drive(data.region_center(spec.region), b, last, 16 * 60, False)
+        if dr:
+            return dr["total_min"]
     return travel.intercity_minutes(data.region_center(spec.region), b, spec.long_transport)
 
 

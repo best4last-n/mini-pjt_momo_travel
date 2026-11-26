@@ -157,12 +157,30 @@ def guide(spec, one_way_drive: int | None) -> dict | None:
         g["booking"] = [BOOKING["고속버스"], BOOKING["시외버스"]]
         g["tips"] = ["명절·주말은 매진이 잦아요. 예매 앱으로 미리 좌석을 잡아 두세요"]
         g["options"] = [{**o, "best": False} for o in rail[:2]]
-    else:   # 자차
-        g["summary"] = f"{oname} → {data.region_label(spec.region)} 자차 약 {one_way_drive}분(편도, 추정)"
-        g["total_min"] = one_way_drive
-        g["options"] = [{**o, "best": False} for o in rail[:2]]
-        g["tips"] = ["휴게소에서 2시간마다 쉬어 가세요", "출발 전 타이어 공기압·워셔액을 확인해 주세요"]
+    else:   # 자차 — 도로 경로 기준(열차는 '참고'로만)
+        from . import roads
+        dr = roads.drive(origin, data.region_center(spec.region), spec.start, spec.depart_time, True)
+        dest = data.region_label(spec.region)
+        if dr:
+            g["summary"] = (f"{oname} → {dest} 자차 약 {dr['distance_km']:,.0f}km · 예상 {dr['total_min']}분"
+                            f"(막힘 없을 때 {dr['free_min']}분 × {dr['reason']} {dr['factor']}배"
+                            + (f" + 휴게 {dr['rests']}회" if dr["rests"] else "") + ")")
+            g["total_min"] = dr["total_min"]
+            g["legs"] = [{"type": "drive", "from": oname, "to": dest, "minutes": dr["total_min"],
+                          "distance_km": dr["distance_km"], "note": dr["source"]}]
+            g["route_path"] = dr["path"]
+            g["source"] = dr["source"]
+            g["estimated"] = not dr["live"]
+        else:
+            g["summary"] = f"{oname} → {dest} 자차 약 {one_way_drive}분(편도, 직선거리 추정)"
+            g["total_min"] = one_way_drive
+        g["options"] = []
+        g["alternatives"] = [{**o, "best": False} for o in rail[:2]]   # 참고: 열차로 가면
+        g["tips"] = ["휴게소에서 2시간마다 쉬어 가세요", "출발 전 타이어 공기압·워셔액을 확인해 주세요",
+                     "실제 소요는 출발 직전 내비게이션 실시간 경로로 확인해 주세요"]
         g["fuel"] = fuel_tips(spec, origin)
+        g["traffic_note"] = ("국가교통정보센터 실시간 소통·CCTV는 ITS_API_KEY 설정 후 '경로 CCTV'에서 볼 수 있어요"
+                             if not roads.its_key() else "경로 주변 CCTV를 '경로 CCTV'에서 볼 수 있어요")
     return g
 
 

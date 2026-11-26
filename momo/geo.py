@@ -80,6 +80,27 @@ def search(q: str, limit: int = 6) -> list[dict]:
         lat, lng = data.SIDO_COORDS[quick]
         out.append({"label": q, "sido": quick, "lat": _round(lat), "lng": _round(lng), "source": "대표 도시"})
         seen.add(q)
+    # 브이월드: 주소(도로명·지번)면 주소 검색, 아니면 역·시설 이름 검색 — 표기는 시·군·구(주소)·시설명+시군구까지
+    from .placesearch import vworld_search
+    is_addr = bool(re.search(r"(로|길)\s*\d|\d+\s*(번지|-\d)|[동리]\s*\d", q))
+    vw = []
+    for kind, cat in ((("address", "road"), ("address", "parcel")) if is_addr else (("place", None),)):
+        for raw in vworld_search(q, kind, addr_type=cat or "road"):
+            i = json.loads(raw)
+            pt = i.get("point") or {}
+            addr = (i.get("address") or {}).get("road") or (i.get("address") or {}).get("parcel") or ""
+            toks = addr.split()
+            area = " ".join(toks[:3]) if toks else ""
+            label = area if kind == "address" else f"{i.get('title')} ({' '.join(toks[:2])})"
+            sido = _sido_of(toks[0] if toks else "") if toks else None
+            if pt.get("y") and sido and label not in seen:
+                seen.add(label)
+                vw.append({"label": label, "sido": sido, "lat": _round(pt["y"]), "lng": _round(pt["x"]), "source": "브이월드"})
+        if vw:
+            break
+    from .placesearch import similarity
+    vw.sort(key=lambda r: -similarity(q, r["label"].split(" (")[0]))   # 이름이 같은 곳(수원역) 먼저
+    out.extend(vw[:4])
     for x in json.loads(_nominatim(q)):
         label, sido = _label_from_addr(x.get("address") or {})
         if not sido or not label or label in seen:
