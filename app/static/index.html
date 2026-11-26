@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>모모의 여행 상담소</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header><h1>✉ 모모의 여행 상담소</h1><p>우체부 철새 모모가 운영시간·휴무일까지 확인한 국내 여행 일정을 짜 드려요 (경주 · 순천/구례)</p></header>
+<main>
+  <div id="log"><div class="msg momo">안녕하세요, 우체부 철새 모모예요! 가고 싶은 지역, 날짜, 함께 가는 분을 알려 주세요.
+예) 12월 12일 토요일에 아이 둘이랑 경주 1박 2일 가요. 서울에서 차로 출발해요</div></div>
+  <div id="plan"></div>
+  <div class="actions" id="actions"></div>
+</main>
+<form id="f"><textarea id="q" placeholder="모모에게 편지 쓰기…"></textarea><button>보내기</button></form>
+<script src="/static/cards.js"></script>
+<script>
+let sessionId = null, draftVersion = null;
+const log = document.getElementById("log"), planEl = document.getElementById("plan"), actions = document.getElementById("actions");
+function say(text, who) { const d = document.createElement("div"); d.className = "msg " + who; d.textContent = text; log.appendChild(d); d.scrollIntoView({block: "end"}); return d; }
+async function send(body) {
+  if (body.question) say(body.question, "me");
+  const wait = say("모모가 날아가서 알아보는 중이에요…", "momo");
+  try {
+    const r = await fetch("/query", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ ...body, session_id: sessionId, draft_version: draftVersion }) });
+    const j = await r.json();
+    wait.remove();
+    sessionId = j.session_id || sessionId;
+    say(j.answer, "momo");
+    actions.innerHTML = "";
+    if (j.chips) { const c = document.createElement("div"); c.className = "chips";
+      j.chips.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t;
+        b.onclick = () => send({ question: t }); c.appendChild(b); }); log.appendChild(c); }
+    if (j.itinerary && j.itinerary.length) renderItinerary(planEl, j.itinerary);
+    if (j.status === "승인 대기") {
+      draftVersion = j.draft_version || draftVersion;
+      const b = document.createElement("button"); b.className = "primary"; b.type = "button"; b.textContent = "확정할게요";
+      b.onclick = () => send({ question: "", action: "approve" }); actions.appendChild(b);
+    }
+    if (j.status === "확정") {
+      actions.innerHTML = `<a href="${j.share_url}" target="_blank">공유 링크 열기</a><a href="${j.ics_url}">캘린더(.ics) 받기</a>`;
+    }
+  } catch (e) { wait.textContent = "앗, 연결이 끊겼어요. 다시 보내 주실래요?"; }
+}
+document.getElementById("f").onsubmit = e => { e.preventDefault(); const q = document.getElementById("q"); if (!q.value.trim()) return; send({ question: q.value.trim() }); q.value = ""; };
+</script>
+</body>
+</html>

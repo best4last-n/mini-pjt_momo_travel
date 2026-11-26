@@ -358,3 +358,16 @@
   - scripts/build_index.py 신규: data/index/docs.jsonl(BM25용) + chroma_db/(Titan v2, contentid id, 해시 같으면 재임베딩 안 함). 120건(경주 60 + 순천/구례 60) 색인 완료.
   - 검색 점검: 벡터는 대릉원·국립경주박물관·꼬막 식당을 잘 찾음, BM25는 흔한 단어(경주·운영시간)에 끌려 약함 → retrieve 구현 시 지역명·일반어 제거·제목 가중 필요.
 - **다음 할 일**: 요약 완료 확인 → src 패키지(조건 구조화·retrieve·validate_plan·생성·재생성 2회) → LangGraph(C안) → POST /query·가드레일·승인 → 카드형 화면 → reference 초안 → 18:00 1차 평가. 미커밋 변경 커밋 여부 사용자 확인 필요.
+
+### [2026-11-26] 커밋 · 에이전트 본체 구현 (경주 + 순천/구례)
+- **사용자 요청**: 커밋하고 에이전트 본체 구현 진행.
+- **Claude 작업**:
+  - 커밋 7ee7fd0(범위 축소 반영·경주 수집·색인). 요약 백그라운드 완료: 경주 60 + 순천/구례 남은 25곳 모두 Judge 통과(인용 대체 0건, 한도 미도달).
+  - `momo/` 패키지(FastAPI와 분리): config, data(지역·출발지 좌표표), hours(운영시간·휴무 해석 — 계절·평일/주말·마감·휴게·n번째 요일·설/추석), travel(직선×1.3 추정), retrieve(BM25+Chroma RRF, 흔한 단어 제거·제목 가중, 이름 검색), schemas(ParsedRequest·PlanPick·ItineraryItem), guardrails(PII 10종 마스킹·인젝션·출력 비밀 검사·공개 연락처 허용), planner(후보→LLM 선택→코드 시각 계산→규칙 검사→재생성 2회→코드 보정), tools(운영정보·축제 스냅샷·날씨 Open-Meteo/계절 평년·OSM 지명), render(모모 말투 템플릿 answer), store(plan_id 덮어쓰기·.ics), agent(LangGraph C안: guard_in→parse→plan/modify/info(ReAct create_agent)/approve_chat/reject/approve→guard_out, SQLite 체크포인터).
+  - `app/`: POST /query(InvalidRequest 400/413 표준 본문), GET /, /plan/{id}(읽기 전용), /plan/{id}.ics, 카드형 화면(index·share·cards.js·style.css, 이미지·공공누리 유형·요약·운영 배지·이동 칸, 360px 1열).
+  - fastapi·icalendar 설치, requirements.txt, tests/(규칙·API·가드레일·.ics 24건, LLM 없이 1초) 전부 통과.
+  - 동작 확인(MOMO_TODAY=2026-11-25): #1 생성→#5 수정(1일차 고정, 2일차 오후만 실내로 바뀜 표시)→#20 채팅 승인 거부→버튼 승인 확정→공유 페이지·.ics→재승인 같은 plan_id. 나머지 17건 실행 후 고침: 출력 마스킹이 공개 전화번호·0507 번호를 가리던 문제, #18 거절→되묻기+문자 발송 불가 안내, #13 정보→되묻기, #6 정보→일정+준비물 팁, #12·#15·#17 잔여 위반(보정 단계 재작성) → 재실행 시 모두 위반 0건. 오늘 요일 오답(#10)·저녁에 카페 배치는 프롬프트 보강.
+  - 주소 마스킹 오탐 수정("고분으로 11,526점", "경주로 1박").
+  - SERVICE.md 3-4c 구현 메모 3건(LLM 선택+코드 계산, 재생성 후 코드 보정, 세션 400/200 구분·공개 연락처 예외).
+- **남은 예상 실패(1차)**: 수원 #3·#4·#8(데이터 2차 전 보강), #16 해외(NICE), #17 add-on 켬.
+- **다음 할 일**: 커밋 → reference 초안 20건(Bedrock) → 사용자 검토·고정 → 평가 실행기(LLM Judge Sonnet 4.6 + 규칙 게이트 + RAGAS) → round1 리포트(18:00 컷라인).

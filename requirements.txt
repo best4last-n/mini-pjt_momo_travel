@@ -1,0 +1,17 @@
+boto3>=1.44
+python-dotenv>=1.0
+requests>=2.32
+langchain>=1.5
+langchain-aws>=1.9
+langchain-core>=1.8
+langgraph>=1.2
+langgraph-checkpoint-sqlite>=3.1
+chromadb>=1.5
+kiwipiepy>=0.24
+rank-bm25>=0.2
+pydantic>=2.14
+fastapi>=0.165
+uvicorn>=0.54
+icalendar>=7.3
+pytest>=8.4
+httpx>=0.28

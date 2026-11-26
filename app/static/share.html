@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header><h1>✉ __TITLE__</h1><p id="sub"></p></header>
+<main>
+  <div id="plan"></div>
+  <p class="src">장소·운영시간·사진 출처: 한국관광공사 TourAPI(공공누리). 이동시간은 직선거리 기반 추정이에요. ·
+    <a href="/plan/__PLAN_ID__.ics">캘린더(.ics) 받기</a></p>
+</main>
+<script src="/static/cards.js"></script>
+<script>
+const P = __DATA__;
+document.getElementById("sub").textContent = `${P.region_label} · ${P.start} 출발` + (P.departure_sido ? ` · 출발지 ${P.departure_sido}` : "") + " · 읽기 전용";
+renderItinerary(document.getElementById("plan"), P.itinerary);
+</script>
+</body>
+</html>
