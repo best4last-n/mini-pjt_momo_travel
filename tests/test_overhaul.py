@@ -70,3 +70,11 @@ def test_josa():
     assert _josa("출발지", "을를") == "출발지를"
     assert _josa("'서울'", "으로로") == "'서울'로"
     assert _josa("'100만 원'", "으로로") == "'100만 원'으로"
+
+
+def test_place_name_variants():
+    from momo import placesearch as P
+    assert P.name_key("라플라타카페") == P.name_key("라플라타")
+    assert P.name_key("1001카페") == P.name_key("일공공일 카페") == P.name_key("1001 cafe") == "1001"
+    assert "일공공일" in P.variants("1001카페") and "라플라타" in P.variants("라플라타카페")
+    assert P.similarity("사성", "사성암(구례)") > P.similarity("1001", "일공공일안경콘택트")
