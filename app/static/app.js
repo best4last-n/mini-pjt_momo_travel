@@ -102,6 +102,11 @@
 <symbol id="ico-layers" viewBox="0 0 16 16"><path d="M8 2 14.5 5.5 8 9 1.5 5.5zM1.5 8.5 8 12l6.5-3.5M1.5 11.2 8 14.7l6.5-3.5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></symbol>
 <symbol id="ico-expand" viewBox="0 0 16 16"><path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
 <symbol id="ico-shrink" viewBox="0 0 16 16"><path d="M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-plus" viewBox="0 0 16 16"><path d="M8 3v10M3 8h10" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+<symbol id="ico-route" viewBox="0 0 16 16"><circle cx="3.5" cy="3.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/><circle cx="12.5" cy="12.5" r="1.8" fill="none" stroke="currentColor" stroke-width="1.4"/><path d="M5.3 3.5h5a2.3 2.3 0 0 1 0 4.6H5.8a2.2 2.2 0 0 0 0 4.4h4.9" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></symbol>
+<symbol id="ico-grip" viewBox="0 0 16 16"><g fill="currentColor"><circle cx="6" cy="4" r="1.2"/><circle cx="10" cy="4" r="1.2"/><circle cx="6" cy="8" r="1.2"/><circle cx="10" cy="8" r="1.2"/><circle cx="6" cy="12" r="1.2"/><circle cx="10" cy="12" r="1.2"/></g></symbol>
+<symbol id="ico-undo" viewBox="0 0 16 16"><path d="M5.5 3.5 2.5 6.5l3 3M2.8 6.5h6.7a4 4 0 0 1 0 8H7" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+<symbol id="ico-alert" viewBox="0 0 16 16"><path d="M8 2.2 14.5 13.5h-13z" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/><path d="M8 6.5v3.2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><circle cx="8" cy="11.6" r=".9" fill="currentColor"/></symbol>
 <symbol id="ico-pin" viewBox="0 0 16 16"><path d="M8 15s5-4.6 5-8.4A5 5 0 0 0 3 6.6C3 10.4 8 15 8 15z" fill="none" stroke="currentColor" stroke-width="1.5"/><circle cx="8" cy="6.6" r="1.8" fill="currentColor"/></symbol>
 </defs></svg>`;
   const bird = (cls = "bird") => `<svg class="${cls}" aria-hidden="true" focusable="false"><use href="#${BRAND_SPRITE}"/></svg>`;
@@ -167,15 +172,28 @@
     expenses: null, progress: null,
     search: { q: "", results: [], loading: false }, pending: {},
     manual: { open: false, name: "", address: "", lat: null, lng: null, src: null, picking: false, place: null }, cctv: [], routeFit: false,
+    mode: "view", owner: false, needsReconfirm: false, undoCount: 0, planId: null, reconfirming: false,
   };
-  const canEdit = () => !READ_ONLY && state.planStatus === "승인 대기";
+  // 수정 권한: 상담 화면이거나, /view 에서 이 브라우저가 계획 주인일 때. 실제 편집 컨트롤은 '수정' 모드에서만 보인다
+  const editAllowed = () => !!state.plan && !DEMO_VIEW && (!READ_ONLY || !!state.owner);
+  const canEdit = () => editAllowed() && state.mode === "edit";
+  const modeKey = () => "momo.mode." + (state.sessionId || "new");
+  function loadMode() { try { state.mode = localStorage.getItem(modeKey()) === "edit" ? "edit" : "view"; } catch (e) { state.mode = "view"; } }
+  function setMode(m) {
+    state.mode = m === "edit" ? "edit" : "view";
+    try { localStorage.setItem(modeKey(), state.mode); } catch (e) { /* 저장 불가 */ }
+    renderBrochure({}); renderSide();
+    const b = $(`.mode-seg [data-v="${state.mode}"]`); if (b) b.focus();
+  }
 
   /* ───────── 토스트 ───────── */
   let toastTimer = 0;
-  function toast(msg, ms = 3200) {
+  function toast(msg, ms = 3200, action) {
     const t = $("#toast");
     if (!t) return;
-    t.innerHTML = Array.isArray(msg) ? msg.map((m) => `<span>${esc(m)}</span>`).join("") : `<span>${esc(msg)}</span>`;
+    t.innerHTML = (Array.isArray(msg) ? msg.map((m) => `<span>${esc(m)}</span>`).join("") : `<span>${esc(msg)}</span>`)
+      + (action ? `<button type="button" class="toast-act" data-act="${esc(action.act)}">${esc(action.label)}</button>` : "");
+    t.classList.toggle("has-act", !!action);
     t.classList.add("show");
     clearTimeout(toastTimer);
     toastTimer = setTimeout(() => t.classList.remove("show"), ms);
@@ -261,7 +279,7 @@
   }
 
   /** kind: chat | edit | set | cost | approve — edit·set·cost는 브로셔를 제자리에서 갱신 */
-  const IN_PLACE = { edit: 1, set: 1, cost: 1 };
+  const IN_PLACE = { edit: 1, set: 1, cost: 1, undo: 1 };
   async function send(body, kind, userText) {
     if (state.busy) { toast("모모가 아직 날아가는 중이에요. 잠시만 기다려 주세요."); return; }
     if (DEMO && kind !== "chat") { toast("데모 모드에서는 바뀌지 않아요"); return; }
@@ -284,7 +302,15 @@
     if (wait) wait.stop();
     setBusy(false, kind);
     handleResponse(j, kind);
-    if (useAsync && IN_PLACE[kind] && j && j.plan && j.status !== "오류") toast("새 계획으로 바꿨어요");
+    if (useAsync && IN_PLACE[kind] && j && j.plan && j.status !== "오류") {
+      const ch = Array.isArray(j.changes) && j.changes.length ? j.changes : ["새 계획으로 바꿨어요"];
+      toast(ch, 9000, kind === "edit" && state.undoCount > 0 ? { label: "되돌리기", act: "undo" } : null);
+    }
+    if (state.focusAfter && j && j.plan) {
+      const pid = state.focusAfter; state.focusAfter = null;
+      const el = $(`#brochure .stop[data-pid="${cssEsc(pid)}"]`);
+      if (el) setTimeout(() => focusCard(el.id), 120);
+    }
   }
 
   async function demoPlanResponse(done) {
@@ -300,7 +326,18 @@
   }
 
   function handleResponse(j, kind) {
+    const newSid = j.session_id && j.session_id !== state.sessionId;
     if (j.session_id) state.sessionId = j.session_id;
+    if (newSid) loadMode();
+    if ("needs_reconfirm" in j) state.needsReconfirm = !!j.needs_reconfirm;
+    if (j.undo_count != null) state.undoCount = Number(j.undo_count) || 0;
+    if (j.plan_id) { state.planId = j.plan_id; if (state.view) state.view.plan_id = j.plan_id; }
+    // 확정본과 지금 초안이 같으면(확정 상태) 공유 링크를 plan_id 로 만든다
+    if (j.plan_id && j.confirmed_version && j.draft_version && j.confirmed_version === j.draft_version && !j.needs_reconfirm && j.status !== "오류") {
+      j = Object.assign({}, j, { status: "확정" });
+      const id = encodeURIComponent(j.plan_id);
+      if (!j.share_url) Object.assign(j, { share_url: `/plan/${id}`, html_url: `/plan/${id}.html`, docx_url: `/plan/${id}.docx`, print_url: `/plan/${id}?print=1`, ics_url: `/plan/${id}.ics`, report_url: `/plan/${id}/report` });
+    }
     if (j.plan) S.collapsed = true;
     if (kind === "set" && j.status !== "오류") { state.pending = {}; Object.keys(condPlace).forEach((k) => delete condPlace[k]); }
     if (!DEMO && state.sessionId) {
@@ -311,11 +348,14 @@
     state.status = j.status || null;
     if (j.stage) state.stage = j.stage;
     if (j.status === "승인 대기" || j.status === "확정") state.planStatus = j.status;
+    if (j.status === "확정" && state.reconfirming) { state.reconfirming = false; setTimeout(() => toast("다시 확정했어요. 공유 링크는 그대로예요.", 5000), 50); }
+    else if (state.reconfirming && kind === "approve") { state.reconfirming = false; setTimeout(() => toast(String(j.answer || "아직 다시 확정할 수 없어요").slice(0, 160), 8000), 50); }
     if (j.status === "확정") {
       state.exports = { share_url: j.share_url, html_url: j.html_url, docx_url: j.docx_url, print_url: j.print_url, ics_url: j.ics_url, report_url: j.report_url };
     }
     const changes = Array.isArray(j.changes) ? j.changes.filter(Boolean) : [];
-    const b = bubble("momo", j.answer || "", { replies: j.quick_replies || j.chips || [], changes, status: j.status, html: j.answer_html || "", longPlan: !!j.plan && (j.stage === "plan" || j.stage === "refine") });
+    const quiet = VIEW || kind === "undo";
+    const b = quiet ? null : bubble("momo", j.answer || "", { replies: j.quick_replies || j.chips || [], changes, status: j.status, html: j.answer_html || "", longPlan: !!j.plan && (j.stage === "plan" || j.stage === "refine") });
     if (changes.length) toast(changes, 5200);
     if (j.plan) {
       state.plan = j.plan;
@@ -414,6 +454,7 @@
   }
 
   function loadingBubble() {
+    if (VIEW) return { stop() {} };
     const thread = $("#thread");
     const el = document.createElement("div");
     el.className = "msg momo is-loading";
@@ -1186,6 +1227,29 @@
     return (day.legs || []).find((l) => (stop.place_id != null && String(l.to) === String(stop.place_id)) || (l.to_name && l.to_name === stop.name));
   }
 
+  let IN_PLAN = new Set();
+  function statusPill() {
+    if (state.needsReconfirm) return `<span class="st-pill edit">수정 중</span>`;
+    return state.planStatus === "확정" || ((VIEW || state.planId) && (state.view ? state.view.plan_id : state.planId)) ? `<span class="st-pill ok">확정</span>` : `<span class="st-pill draft">초안</span>`;
+  }
+  function reconfirmBanner() {
+    if (!state.needsReconfirm || !editAllowed()) return "";
+    return `<div class="reconfirm" role="status"><p><b>확정 후 수정됨</b> · 공유 링크에는 확정 당시 내용이 보여요</p>
+      <button type="button" class="btn sm primary" data-act="reconfirm"${state.busy ? " disabled" : ""}>다시 확정</button></div>`;
+  }
+  function modeBar() {
+    if (!editAllowed()) return "";
+    const ed = state.mode === "edit";
+    return `<div class="mode-bar noprint">
+      <div class="mode-seg" role="group" aria-label="보기 또는 수정">
+        <button type="button" data-act="mode" data-v="view" aria-pressed="${!ed}">보기</button>
+        <button type="button" data-act="mode" data-v="edit" aria-pressed="${ed}">${VIEW ? "✏️ 이 계획 고치기" : "수정"}</button></div>
+      ${statusPill()}
+      ${ed ? `<span class="mode-sp"></span>
+        <button type="button" class="btn sm ghost" data-act="undo"${state.undoCount > 0 && !state.busy ? "" : " disabled"} title="직전 수정을 되돌려요(최대 20번)">${ico("ico-undo")}되돌리기${state.undoCount ? ` (${state.undoCount})` : ""}</button>
+        <button type="button" class="btn sm primary re-open-btn" data-act="re-open" aria-haspopup="dialog">${ico("ico-route")}동선 편집 · 최적화</button>` : `<span class="mode-hint">${VIEW ? "고치려면 ‘이 계획 고치기’를 눌러 주세요" : "순서·장소를 바꾸려면 ‘수정’을 눌러 주세요"}</span>`}
+    </div>${reconfirmBanner()}${ed ? `<p class="mode-tip noprint">${ico("ico-grip")} 카드 왼쪽 손잡이를 끌어 순서를 바꾸거나 다른 날로 옮길 수 있어요. 키보드는 손잡이에서 스페이스 → ↑↓ → 스페이스.</p>` : ""}`;
+  }
   function renderBrochure(opt) {
     const el = $("#brochure");
     const plan = state.plan;
@@ -1193,6 +1257,9 @@
     if (opt && opt.moveAfter && opt.moveAfter.parentNode) opt.moveAfter.after(el);
     stashPanels(); // 모바일에서 브로셔 안으로 옮겨 둔 지도·경비·버튼 패널을 다시 그리기 전에 꺼내 둔다
     const openIds = new Set($$(".stop.open", el).map((s) => s.id));
+    document.body.classList.toggle("can-edit", canEdit());
+    IN_PLAN = new Set();
+    (plan.itinerary || []).forEach((dd) => (dd.stops || []).forEach((st) => { if (st.place_id != null) IN_PLAN.add(String(st.place_id)); }));
     const P = placeIndex(plan);
     const trip = plan.trip || {};
     const days = plan.itinerary || [];
@@ -1201,13 +1268,15 @@
 
     const html = [];
     html.push(tripHeader(plan));
+    html.push(modeBar());
     html.push(`<div id="m-map-slot" class="m-map"><button type="button" class="m-toggle" data-act="m-map" aria-expanded="${state.mobileMapOpen}" aria-controls="m-map-body">
       ${ico("ico-pin")}<span>지도 보기</span><span class="m-sub">날짜별 동선과 순서</span>${ico("ico-chev", "ico chev")}</button><div id="m-map-body" class="m-body"${state.mobileMapOpen ? "" : " hidden"}></div></div>`);
-    if (ld.outbound) html.push(ticket(ld.outbound, "가는 길", trip.start_date));
+    const hpts = homePoints(plan);
+    if (ld.outbound && !(hpts.st && ld.outbound.mode === "자차")) html.push(ticket(ld.outbound, "가는 길", trip.start_date));
     html.push(transportGuide(plan.transport_guide));
     days.forEach((d) => {
       html.push(daySection(d, P, plan));
-      if (d.day === lastDay && ld.inbound) html.push(ticket(ld.inbound, "오는 길", d.date));
+      if (d.day === lastDay && ld.inbound && !(hpts.en && ld.inbound.mode === "자차")) html.push(ticket(ld.inbound, "오는 길", d.date));
     });
     if (canEdit() && days.length) html.push(addByName(days));
     if ((plan.warnings || []).length) {
@@ -1285,9 +1354,48 @@
       </div></section>`;
   }
 
+  /* 출발지·도착지(집): 서버 start_point/end_point, 없으면 trip.origin + 장거리 이동으로 만든다 */
+  function homePoints(plan) {
+    const its = plan.itinerary || [];
+    const t = plan.trip || {};
+    const ld = (plan.totals && plan.totals.long_distance) || {};
+    const op = t.origin_point || null, ep = t.end_point || t.origin_point || null;
+    let st = its.length ? its[0].start_point : null;
+    let en = its.length ? its[its.length - 1].end_point : null;
+    if (!st && (op || t.origin) && ld.outbound) st = { kind: "home", role: "출발", name: (op && op.name) || t.origin, label: (op && op.label) || t.origin, time: ld.outbound.depart, leg: ld.outbound, approx: op ? op.approx : true };
+    if (!en && (ep || t.end_location || t.origin) && ld.inbound) en = { kind: "home", role: "도착", name: (ep && ep.name) || t.end_location || t.origin, label: (ep && ep.label) || t.end_location || t.origin, time: ld.inbound.arrive, leg: ld.inbound, approx: ep ? ep.approx : true };
+    if (st && st.lat == null && op) st = Object.assign({}, st, { lat: op.lat, lng: op.lng });
+    if (en && en.lat == null && ep) en = Object.assign({}, en, { lat: ep.lat, lng: ep.lng });
+    return { st, en };
+  }
+  function homeLegLine(leg, plan, back) {
+    if (!leg) return "";
+    const g = plan.transport_guide;
+    const dl = isDrive(g) ? (g.legs || []).find((l) => l.type === "drive") : null;
+    const dist = dl && dl.distance_km != null ? ` · ${esc(Math.round(dl.distance_km))}km` : "";
+    const hasRoute = isDrive(g) && Array.isArray(g.route_path) && g.route_path.length > 1;
+    return `<li class="leg long${back ? " back" : ""}"><span class="leg-in">${ico(isDrive(g) || leg.mode === "자차" ? "ico-car" : "ico-pin")}<b>${esc(leg.label || "")}</b> · ${esc(leg.mode || "")} 약 ${fmtMin(leg.duration_min)}${dist}${leg.estimated !== false ? " (추정)" : ""}${leg.depart && leg.arrive ? ` <span class="muted">${esc(leg.depart)}→${esc(leg.arrive)}</span>` : ""}
+      ${(hasRoute || (homePoints(plan).st || {}).lat != null) ? `<button type="button" class="linkish" data-act="route-fit">${back ? "오는 길 보기" : "가는 길 보기"}</button>` : ""}</span></li>`;
+  }
+  function homeCard(pt, end) {
+    if (!pt) return "";
+    const key = end ? "home-e" : "home-s";
+    return `<li class="stop home ${end ? "home-end" : "home-start"}" id="stop-${key}" data-day="" data-pid="">
+      <span class="num home-num" aria-hidden="true">${ico("ico-home")}</span>
+      <div class="card home-card"><span class="home-role">${end ? "도착" : "출발"}</span>
+        ${end ? `<b>${esc(pt.name || "")}</b>${pt.time ? `<span class="time">${esc(pt.time)} 도착</span>` : ""}`
+              : `${pt.time ? `<span class="time">${esc(pt.time)}</span>` : ""}<b>${esc(pt.name || "")} 출발</b>`}
+        ${pt.label && pt.label !== pt.name ? `<span class="muted">${esc(pt.label)}</span>` : ""}${pt.approx ? `<small class="home-approx">대략 위치</small>` : ""}</div></li>`;
+  }
+
   function daySection(d, P, plan) {
     const color = dayColor(d.day);
     const stops = d.stops || [];
+    const its = plan.itinerary || [];
+    const hp = homePoints(plan);
+    const isFirst = its[0] === d, isLast = its[its.length - 1] === d;
+    const headHome = isFirst && hp.st ? homeCard(hp.st, false) + homeLegLine(hp.st.leg, plan, false) : "";
+    const tailHome = isLast && hp.en ? homeLegLine(hp.en.leg, plan, true) + homeCard(hp.en, true) : "";
     const items = stops.map((s, i) => {
       const leg = findLeg(d, s);
       const legHtml = leg ? `<li class="leg" aria-label="이동 ${esc(km(leg.distance_km))}, 약 ${fmtMin(leg.duration_min)}">
@@ -1305,8 +1413,9 @@
         <div><h3 id="day-h-${esc(d.day)}">${fmtDate(d.date)}${d.theme ? ` <span class="theme">${esc(d.theme)}</span>` : ""}</h3>
         <p>이동 약 ${fmtMin(d.day_travel_min)} · ${esc(km(d.day_distance_km || 0))} · 관광 ${nPlaces}곳 ${rBadge}</p></div>
         ${wxChip(weatherOf(d.date))}
+        ${canEdit() ? `<button type="button" class="btn sm re-open-btn noprint" data-act="re-open" data-day="${esc(d.day)}" aria-haspopup="dialog">${ico("ico-route")}동선 편집</button>` : ""}
       </header>
-      <ol class="stops">${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}</ol></section>`;
+      <ol class="stops">${headHome}${items || `<li class="empty">이 날은 아직 비어 있어요.</li>`}${tailHome}</ol></section>`;
   }
 
   function licenseOf(img) { return LICENSE[img.license] || img.license || "공공누리"; }
@@ -1342,13 +1451,20 @@
     const comp = (plan.trip && plan.trip.companions) || {};
     const compLabel = comp.type === "노약자" ? "노약자 동반 참고" : /어린이|유아/.test(comp.type || "") ? "아이 동반 참고" : "동반자 참고";
     const info = [["휴무", place.closed], ["요금", place.fee], ["주차", place.parking], ["문의", place.contact]].filter((x) => x[1]);
-    const chips = (arr, food) => (arr || []).map((x) => `<li class="chip-s" title="${esc(x.note || "")}">${esc(x.name)}${x.distance_km != null ? ` · ${esc(x.distance_km)}km` : ""}${food && x.note ? ` <span class="muted">· ${esc(x.note)}</span>` : ""}</li>`).join("");
+    const nearRows = (arr, food) => (arr || []).slice(0, food ? 4 : 3).map((x) => {
+      const inPlan = x.place_id != null && IN_PLAN.has(String(x.place_id));
+      const act = inPlan ? `<span class="badge ok near-in">일정에 있음</span>`
+        : canEdit() && x.place_id != null && s.place_id != null
+          ? `<button type="button" class="near-add" data-act="near-add" data-pid="${esc(x.place_id)}" data-name="${esc(x.name)}" data-after="${esc(s.place_id)}" data-after-name="${esc(name)}" data-day="${esc(d.day)}" aria-label="${esc(name)} 다음에 ${esc(x.name)} 들르기">${ico("ico-plus")}이 다음에 들르기</button>` : "";
+      return `<li class="near-row${inPlan ? " in" : ""}"><span class="near-n">${esc(x.name)}</span>${x.distance_km != null ? `<span class="near-d">${esc(x.distance_km)}km</span>` : ""}${x.note ? `<span class="near-note">${esc(x.note)}</span>` : ""}${act}</li>`;
+    }).join("");
+    const foodsBox = s.type === "place" && (place.foods || []).length ? `<div class="near-box"><h5>${ico("ico-fork")}근처 먹거리 <span class="muted">${canEdit() ? "눌러서 이 장소 바로 다음에 넣을 수 있어요" : ""}</span></h5><ul class="near-list">${nearRows(place.foods, true)}</ul></div>` : "";
     const details = [
       (place.highlights || []).length ? `<div class="d-block"><h5>이곳만의 볼거리</h5><ul class="hl">${place.highlights.map((h) => `<li>${esc(h)}</li>`).join("")}</ul></div>` : "",
       place.guide_tips ? `<div class="d-block"><h5>관람 팁</h5><p>${esc(place.guide_tips)}</p></div>` : "",
       place.companion_notes ? `<div class="d-block comp"><h5>${esc(compLabel)}</h5><p>${esc(place.companion_notes)}</p></div>` : "",
-      (place.nearby_sights || []).length ? `<div class="d-block"><h5>근처 볼거리</h5><ul class="chips-s">${chips(place.nearby_sights)}</ul></div>` : "",
-      (place.foods || []).length ? `<div class="d-block"><h5>근처 먹거리</h5><ul class="chips-s">${chips(place.foods, true)}</ul></div>` : "",
+      (place.nearby_sights || []).length ? `<div class="d-block"><h5>근처 볼거리</h5><ul class="near-list">${nearRows(place.nearby_sights)}</ul></div>` : "",
+      s.type !== "place" && (place.foods || []).length ? `<div class="d-block"><h5>근처 먹거리</h5><ul class="near-list">${nearRows(place.foods, true)}</ul></div>` : "",
       info.length ? `<dl class="info">${info.map((x) => `<div><dt>${x[0]}</dt><dd>${esc(x[1])}</dd></div>`).join("")}</dl>` : "",
       place.address ? `<p class="addr">${esc(place.address)}</p>` : "",
     ].join("");
@@ -1361,11 +1477,14 @@
         : `<button type="button" class="btn xs ghost swap-mini" data-act="swap" data-pid="${esc(s.place_id)}" data-kind="${esc(swapKind)}" data-name="${esc(name)}" aria-haspopup="dialog" aria-label="${esc(name)} 다른 곳으로 바꾸기" title="다른 곳으로 바꾸기">${ico("ico-swap")}바꾸기</button>`)
       : "";
     const edit = canEdit() && s.place_id != null ? `<div class="edit" role="group" aria-label="${esc(name)} 편집">${swapHint ? "" : swapBtn}
-        <button type="button" class="btn xs ghost" data-act="up" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" ${i === 0 ? "disabled" : ""} aria-label="${esc(name)} 앞으로">▲</button>
-        <button type="button" class="btn xs ghost" data-act="down" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" ${i === n - 1 ? "disabled" : ""} aria-label="${esc(name)} 뒤로">▼</button>
-        ${(plan.itinerary || []).length > 1 ? `<span class="move-wrap"><label class="sr" for="mv-${id}">옮길 날</label><select id="mv-${id}" class="sel xs">${(plan.itinerary || []).filter((x) => x.day !== d.day).map((x) => `<option value="${esc(x.day)}">${esc(x.day)}일차로</option>`).join("")}</select><button type="button" class="btn xs ghost" data-act="move" data-pid="${esc(s.place_id)}">다른 날로</button></span>` : ""}
+        ${s.type !== "stay" && (plan.itinerary || []).length > 1 ? `<span class="move-days" role="group" aria-label="${esc(name)} 다른 날로 옮기기">${(plan.itinerary || []).filter((x) => x.day !== d.day).length <= 3
+          ? (plan.itinerary || []).filter((x) => x.day !== d.day).map((x) => `<button type="button" class="btn xs move-day" data-act="tl-moveday" data-pid="${esc(s.place_id)}" data-day="${esc(x.day)}" style="--c:${dayColor(x.day)}">${ico("ico-swap")}${esc(x.day)}일차로 옮기기</button>`).join("")
+          : `<label class="sr" for="md-${id}">${esc(name)} 옮길 날</label><select id="md-${id}" class="sel xs move-day-sel" data-pid="${esc(s.place_id)}"><option value="">다른 날로 옮기기…</option>${(plan.itinerary || []).filter((x) => x.day !== d.day).map((x) => `<option value="${esc(x.day)}">${esc(x.day)}일차로 옮기기</option>`).join("")}</select>`}</span>` : ""}
+        <button type="button" class="btn xs ghost" data-act="re-open" data-day="${esc(d.day)}" data-focus="${esc(s.place_id)}">${ico("ico-route")}동선 편집</button>
         <button type="button" class="btn xs danger" data-act="remove" data-pid="${esc(s.place_id)}" data-day="${esc(d.day)}" data-name="${esc(name)}">빼기</button></div>` : "";
-    return `<li class="stop t-${esc(s.type)}" id="${id}" data-day="${esc(d.day)}" data-pid="${esc(s.place_id)}">${num}
+    const grip = canEdit() && s.place_id != null && s.type !== "stay"
+      ? `<button type="button" class="tl-grip" aria-label="${esc(name)} 옮기기 — 스페이스로 들고 ↑↓로 옮긴 뒤 스페이스로 놓아요" title="끌어서 순서 바꾸기">${ico("ico-grip")}</button>` : "";
+    return `<li class="stop t-${esc(s.type)}${grip ? " has-grip" : ""}" id="${id}" data-day="${esc(d.day)}" data-pid="${esc(s.place_id)}">${num}${grip}
       <article class="card" aria-labelledby="${id}-h">
         ${mediaHtml(p, name)}
         <div class="body">
@@ -1373,6 +1492,7 @@
           <h4 id="${id}-h">${esc(name)}</h4>
           ${reason ? `<p class="reason">${esc(reason)}</p>` : ""}
           ${place.summary ? `<p class="summary">${esc(place.summary)}</p>` : ""}
+          ${foodsBox}
           ${hasDetails ? `<div class="details" id="${id}-d">${details}</div>` : ""}
           <div class="card-foot">
             ${hasDetails ? `<button type="button" class="more" data-act="more" aria-expanded="false" aria-controls="${id}-d">자세히${ico("ico-chev", "ico chev")}</button>` : ""}
@@ -1651,6 +1771,25 @@
       ${alts.map((o) => `<tr><th scope="row">${esc(o.name)}</th><td class="num-c">${o.access_min != null ? fmtMin(o.access_min) : "-"}</td><td class="num-c">${o.ride_min != null ? fmtMin(o.ride_min) : "-"}</td><td class="num-c">${o.total_min != null ? fmtMin(o.total_min) : "-"}</td></tr>`).join("")}</tbody></table></div></details>` : "";
     const fuel = (g.fuel || []).length ? `<div class="tg-fuel"><p class="tg-fuel-h"><span aria-hidden="true">⛽</span> 주유 안내</p><ul>${g.fuel.map((f) => `<li><b>${esc(f.at)}</b> ${esc(f.text)}</li>`).join("")}</ul></div>` : "";
     const hasRoute = Array.isArray(g.route_path) && g.route_path.length > 1;
+    // ITS 기반 도로 정보
+    const srcCls = (x) => /실시간/.test(x || "") ? "live" : /ITS|예측/.test(x || "") ? "pred" : "avg";
+    const srcB = (x) => x ? `<span class="tg-src-b ${srcCls(x)}">${esc(x)}</span>` : "";
+    const more = (n, key) => n > 3 ? `<button type="button" class="linkish tg-morebtn" data-act="tg-more" aria-expanded="false" data-k="${key}">더 보기 (${n - 3})</button>` : "";
+    const segs = g.road_segments || [];
+    const segHtml = segs.length ? `<div class="tg-block" data-more="seg"><p class="tg-sub">도로별 예상 ${(g.traffic_sources || []).map(srcB).join("")}</p>
+      <div class="mm-scroll tg-scroll"><table class="tbl tg-segs"><thead><tr><th scope="col">도로</th><th scope="col">거리</th><th scope="col">막힘 없을 때 → 예상</th><th scope="col">속도</th></tr></thead><tbody>
+      ${segs.map((r, i) => `<tr class="${i >= 3 ? "x-more" : ""}"><th scope="row">${esc(r.road || "")}${r.ref ? ` <small>${esc(r.ref)}</small>` : ""}</th><td class="num-c">${r.km != null ? esc(Math.round(r.km)) + "km" : "-"}</td>
+        <td class="num-c">${r.free_min != null ? fmtMin(r.free_min) : "-"} → <b>${r.min != null ? fmtMin(r.min) : "-"}</b></td><td class="num-c">${r.speed_kmh != null ? esc(Math.round(r.speed_kmh)) + "km/h" : "-"} ${srcB(r.source)}</td></tr>`).join("")}</tbody></table></div>${more(segs.length, "seg")}</div>` : "";
+    const evs = g.road_events || [];
+    const evHtml = evs.length ? `<div class="tg-block" data-more="ev"><p class="tg-sub">${ico("ico-alert")}돌발 상황 ${evs.length}건</p><ul class="tg-evs">
+      ${evs.map((e, i) => `<li class="tg-ev t-${/사고/.test(e.type || "") ? "acc" : /공사|작업/.test(e.type || "") ? "work" : /기상/.test(e.type || "") ? "wx" : "etc"}${i >= 3 ? " x-more" : ""}">
+        <span class="tg-ev-ic">${ico("ico-alert")}</span><b>${esc(e.type || "알림")}</b>${e.road ? `<span class="tg-ev-road">${esc(e.road)}</span>` : ""}<span class="tg-ev-msg">${esc(e.message || e.detail || "")}</span>
+        ${e.lanes_blocked ? `<span class="badge warn">차로 차단${typeof e.lanes_blocked === "number" ? ` ${esc(e.lanes_blocked)}` : ""}</span>` : ""}${Number(e.delay_min) > 0 ? `<span class="badge warn">+${esc(e.delay_min)}분</span>` : ""}</li>`).join("")}</ul>${more(evs.length, "ev")}</div>` : "";
+    const cts = g.road_cautions || [];
+    const ctHtml = cts.length ? `<div class="tg-block" data-more="ct"><p class="tg-sub">주의운전 구간 ${cts.length}곳</p><ul class="tg-cts">
+      ${cts.map((x, i) => `<li class="${i >= 3 ? "x-more" : ""}" title="${esc(x.message || "")}"><b>${esc(x.type || "주의")}</b>${x.road ? ` · ${esc(x.road)}` : ""}${x.message ? `<span>${esc(x.message)}</span>` : ""}</li>`).join("")}</ul>${more(cts.length, "ct")}</div>` : "";
+    const rd = g.return_drive;
+    const retHtml = rd && rd.total_min != null ? `<p class="tg-ret">${ico("ico-home")}돌아올 때 약 <b>${fmtMin(rd.total_min)}</b>${rd.free_min != null ? ` <span class="muted">(막힘 없을 때 ${fmtMin(rd.free_min)})</span>` : ""}${(rd.traffic_sources || []).map(srcB).join("")}${rd.reason ? ` <span class="muted">· ${esc(rd.reason)}</span>` : ""}</p>` : "";
     return `<section class="tguide drive" aria-labelledby="tg-h">
       <div class="tg-head"><h3 id="tg-h">어떻게 가나요?</h3><span class="badge route">자차</span>${g.total_min != null ? `<span class="tg-total">편도 약 <b>${fmtMin(g.total_min)}</b>${g.estimated !== false ? " (추정)" : ""}</span>` : ""}</div>
       <div class="tg-drive">
@@ -1663,6 +1802,7 @@
           ${d.note || g.source ? `<p class="tg-src">${esc([...new Set([d.note, g.source].filter(Boolean))].join(" · "))}</p>` : ""}
         </div>
       </div>
+      ${retHtml}${segHtml}${evHtml}${ctHtml}
       <div class="tg-actions noprint">
         ${hasRoute ? `<button type="button" class="btn sm ghost" data-act="route-fit">${ico("ico-pin")}지도에서 가는 길 보기</button>` : ""}
         <button type="button" class="btn sm ghost" data-act="cctv">${ico("ico-cam")}경로 CCTV 보기</button>
@@ -1875,6 +2015,500 @@
     send({ question: `${oldName} → ${x.name} 바꾸기`, action: "edit", edit: { op: "replace", target: SW.pid, choice: x.choice } }, "edit");
   }
 
+  /* ───────── 되돌리기 (POST /trips/{sid}/undo) ───────── */
+  async function doUndo() {
+    if (state.busy) { toast("모모가 아직 날아가는 중이에요. 잠시만 기다려 주세요."); return; }
+    if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
+    if (!state.sessionId) return;
+    setBusy(true, "undo"); setMood("thinking");
+    let r = null, j = null;
+    try { r = await fetch(`/trips/${encodeURIComponent(state.sessionId)}/undo`, { method: "POST" }); j = await r.json().catch(() => null); } catch (e) { r = null; }
+    setBusy(false, "undo");
+    if (!r) { setMood("sorry"); toast("앗, 연결이 끊겼어요. 다시 해 주실래요?"); return; }
+    if (r.status === 404) { setMood("idle"); state.undoCount = 0; renderBrochure({}); toast((j && j.error) || "되돌릴 수정이 없어요"); return; }
+    if (r.status === 409) { setMood("idle"); toast("다른 작업을 처리하는 중이에요. 끝나면 다시 눌러 주세요."); return; }
+    if (!r.ok || !j) { setMood("sorry"); toast((j && (j.error || j.answer)) || "되돌리지 못했어요"); return; }
+    const st = j.status === "초안" ? "승인 대기" : j.status;
+    handleResponse(Object.assign({}, j, { status: st, quick_replies: [], answer: "" }), "undo");
+    toast(Array.isArray(j.changes) && j.changes.length ? j.changes : ["직전 수정을 되돌렸어요"], 5000);
+  }
+
+  /* ───────── 타임라인에서 바로 끌어서 순서 바꾸기 (수정 모드) ───────── */
+  let TL = null;
+  const tlServerOrder = () => (state.plan.itinerary || []).map((d) => ({ day: d.day, pids: (d.stops || []).filter((x) => x.place_id != null).map((x) => String(x.place_id)) }));
+  function tlDomOrder() {
+    return $$("#brochure .day").map((sec) => ({ day: Number(sec.dataset.day), pids: $$(".stops > .stop", sec).map((x) => x.dataset.pid).filter(Boolean) }));
+  }
+  function tlCandidates(list, except) { return $$(":scope > .stop", list).filter((x) => x !== except && x.dataset.pid && !x.classList.contains("home")); }
+  function tlPlace(li, list, before) {
+    // 숙소(.t-stay)는 그날 마지막, 출발·도착 집 카드는 맨 앞·맨 뒤에 고정
+    const cands = tlCandidates(list, li);
+    const stay = cands.find((x) => x.classList.contains("t-stay"));
+    if (!before || (stay && cands.indexOf(before) > cands.indexOf(stay))) before = stay || $(":scope > .stop.home-end", list) || null;
+    if (before) list.insertBefore(li, before);
+    else list.appendChild(li);
+  }
+  function tlMoveToDay(pid, day) {
+    if (!canEdit()) return;
+    if (state.busy) { toast("앞의 수정을 적용하는 중이에요. 잠시만요."); return; }
+    const li = $(`#brochure .stop[data-pid="${cssEsc(pid)}"]`);
+    const sec = $(`#brochure .day[data-day="${day}"]`);
+    if (!li || !sec) return;
+    $("#brochure").classList.add("tl-dragging");
+    tlPlace(li, $(".stops", sec), null);
+    li.scrollIntoView({ block: "center", behavior: scrollBehavior() });
+    li.classList.add("flash");
+    tlCommit(pid);
+  }
+  function tlStart(li, kb) {
+    if (state.busy) { toast("앞의 수정을 적용하는 중이에요. 잠시만요."); return false; }
+    TL = { li, kb, ghost: null, dy: 0 };
+    li.classList.add("tl-ph");
+    $("#brochure").classList.add("tl-dragging");
+    return true;
+  }
+  function tlEnd(commit) {
+    if (!TL) return;
+    const { li, ghost } = TL;
+    if (TL.timer) clearInterval(TL.timer);
+    if (ghost) ghost.remove();
+    li.classList.remove("tl-ph");
+    TL = null;
+    document.removeEventListener("pointermove", tlMove);
+    if (commit) tlCommit(li.dataset.pid); else { renderBrochure({}); }
+  }
+  function tlCommit(pid) {
+    const srv = tlServerOrder(), now = tlDomOrder();
+    const days = now.filter((d) => { const o = srv.find((x) => x.day === d.day); return !o || o.pids.join() !== d.pids.join(); }).map((d) => ({ day: d.day, place_ids: d.pids }));
+    if (!days.length) { renderBrochure({}); return; }
+    if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); renderBrochure({}); return; }
+    days.forEach((d) => { const sec = $(`#brochure .day[data-day="${d.day}"]`); if (sec) sec.classList.add("tl-applying"); });
+    state.focusAfter = pid;
+    toast(`${days.map((d) => d.day + "일차").join("·")} 순서를 적용하는 중…`, 60000);
+    send({ question: `[동선 편집] ${days.map((d) => d.day + "일차").join("·")} 순서 바꾸기`, action: "edit", edit: { op: "order", days } }, "edit");
+  }
+  function tlPointerDown(e) {
+    const g = e.target.closest && e.target.closest(".tl-grip");
+    if (!g || e.button > 0 || !canEdit()) return;
+    const li = g.closest(".stop");
+    e.preventDefault();
+    if (!tlStart(li, false)) return;
+    const r = li.getBoundingClientRect();
+    const ghost = document.createElement("div");
+    ghost.className = "tl-ghost";
+    ghost.innerHTML = `${ico("ico-grip")}<b>${esc(($("h4", li) || {}).textContent || "")}</b>`;
+    ghost.style.left = Math.max(8, e.clientX - 20) + "px"; ghost.style.top = (e.clientY - 20) + "px"; ghost.style.width = Math.min(r.width, 360) + "px";
+    document.body.appendChild(ghost);
+    TL.ghost = ghost;
+    document.addEventListener("pointermove", tlMove);
+    document.addEventListener("pointerup", () => tlEnd(true), { once: true });
+    document.addEventListener("pointercancel", () => tlEnd(false), { once: true });
+  }
+  function tlMove(e) {
+    if (!TL || !TL.ghost) return;
+    TL.ghost.style.top = (e.clientY - 20) + "px"; TL.ghost.style.left = Math.max(8, e.clientX - 20) + "px";
+    const sec = (document.elementsFromPoint ? document.elementsFromPoint(e.clientX, e.clientY) : [document.elementFromPoint(e.clientX, e.clientY)])
+      .map((x) => x && x.closest && x.closest("#brochure .day")).find(Boolean);
+    const list = sec && $(".stops", sec);
+    if (list) {
+      const cands = tlCandidates(list, TL.li);
+      let before = null;
+      for (const c of cands) { const rr = c.getBoundingClientRect(); if (e.clientY < rr.top + Math.min(rr.height / 2, 80)) { before = c; break; } }
+      tlPlace(TL.li, list, before);
+    }
+    // 가장자리 자동 스크롤: 포인터가 가장자리에 머무는 동안 계속 굴린다
+    const sc = MQ_PC.matches ? $("#scroller") : null;
+    const bar = !sc ? $(".m-condbar") : null; // 모바일: 위에 붙은 조건 바 아래부터
+    const top = sc ? sc.getBoundingClientRect().top : (bar ? Math.max(0, bar.getBoundingClientRect().bottom) : 0);
+    const bot = sc ? sc.getBoundingClientRect().bottom : (($("#composer") && $("#composer").getBoundingClientRect().top) || window.innerHeight);
+    TL.x = e.clientX; TL.y = e.clientY;
+    TL.dy = e.clientY < top + 60 ? -1 : e.clientY > bot - 80 ? 1 : 0;
+    if (TL.dy && !TL.timer) {
+      TL.timer = setInterval(() => {
+        if (!TL || !TL.dy) { if (TL) { clearInterval(TL.timer); TL.timer = 0; } return; }
+        if (sc) sc.scrollTop += TL.dy * 14; else window.scrollBy(0, TL.dy * 14);
+        tlMove({ clientX: TL.x, clientY: TL.y });
+      }, 30);
+    }
+  }
+  function tlKeydown(e) {
+    const g = e.target.closest && e.target.closest(".tl-grip");
+    if (!g) return;
+    const li = g.closest(".stop");
+    if (e.key === " " || e.key === "Enter") {
+      e.preventDefault();
+      if (TL && TL.li === li) { toast("놓았어요"); tlEnd(true); }
+      else if (!TL && tlStart(li, true)) toast(["들었어요", "↑↓로 옮기고 스페이스로 놓아요 · Esc는 취소"], 6000);
+      return;
+    }
+    if (!TL || TL.li !== li) return;
+    if (e.key === "Escape") { e.preventDefault(); toast("옮기기를 취소했어요"); tlEnd(false); return; }
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    e.preventDefault();
+    const list = li.parentNode;
+    const cands = tlCandidates(list, li).filter((x) => !x.classList.contains("t-stay"));
+    const all = $$(":scope > .stop", list).filter((x) => x.dataset.pid && !x.classList.contains("home") && !x.classList.contains("t-stay"));
+    const i = all.indexOf(li);
+    const secs = $$("#brochure .day");
+    const si = secs.indexOf(list.closest(".day"));
+    if (e.key === "ArrowUp") {
+      if (i > 0) list.insertBefore(li, all[i - 1]);
+      else if (si > 0) { const pl = $(".stops", secs[si - 1]); tlPlace(li, pl, null); }
+    } else {
+      if (i < all.length - 1) { const nx = all[i + 1]; list.insertBefore(li, nx.nextSibling); }
+      else if (si < secs.length - 1) { const nl = $(".stops", secs[si + 1]); tlPlace(li, nl, tlCandidates(nl, li)[0] || null); }
+    }
+    void cands;
+    g.focus();
+    li.scrollIntoView({ block: "nearest" });
+    const day = li.closest(".day");
+    toast(`${day ? day.dataset.day : ""}일차 ${$$(":scope > .stop", li.parentNode).filter((x) => x.dataset.pid && !x.classList.contains("home")).indexOf(li) + 1}번째`, 2000);
+  }
+
+  /* ───────── 동선 편집 (끌어서 순서 바꾸기 · 최적화) ───────── */
+  const RE = { scope: null, open: false, days: [], orig: [], dirty: {}, opt: null, optErr: "", focusDay: null, last: null, origPos: {} };
+  function reSnapshot(plan) {
+    const P = placeIndex(plan);
+    return (plan.itinerary || []).map((d) => ({
+      day: d.day, date: d.date, travel: d.day_travel_min, dist: d.day_distance_km,
+      items: (d.stops || []).filter((s) => s.place_id != null).map((s) => {
+        const leg = findLeg(d, s);
+        const role = s.role || (s.type === "stay" ? "stay" : s.type === "meal" ? (String(s.arrive || "") < "15:00" ? "lunch" : "dinner") : "place");
+        const c = coordOf(s, P);
+        return { pid: String(s.place_id), name: s.name, type: s.type, role, arrive: s.arrive || "", inMin: leg ? leg.duration_min : null, lat: c ? c[0] : null, lng: c ? c[1] : null };
+      }),
+    }));
+  }
+  function openRouteEditor(day, focusPid) {
+    if (!state.plan || !canEdit()) return;
+    RE.days = reSnapshot(state.plan);
+    RE.orig = JSON.parse(JSON.stringify(RE.days));
+    RE.origPos = {};
+    RE.orig.forEach((d) => d.items.forEach((it, i) => { RE.origPos[it.pid] = { day: d.day, i }; }));
+    RE.dirty = {}; RE.open = true; RE.focusDay = day; RE.last = document.activeElement;
+    if (!RE.scope) RE.scope = RE.days.length > 1 ? "all" : "day";
+    let el = $("#re-panel");
+    if (!el) {
+      el = document.createElement("dialog");
+      el.id = "re-panel"; el.className = "re-dlg"; el.setAttribute("aria-labelledby", "re-h");
+      document.body.appendChild(el);
+      el.addEventListener("pointerdown", reDragStart);
+      el.addEventListener("keydown", reKeydown);
+      el.addEventListener("cancel", (e) => { e.preventDefault(); closeRouteEditor(); });
+    }
+    el.innerHTML = `<div class="re-main" id="re-content"></div>
+      <aside class="re-side" aria-label="미리보기 지도">
+        <button type="button" class="re-maptoggle" data-act="re-maptoggle" aria-expanded="${MQ_PC.matches}" aria-controls="re-mapbox">${ico("ico-pin")}<span>미리보기 지도</span>${ico("ico-chev", "ico chev")}</button>
+        <div id="re-mapbox" class="re-mapbox"${MQ_PC.matches ? "" : " hidden"}><div id="re-map" class="re-map"></div>
+        <p class="legend">편집 중인 순서대로 그려요 · 점선은 직선 순서예요</p></div></aside>`;
+    if (el.showModal) { if (!el.open) el.showModal(); } else el.setAttribute("open", "");
+    document.body.classList.add("re-open");
+    const tst = $("#toast"); if (tst) el.appendChild(tst); // 모달(최상위 레이어) 안에서도 알림이 보이게
+    renderRouteEditor();
+    initReMap();
+    const target = focusPid ? el.querySelector(`.re-item[data-pid="${cssEsc(focusPid)}"] .re-grip`) : day ? el.querySelector(`.re-day[data-day="${day}"]`) : null;
+    if (target) { target.scrollIntoView({ block: "center" }); if (target.focus) target.focus(); } else { const h = $("#re-h"); if (h) h.focus(); }
+    loadOptimize();
+  }
+  function closeRouteEditor() {
+    const el = $("#re-panel");
+    RE.open = false;
+    if (RE.map) { RE.map.remove(); RE.map = null; RE.layer = null; }
+    const tst = $("#toast"); if (tst && el && el.contains(tst)) document.body.appendChild(tst);
+    if (el) { if (el.close && el.open) el.close(); else el.removeAttribute("open"); el.innerHTML = ""; }
+    document.body.classList.remove("re-open");
+    setTimeout(refitMap, 30); // 배경 지도는 건드리지 않고 크기만 다시 맞춘다
+    if (RE.last && RE.last.isConnected) RE.last.focus();
+  }
+  function reLoadFromPlan() {
+    RE.days = reSnapshot(state.plan);
+    RE.orig = JSON.parse(JSON.stringify(RE.days));
+    RE.origPos = {};
+    RE.orig.forEach((d) => d.items.forEach((it, i) => { RE.origPos[it.pid] = { day: d.day, i }; }));
+    RE.dirty = {};
+  }
+  /* 편집기 전용 미니 지도 (열 때 만들고 닫을 때 없앤다) */
+  function initReMap() {
+    const box = $("#re-map");
+    if (!box || !window.L || RE.map) return;
+    const lay = MAPL.list.find((l) => l.id === MAPL.cur) || OSM_LAYER;
+    RE.map = L.map(box, { zoomControl: true, attributionControl: true });
+    L.tileLayer(lay.url, { attribution: lay.attribution || "", maxZoom: lay.max_zoom || 19, minZoom: lay.min_zoom || 0, subdomains: "abc" }).addTo(RE.map);
+    if (lay.overlay_url) L.tileLayer(lay.overlay_url, { maxZoom: lay.max_zoom || 19, subdomains: "abc" }).addTo(RE.map);
+    RE.layer = L.layerGroup().addTo(RE.map);
+    RE.map.setView([35.5, 127.5], 8);
+    setTimeout(() => { if (RE.map) { RE.map.invalidateSize(); drawReMap(true); } }, 80);
+  }
+  function drawReMap(fit) {
+    if (!RE.map || !RE.layer) return;
+    RE.layer.clearLayers();
+    const byPid = {};
+    RE.days.forEach((d) => d.items.forEach((it) => { byPid[it.pid] = it; }));
+    const order = RE.dragOrder || RE.days.map((d) => ({ day: d.day, pids: d.items.map((x) => x.pid) }));
+    const all = [];
+    order.forEach((o) => {
+      const color = dayColor(o.day);
+      const hot = RE.hotDay && RE.hotDay === o.day;
+      const pts = [];
+      o.pids.forEach((pid, i) => {
+        const it = byPid[pid];
+        if (!it || it.lat == null) return;
+        const c = [Number(it.lat), Number(it.lng)];
+        pts.push(c);
+        const kind = it.type === "meal" ? "meal" : it.type === "stay" ? "stay" : "place";
+        const inner = kind === "meal" ? ico("ico-fork") : kind === "stay" ? "숙" : String(i + 1);
+        const size = kind === "meal" ? 20 : 26;
+        L.marker(c, { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk ${kind}" style="--c:${color}">${inner}</span>`, iconSize: [size, size], iconAnchor: [size / 2, size / 2] }), title: `${o.day}일차 ${i + 1}. ${it.name}`, keyboard: false }).addTo(RE.layer);
+      });
+      if (pts.length > 1) L.polyline(pts, { color, weight: hot ? 5 : 3, opacity: hot ? 1 : 0.8, dashArray: "6 7", interactive: false }).addTo(RE.layer);
+      all.push(...pts);
+    });
+    const hp = homePoints(state.plan);
+    [hp.st, hp.en].forEach((pt, k) => { if (pt && pt.lat != null && !(k === 1 && hp.st && hp.st.lat === pt.lat && hp.st.lng === pt.lng)) L.marker([Number(pt.lat), Number(pt.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk home" style="--c:${dayColor(1)}">${ico("ico-home")}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), title: pt.name, keyboard: false }).addTo(RE.layer); });
+    if (fit && all.length) RE.map.fitBounds(L.latLngBounds(all), { padding: [24, 24], maxZoom: 14, animate: false });
+  }
+  const reDirtyDays = () => Object.keys(RE.dirty).map(Number).sort((a, b) => a - b);
+  function reIcon(it) { return it.type === "meal" ? ico("ico-fork") : it.type === "stay" ? `<span class="re-k">숙</span>` : ""; }
+  function renderRouteEditor() {
+    const el = $("#re-content");
+    if (!el || !RE.open) return;
+    const fk = document.activeElement && el.contains(document.activeElement) ? (document.activeElement.dataset.k || null) : null;
+    const hp = homePoints(state.plan);
+    const nDays = RE.days.length;
+    const dirty = reDirtyDays();
+    const dayOpts = (cur) => RE.days.filter((x) => x.day !== cur).map((x) => `<option value="${x.day}">${x.day}일차로</option>`).join("");
+    const days = RE.days.map((d, di) => {
+      const color = dayColor(d.day);
+      const isDirty = !!RE.dirty[d.day];
+      let n = 0;
+      const rows = d.items.map((it, i) => {
+        const pinned = it.type === "stay";
+        if (it.type !== "meal") n += 0;
+        const op = RE.origPos[it.pid];
+        const mealHint = it.type === "meal" && op && (op.day !== d.day || Math.abs(op.i - i) >= 2);
+        const travel = !isDirty && it.inMin != null && i > 0 ? `<li class="re-gap" aria-hidden="true">↓ 약 ${fmtMin(it.inMin)}</li>` : "";
+        return `${travel}<li class="re-item${pinned ? " pinned" : ""}${it.type === "meal" ? " meal" : ""}" data-pid="${esc(it.pid)}" data-day="${d.day}">
+          <button type="button" class="re-grip" data-k="grip-${esc(it.pid)}" ${pinned ? "disabled aria-disabled=\"true\" title=\"숙소는 그날 마지막에 고정돼요\"" : `aria-label="${esc(it.name)} 옮기기. 위아래 화살표로 순서를 바꿔요" title="끌어서 옮기기 · ↑↓ 키"`}>${ico("ico-grip")}</button>
+          <span class="re-num" style="--c:${color}">${i + 1}</span>
+          <span class="re-name">${reIcon(it)}<b>${esc(it.name)}</b>${mealHint ? `<small class="re-hint">식사 시간이 바뀔 수 있어요</small>` : ""}</span>
+          <span class="re-time">${isDirty ? "" : esc(it.arrive)}</span>
+          ${pinned || nDays < 2 ? "" : `<label class="sr" for="rs-${esc(it.pid)}">${esc(it.name)} 다른 날로</label><select id="rs-${esc(it.pid)}" class="sel xs re-day-sel" data-pid="${esc(it.pid)}" data-k="sel-${esc(it.pid)}"><option value="">다른 날로</option>${dayOpts(d.day)}</select>`}
+        </li>`;
+      }).join("");
+      const startRow = di === 0 && hp.st ? `<li class="re-item home pinned"><span class="re-grip-ph" aria-hidden="true">${ico("ico-home")}</span><span class="re-name"><b>${esc(hp.st.name)} 출발</b></span><span class="re-time">${esc(hp.st.time || "")}</span></li>` : "";
+      const endRow = di === nDays - 1 && hp.en ? `<li class="re-item home pinned"><span class="re-grip-ph" aria-hidden="true">${ico("ico-home")}</span><span class="re-name"><b>${esc(hp.en.name)} 도착</b></span><span class="re-time">${esc(hp.en.time || "")}</span></li>` : "";
+      return `<section class="re-day${RE.focusDay === d.day ? " focus" : ""}" data-day="${d.day}" style="--day:${color}">
+        <h3><span class="day-no"><b>${d.day}</b>일차</span><span class="re-dh">${fmtDate(d.date)}</span>
+          ${isDirty ? `<span class="badge user">순서 바뀜 · 저장하면 다시 계산</span>` : `<span class="muted">이동 약 ${fmtMin(d.travel)} · ${esc(km(d.dist || 0))}</span>`}</h3>
+        <ol class="re-list" data-day="${d.day}">${startRow}${rows || `<li class="re-empty">여기로 끌어 놓을 수 있어요</li>`}${endRow}</ol></section>`;
+    }).join("");
+    el.innerHTML = `<div class="re-head"><h2 id="re-h" tabindex="-1">동선 편집</h2>
+        <p class="muted">${ico("ico-grip")} 손잡이를 끌어 다른 날로도 옮길 수 있어요(↑↓ 키·‘다른 날로’도 돼요). 저장하면 이동시간을 다시 계산해요.</p>
+        <div class="re-head-act"><button type="button" class="btn sm ghost" data-act="re-undo" data-k="undo"${state.undoCount > 0 && !state.busy ? "" : " disabled"} title="서버에 적용된 직전 수정을 되돌려요">${ico("ico-undo")}되돌리기${state.undoCount ? ` (${state.undoCount})` : ""}</button>
+        <button type="button" class="x" data-act="re-close" data-k="close" aria-label="닫기 (Esc)">×</button></div></div>
+      <div class="re-body">
+        <div class="re-opt" aria-live="polite">${optimizeHtml()}</div>
+        <div class="re-days">${days}</div>
+      </div>
+      <div class="re-foot">
+        ${dirty.length ? `<button type="button" class="btn sm ghost" data-act="re-reset" data-k="reset">처음 순서로</button>` : ""}
+        <span class="re-foot-sp"></span>
+        <button type="button" class="btn sm ghost" data-act="re-cancel" data-k="cancel">취소</button>
+        <button type="button" class="btn sm primary" data-act="re-save" data-k="save"${dirty.length && !state.busy ? "" : " disabled"}>${dirty.length ? `저장 (${dirty.map((x) => x + "일차").join("·")} 변경)` : "저장"}</button></div>`;
+    if (fk) { const f = el.querySelector(`[data-k="${cssEsc(fk)}"]`); if (f) f.focus(); }
+  }
+  function optimizeHtml() {
+    const O = RE.opt;
+    const multi = RE.days.length > 1;
+    const seg = multi ? `<div class="mode-seg re-scope" role="group" aria-label="최적화 범위">
+        <button type="button" data-act="re-scope" data-v="all" data-k="scope-all" aria-pressed="${RE.scope === "all"}">전체 일정</button>
+        <button type="button" data-act="re-scope" data-v="day" data-k="scope-day" aria-pressed="${RE.scope !== "all"}">일별</button></div>` : "";
+    const head = (right) => `<div class="re-opt-h"><b>${ico("ico-route")}동선 최적화</b>${seg}${right}</div>`;
+    if (RE.optErr) return head("") + `<p class="re-opt-msg">${esc(RE.optErr)}</p>`;
+    if (!O) return head("") + `<p class="re-opt-msg">동선 최적화 결과를 계산하는 중이에요…</p>`;
+    const total = Number(O.total_saved_min) || 0;
+    const chip = (x) => x.from_day ? ` <span class="re-from" style="--c:${dayColor(x.from_day)}">←${esc(x.from_day)}일차</span>` : "";
+    const ord = (arr) => (arr || []).map((x, i) => `<li>${i + 1}. ${esc(x.name)}${chip(x)}</li>`).join("");
+    if (O.scope === "all") {
+      const tb = Number(O.total_before_min) || 0, ta = Number(O.total_after_min) || 0;
+      const saved = Math.max(0, tb - ta) || total;
+      const moved = O.moved || [];
+      return head("") + `<p class="re-opt-total">전체 일정 <b>${fmtMin(tb)} · ${esc(km(O.total_before_km))}</b> → <b>${fmtMin(ta)} · ${esc(km(O.total_after_km))}</b> ${saved > 0 ? `<b class="re-save">(−${fmtMin(saved)})</b>` : `<span class="badge ok">이미 최적이에요</span>`}</p>
+        ${moved.length ? `<div class="re-moved"><p class="re-moved-h">날짜가 바뀌는 곳</p><ul>${moved.map((m) => `<li><b>${esc(m.name)}</b> <span class="re-dchip" style="--c:${dayColor(m.from_day)}">${esc(m.from_day)}일차</span> → <span class="re-dchip" style="--c:${dayColor(m.to_day)}">${esc(m.to_day)}일차</span></li>`).join("")}</ul></div>` : ""}
+        <details class="re-cmp" open><summary>날짜별 새 순서</summary><div class="re-cmp-days">${(O.days || []).map((d) => `<div style="--day:${dayColor(d.day)}"><p><span class="day-no"><b>${esc(d.day)}</b>일차</span> ${fmtMin(d.before_min)} → ${fmtMin(d.after_min)}</p><ol>${ord(d.after)}</ol></div>`).join("")}</div></details>
+        <div class="re-opt-go"><button type="button" class="btn sm primary" data-act="re-opt-scope-all" data-k="opt-scope-all"${saved > 0 && !state.busy ? "" : " disabled"}>전체 일정에 적용</button></div>
+        ${O.note ? `<p class="re-opt-msg">${esc(O.note)}</p>` : ""}`;
+    }
+    const fell = RE.scope === "all" && O.scope && O.scope !== "all";
+    return head(`<span>${total > 0 ? `날짜는 그대로, 약 <b>${fmtMin(total)}</b> 줄일 수 있어요` : "모든 날이 이미 최적이에요"}</span>
+        <button type="button" class="btn sm primary" data-act="re-opt-all" data-k="opt-all"${total > 0 && !state.busy ? "" : " disabled"}>전체 적용</button>`)
+      + (fell ? `<p class="re-opt-msg">날짜를 옮겨도 더 나아지지 않아 날짜별 순서만 정리했어요.</p>` : "") + `
+      <ul class="re-opt-days">${(O.days || []).map((d) => {
+        const saved = Number(d.saved_min) || 0;
+        return `<li class="re-opt-day" style="--day:${dayColor(d.day)}"><span class="day-no"><b>${esc(d.day)}</b>일차</span>
+          <span class="re-opt-nums">지금 ${fmtMin(d.before_min)} · ${esc(km(d.before_km))} → 최적화 ${fmtMin(d.after_min)} · ${esc(km(d.after_km))} ${saved > 0 ? `<b class="re-save">(−${fmtMin(saved)})</b>` : `<span class="badge ok">이미 최적이에요</span>`}</span>
+          ${saved > 0 ? `<button type="button" class="btn xs ghost" data-act="re-opt-day" data-day="${esc(d.day)}" data-k="opt-${esc(d.day)}"${state.busy ? " disabled" : ""}>이 날 적용</button>` : ""}
+          ${d.user_ordered && saved > 0 ? `<p class="re-opt-note">직접 정한 순서예요 — 적용하면 최적화 순서로 바뀌어요</p>` : ""}
+          ${saved > 0 ? `<details class="re-cmp"><summary>순서 비교</summary><div class="re-cmp-b"><div><p>지금</p><ol>${ord(d.before)}</ol></div><div><p>최적화</p><ol>${ord(d.after)}</ol></div></div></details>` : ""}</li>`;
+      }).join("")}</ul>${O.note ? `<p class="re-opt-msg">${esc(O.note)}</p>` : ""}`;
+  }
+  async function loadOptimize() {
+    RE.opt = null; RE.optErr = "";
+    let j = null;
+    try {
+      const r = await fetch(DEMO ? "/static/sample_optimize.json" : `/route/optimize?session_id=${encodeURIComponent(state.sessionId || "")}&scope=${RE.scope === "all" ? "all" : "day"}`);
+      j = await r.json().catch(() => null);
+      if (!r.ok || !j) throw new Error((j && (j.answer || j.message)) || "");
+    } catch (e) { RE.optErr = (e && e.message) || "동선 최적화 결과를 불러오지 못했어요. 끌어서 직접 바꿀 수는 있어요."; }
+    if (DEMO && j && RE.scope === "all" && j.all) j = j.all;
+    RE.opt = j;
+    const box = $("#re-panel .re-opt");
+    if (box && RE.open) box.innerHTML = optimizeHtml();
+  }
+  function applyOptimize(day, scope) {
+    const edit = { op: "optimize" };
+    if (scope === "all") edit.scope = "all";
+    else if (day) edit.day = day;
+    closeRouteEditor();
+    send({ question: scope === "all" ? "전체 일정 동선 최적화(날짜 이동 포함)" : day ? `${day}일차 동선 최적화` : "날짜별 동선 최적화", action: "edit", edit }, "edit");
+  }
+  function saveRouteEditor() {
+    const dirty = reDirtyDays();
+    if (!dirty.length) return;
+    const days = dirty.map((n) => ({ day: n, place_ids: (RE.days.find((d) => d.day === n) || { items: [] }).items.map((it) => it.pid) }));
+    closeRouteEditor();
+    send({ question: `[동선 편집] ${dirty.map((x) => x + "일차").join("·")} 순서 바꾸기`, action: "edit", edit: { op: "order", days } }, "edit");
+  }
+  /* RE 상태 조작 */
+  function reFind(pid) { for (const d of RE.days) { const i = d.items.findIndex((x) => x.pid === pid); if (i >= 0) return { d, i }; } return null; }
+  function reInsertAt(d, it, idx) {
+    // 숙소는 늘 마지막
+    const stayIdx = d.items.findIndex((x) => x.type === "stay");
+    if (it.type !== "stay" && stayIdx >= 0 && idx > stayIdx) idx = stayIdx;
+    d.items.splice(Math.max(0, Math.min(idx, d.items.length)), 0, it);
+  }
+  function reMove(pid, toDay, toIdx) {
+    const f = reFind(pid);
+    if (!f || f.d.items[f.i].type === "stay") return;
+    const it = f.d.items.splice(f.i, 1)[0];
+    const td = RE.days.find((d) => d.day === toDay) || f.d;
+    if (td === f.d && toIdx > f.i) toIdx -= 0;
+    reInsertAt(td, it, toIdx);
+    RE.dirty[f.d.day] = true; RE.dirty[td.day] = true;
+    // 처음 순서와 같아지면 '바뀜' 해제
+    RE.days.forEach((d) => { const o = RE.orig.find((x) => x.day === d.day); if (o && o.items.map((x) => x.pid).join() === d.items.map((x) => x.pid).join()) delete RE.dirty[d.day]; });
+  }
+  function reMoveToDay(pid, day) {
+    const td = RE.days.find((d) => d.day === day);
+    if (!td) return;
+    reMove(pid, day, td.items.length);
+    renderRouteEditor(); previewRoute();
+    const g = $(`#re-panel .re-item[data-pid="${cssEsc(pid)}"] .re-grip`); if (g) { g.focus(); g.scrollIntoView({ block: "nearest" }); }
+    toast(`${day}일차로 옮겼어요. 저장하면 반영돼요.`);
+  }
+  function reKeydown(e) {
+    const g = e.target.closest && e.target.closest(".re-grip");
+    if (e.key === "Escape") { e.preventDefault(); closeRouteEditor(); return; }
+    if (!g || (e.key !== "ArrowUp" && e.key !== "ArrowDown")) return;
+    e.preventDefault();
+    const pid = g.closest(".re-item").dataset.pid;
+    const f = reFind(pid);
+    if (!f) return;
+    const ni = f.i + (e.key === "ArrowUp" ? -1 : 1);
+    if (ni < 0 || ni >= f.d.items.length || f.d.items[ni].type === "stay") return;
+    reMove(pid, f.d.day, ni);
+    renderRouteEditor(); previewRoute();
+    const ng = $(`#re-panel .re-item[data-pid="${cssEsc(pid)}"] .re-grip`); if (ng) ng.focus();
+  }
+  /* 끌어서 놓기 (pointer events) */
+  let DRG = null;
+  function reDragStart(e) {
+    const g = e.target.closest(".re-grip");
+    if (!g || g.disabled || e.button > 0) return;
+    const row = g.closest(".re-item");
+    e.preventDefault();
+    const r = row.getBoundingClientRect();
+    const ghost = row.cloneNode(true);
+    ghost.classList.add("re-ghost"); ghost.style.width = r.width + "px"; ghost.style.left = r.left + "px"; ghost.style.top = r.top + "px";
+    $("#re-panel").appendChild(ghost);
+    row.classList.add("re-placeholder");
+    DRG = { row, ghost, dy: e.clientY - r.top, pid: row.dataset.pid, raf: 0 };
+    document.addEventListener("pointermove", reDragMove);
+    document.addEventListener("pointerup", reDragEnd, { once: true });
+    document.addEventListener("pointercancel", reDragEnd, { once: true });
+  }
+  function reDragMove(e) {
+    if (!DRG) return;
+    DRG.ghost.style.top = (e.clientY - DRG.dy) + "px";
+    const under = document.elementFromPoint(e.clientX, e.clientY);
+    const list = under && under.closest && under.closest(".re-list");
+    if (list) {
+      const items = $$(".re-item:not(.re-placeholder)", list).filter((x) => !x.classList.contains("home"));
+      let before = null;
+      for (const it of items) { const rr = it.getBoundingClientRect(); if (e.clientY < rr.top + rr.height / 2) { before = it; break; } }
+      const stay = items.find((x) => x.classList.contains("pinned"));
+      if (!before && stay) before = stay;
+      if (before && before.classList.contains("pinned") && !before.classList.contains("home")) { /* 숙소 앞 */ }
+      const endHome = $(".re-item.home:last-child", list);
+      if (before) list.insertBefore(DRG.row, before);
+      else if (endHome && endHome !== list.firstElementChild) list.insertBefore(DRG.row, endHome);
+      else list.appendChild(DRG.row);
+      const empty = $(".re-empty", list); if (empty) empty.remove();
+      if (!DRG.raf) DRG.raf = requestAnimationFrame(() => { DRG && (DRG.raf = 0); previewFromDom(Number(list.dataset.day)); });
+    }
+    const body = $("#re-panel .re-body");
+    if (body) { const br = body.getBoundingClientRect(); if (e.clientY < br.top + 40) body.scrollTop -= 12; else if (e.clientY > br.bottom - 40) body.scrollTop += 12; }
+  }
+  function domOrder() {
+    return $$("#re-panel .re-list").map((l) => ({ day: Number(l.dataset.day), pids: $$(".re-item[data-pid]", l).map((x) => x.dataset.pid) }));
+  }
+  function applyDomOrder() {
+    const byPid = {};
+    RE.days.forEach((d) => d.items.forEach((it) => { byPid[it.pid] = it; }));
+    domOrder().forEach(({ day, pids }) => {
+      const d = RE.days.find((x) => x.day === day);
+      if (!d) return;
+      const items = pids.map((p) => byPid[p]).filter(Boolean);
+      const stays = items.filter((x) => x.type === "stay");
+      d.items = items.filter((x) => x.type !== "stay").concat(stays);
+    });
+    RE.days.forEach((d) => { const o = RE.orig.find((x) => x.day === d.day); if (o && o.items.map((x) => x.pid).join() !== d.items.map((x) => x.pid).join()) RE.dirty[d.day] = true; else delete RE.dirty[d.day]; });
+  }
+  function reDragEnd() {
+    document.removeEventListener("pointermove", reDragMove);
+    if (!DRG) return;
+    const pid = DRG.pid;
+    DRG.ghost.remove(); DRG.row.classList.remove("re-placeholder");
+    DRG = null;
+    applyDomOrder();
+    renderRouteEditor(); previewRoute();
+    const g = $(`#re-panel .re-item[data-pid="${cssEsc(pid)}"] .re-grip`); if (g) g.focus();
+  }
+  /* 지도 미리보기: 편집 중인 순서로 번호와 선을 다시 그린다 */
+  function previewPlan(order) {
+    const plan = JSON.parse(JSON.stringify(state.plan));
+    const P = placeIndex(state.plan);
+    const all = {};
+    (state.plan.itinerary || []).forEach((d) => (d.stops || []).forEach((s) => { if (s.place_id != null) all[String(s.place_id)] = s; }));
+    plan.itinerary.forEach((d) => {
+      const o = order.find((x) => x.day === d.day);
+      if (!o) return;
+      d.stops = o.pids.map((pid, i) => Object.assign({}, all[pid], { order: i + 1 }));
+      d.legs = [];
+    });
+    return plan;
+  }
+  function previewFromDom(day) {
+    if (!RE.open) return;
+    RE.dragOrder = domOrder(); RE.hotDay = day || null;
+    drawReMap(false);
+  }
+  function previewRoute() {
+    if (!RE.open) return;
+    RE.dragOrder = null; RE.hotDay = null;
+    drawReMap(false);
+  }
+
   /* ───────── 준비물 체크리스트 ───────── */
   function packItems(P) {
     if (!P) return [];
@@ -1967,6 +2601,8 @@
   }
   function onPackChange(e) {
     const t = e.target;
+    if (t.classList && t.classList.contains("re-day-sel")) { if (t.value) reMoveToDay(t.dataset.pid, Number(t.value)); return; }
+    if (t.classList && t.classList.contains("move-day-sel")) { if (t.value) tlMoveToDay(t.dataset.pid, Number(t.value)); return; }
     if (t.classList && t.classList.contains("ps-far-day")) { const b = t.parentNode.querySelector('[data-act="ps-add-far"]'); if (b) b.textContent = t.value ? `포함할게요(${t.value}일차)` : "포함할게요"; return; }
     if (!t.dataset || !t.dataset.pk) return;
     const it = packItems(state.plan && state.plan.packing).find((x) => String(x.id) === t.dataset.pk);
@@ -2067,12 +2703,15 @@
           <button type="button" class="btn sm ghost" data-act="share-link">링크 공유</button>
           <button type="button" class="btn sm ghost" data-act="print">인쇄·PDF</button>
           ${pid ? `<a class="btn sm ghost" href="/plan/${encodeURIComponent(pid)}.docx" download>Word(.docx)</a><a class="btn sm ghost" href="/plan/${encodeURIComponent(pid)}.ics" download>캘린더(.ics)</a>` : ""}
-        </nav>${draft ? `<p class="muted small">아직 확정 전 초안이에요. 상담 화면에서 확정하면 공유 링크가 고정돼요.</p>` : ""}`;
+        </nav>${draft ? `<p class="muted small">아직 확정 전 초안이에요. 상담 화면에서 확정하면 공유 링크가 고정돼요.</p>` : ""}
+        ${state.owner && state.mode !== "edit" ? `<button type="button" class="btn sm ghost" data-act="mode" data-v="edit">✏️ 이 계획 고치기</button>` : ""}${reconfirmBanner()}`;
     } else if (READ_ONLY) {
       const id = esc(BOOT.planId);
       act = `<nav class="exports" aria-label="공유"><button type="button" class="btn sm ghost" data-act="share-link">링크 공유</button></nav>` + exportLinks({ html_url: `/plan/${id}.html`, docx_url: `/plan/${id}.docx`, print_url: `/plan/${id}?print=1`, ics_url: `/plan/${id}.ics`, report_url: `/plan/${id}/report` });
-    } else if (state.planStatus === "확정" && state.exports) {
+    } else if (state.planStatus === "확정" && state.exports && !state.needsReconfirm) {
       act = `<p class="state ok"><i class="dot ok"></i>확정됐어요. 원하는 형식으로 가져가세요.</p>${exportLinks(state.exports)}`;
+    } else if (state.needsReconfirm) {
+      act = reconfirmBanner() + (state.exports ? `<p class="muted small">지금 공유 링크(확정 당시 내용)</p>${exportLinks(state.exports)}` : "");
     } else if (state.planStatus === "승인 대기") {
       const pg = getProgress();
       const full = Number(pg.percent) >= 100;
@@ -2218,8 +2857,8 @@
     const p = s.place_id != null ? P.get(String(s.place_id)) : null;
     return p && p.lat != null ? [Number(p.lat), Number(p.lng)] : null;
   }
-  function renderMap() {
-    const plan = state.plan;
+  function renderMap(override) {
+    const plan = override || state.plan;
     const tabs = $("#map-tabs");
     if (!plan || !(plan.itinerary || []).length) { if (tabs) tabs.innerHTML = ""; return; }
     if (!window.L) { const e = $("#map-empty"); if (e) { e.hidden = false; e.querySelector("p").textContent = "지도를 불러오지 못했어요. 인터넷 연결을 확인해 주세요."; } return; }
@@ -2266,15 +2905,44 @@
     // 자차 도로 경로(OSRM): 실선. '전체' 화면 맞춤에는 넣지 않고 '가는 길 보기'로 따로 맞춘다
     if (M.route) { map.removeLayer(M.route); M.route = null; M.routeBounds = null; }
     const tg = plan.transport_guide;
-    if (isDrive(tg) && Array.isArray(tg.route_path) && tg.route_path.length > 1) {
-      const rp = tg.route_path.map((q) => [Number(q[0]), Number(q[1])]).filter((q) => isFinite(q[0]) && isFinite(q[1]));
-      M.route = L.layerGroup();
-      L.polyline(rp, { color: dayColor(1), weight: 3, opacity: 0.6, interactive: false }).addTo(M.route);
-      L.marker(rp[0], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk home" style="--c:${dayColor(1)}">${ico("ico-home")}</span>`, iconSize: [24, 24], iconAnchor: [12, 12] }), title: "출발지", alt: "출발지" }).addTo(M.route);
-      M.routeBounds = L.latLngBounds(rp);
-    } else state.routeFit = false;
+    const rp = isDrive(tg) && Array.isArray(tg.route_path) && tg.route_path.length > 1
+      ? tg.route_path.map((q) => [Number(q[0]), Number(q[1])]).filter((q) => isFinite(q[0]) && isFinite(q[1])) : null;
+    const hp = homePoints(plan);
+    const its = plan.itinerary || [];
+    const firstC = (() => { const d0 = its[0]; for (const st of (d0 && d0.stops) || []) { const c = coordOf(st, P); if (c) return c; } return null; })();
+    const lastC = (() => { const dl = its[its.length - 1]; const ss = ((dl && dl.stops) || []).slice().reverse(); for (const st of ss) { const c = coordOf(st, P); if (c) return c; } return null; })();
+    const rg = L.layerGroup(); const rb = [];
+    const homeMk = (pt, key, color, label) => {
+      const m = L.marker([Number(pt.lat), Number(pt.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk home" style="--c:${color}">${ico("ico-home")}</span>`, iconSize: [26, 26], iconAnchor: [13, 13] }), title: label, alt: label, riseOnHover: true }).addTo(rg);
+      m.on("click", () => focusCard(`stop-${key}`)); M.markers[key] = m; return m;
+    };
+    const sPt = hp.st && hp.st.lat != null ? [Number(hp.st.lat), Number(hp.st.lng)] : (rp ? rp[0] : null);
+    if (sPt) {
+      homeMk({ lat: sPt[0], lng: sPt[1] }, "home-s", dayColor(1), `출발 · ${(hp.st && hp.st.name) || "출발지"}`); rb.push(sPt);
+      if (rp) { L.polyline(rp, { color: dayColor(1), weight: 3, opacity: 0.6, interactive: false }).addTo(rg); rb.push(...rp); }
+      else if (firstC) { L.polyline([sPt, firstC], { color: dayColor(1), weight: 2, opacity: 0.7, dashArray: "2 8", interactive: false }).addTo(rg); rb.push(firstC); }
+    }
+    if (hp.en && hp.en.lat != null) {
+      const ePt = [Number(hp.en.lat), Number(hp.en.lng)];
+      const same = sPt && Math.abs(sPt[0] - ePt[0]) < 0.003 && Math.abs(sPt[1] - ePt[1]) < 0.003;
+      const lastColor = dayColor(its.length ? its[its.length - 1].day : 1);
+      if (same) M.markers["home-e"] = M.markers["home-s"];
+      else homeMk(hp.en, "home-e", lastColor, `도착 · ${hp.en.name || "도착지"}`);
+      rb.push(ePt);
+      if (!(rp && same) && lastC) { L.polyline([lastC, ePt], { color: lastColor, weight: 2, opacity: 0.7, dashArray: "2 8", interactive: false }).addTo(rg); rb.push(lastC); }
+    }
+    if (rb.length) { M.route = rg; M.routeBounds = L.latLngBounds(rb); } else state.routeFit = false;
+    if (M.roadEv) { map.removeLayer(M.roadEv); M.roadEv = null; }
+    if (isDrive(tg) && ((tg.road_events || []).length || (tg.road_cautions || []).length)) {
+      M.roadEv = L.layerGroup();
+      (tg.road_events || []).concat((tg.road_cautions || []).map((x) => Object.assign({ caution: true }, x))).forEach((x) => {
+        if (x.lat == null || x.lng == null) return;
+        L.marker([Number(x.lat), Number(x.lng)], { icon: L.divIcon({ className: "mk-wrap", html: `<span class="mk warnmk${x.caution ? " caution" : ""}">${ico("ico-alert")}</span>`, iconSize: [20, 20], iconAnchor: [10, 10] }),
+          title: `${x.type || "알림"}${x.road ? " · " + x.road : ""}${x.message ? " — " + x.message : ""}`, keyboard: false }).addTo(M.roadEv);
+      });
+    }
     const lg = $("#map-panel .legend");
-    if (lg) lg.textContent = "점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요." + (M.route ? " 실선은 자차 도로 경로(OSRM)예요." : "");
+    if (lg) lg.textContent = "점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요." + (rp ? " 실선은 자차 도로 경로(OSRM)예요." : "") + (M.route ? " 집 모양은 출발·도착지예요." : "");
     if (state.mapDay !== "all" && !M.groups[state.mapDay]) state.mapDay = "all";
     if (tabs) {
       tabs.innerHTML = [["all", "전체"]].concat(plan.itinerary.map((d) => [String(d.day), `${d.day}일차`])).map(([v, t]) =>
@@ -2283,9 +2951,11 @@
     }
     applyMapDay();
   }
+  const lastDayNo = () => { const its = (state.plan && state.plan.itinerary) || []; return its.length ? its[its.length - 1].day : 1; };
   function applyMapDay() {
     if (!M.map) return;
-    if (M.route) { if (state.mapDay === "all" || String(state.mapDay) === "1" || state.routeFit) M.route.addTo(M.map); else M.map.removeLayer(M.route); }
+    if (M.route) { if (state.mapDay === "all" || String(state.mapDay) === "1" || String(state.mapDay) === String(lastDayNo()) || state.routeFit) M.route.addTo(M.map); else M.map.removeLayer(M.route); }
+    if (M.roadEv) { if (state.routeFit) M.roadEv.addTo(M.map); else M.map.removeLayer(M.roadEv); }
     if (state.routeFit && M.routeBounds) { fitMap(M.routeBounds); return; }
     let b = null;
     Object.entries(M.groups).forEach(([day, g]) => {
@@ -2358,7 +3028,7 @@
       entries.forEach((en) => {
         if (!en.isIntersecting) return;
         const key = en.target.id.replace(/^stop-/, "");
-        highlightMarker(key, true);
+        highlightMarker(key, key.indexOf("home") !== 0);
       });
     }, { root, rootMargin: "-40% 0px -50% 0px", threshold: 0 });
     $$("#brochure .stop").forEach((s) => io.observe(s));
@@ -2475,6 +3145,7 @@
       toast("그 계획을 찾지 못했어요. 목록에서 빼 둘게요."); Trips.forget(sid); openTrips(); return;
     }
     resetSession();
+    state.sessionId = sid; loadMode();
     S.collapsed = true;
     bubble("momo", auto ? "지난번에 보던 계획을 다시 펼쳐 놨어요." : "저장된 계획을 불러왔어요.");
     const st = j.status === "초안" ? "승인 대기" : j.status;
@@ -2571,6 +3242,42 @@
         break;
       }
       case "cctv": loadCctv(); break;
+      case "tg-more": { const blk = t.closest(".tg-block"); const on = !blk.classList.contains("show-all"); blk.classList.toggle("show-all", on); t.setAttribute("aria-expanded", String(on)); t.textContent = on ? "접기" : `더 보기 (${$$(".x-more", blk).length})`; break; }
+      case "mode": setMode(t.dataset.v); break;
+      case "undo": doUndo(); break;
+      case "reconfirm":
+        if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
+        state.reconfirming = true;
+        send({ question: "", action: "approve" }, "approve", VIEW ? "" : "수정한 계획으로 다시 확정할게요");
+        break;
+      case "near-add": {
+        if (!canEdit()) return;
+        if (DEMO) { toast("데모 모드에서는 바뀌지 않아요"); return; }
+        toast(`‘${t.dataset.name}’을 ${t.dataset.day}일차 ‘${t.dataset.afterName}’ 바로 다음에 넣는 중…`, 60000);
+        state.focusAfter = t.dataset.pid;
+        send({ question: `${t.dataset.afterName} 다음에 ${t.dataset.name} 추가`, action: "edit", edit: { op: "add", place_id: t.dataset.pid, after: t.dataset.after } }, "edit");
+        break;
+      }
+      case "re-open": openRouteEditor(t.dataset.day ? Number(t.dataset.day) : null, t.dataset.focus || null); break;
+      case "re-close": case "re-cancel": closeRouteEditor(); break;
+      case "re-maptoggle": {
+        const box = $("#re-mapbox"), open = box.hidden;
+        box.hidden = !open; t.setAttribute("aria-expanded", String(open));
+        if (open) setTimeout(() => { if (RE.map) { RE.map.invalidateSize(); drawReMap(true); } }, 40);
+        break;
+      }
+      case "re-undo": (async () => {
+        if (reDirtyDays().length) toast("저장하지 않은 순서는 지우고 되돌려요");
+        await doUndo();
+        if (RE.open) { reLoadFromPlan(); renderRouteEditor(); previewRoute(); drawReMap(true); loadOptimize(); }
+      })(); break;
+      case "re-save": saveRouteEditor(); break;
+      case "re-opt-day": applyOptimize(Number(t.dataset.day)); break;
+      case "re-opt-all": applyOptimize(null); break;
+      case "re-opt-scope-all": applyOptimize(null, "all"); break;
+      case "re-scope": { RE.scope = t.dataset.v; const box = $("#re-panel .re-opt"); if (box) box.innerHTML = optimizeHtml(); const f = $(`#re-panel [data-k="scope-${RE.scope}"]`); if (f) f.focus(); loadOptimize(); break; }
+      case "tl-moveday": tlMoveToDay(t.dataset.pid, Number(t.dataset.day)); break;
+      case "re-reset": { RE.days = JSON.parse(JSON.stringify(RE.orig)); RE.dirty = {}; renderRouteEditor(); previewRoute(); break; }
       case "map-layer-menu": { const c = $("#map-panel .map-ctrl"); c.dataset.open = c.dataset.open === "1" ? "" : "1"; renderMapCtrl(); const f = $("#mc-menu [aria-checked=true]"); if (f) f.focus(); break; }
       case "map-layer": { const c = $("#map-panel .map-ctrl"); c.dataset.open = ""; MAPL.failed[t.dataset.id] = false; setBaseLayer(t.dataset.id); const b = $("#map-panel .mc-layer .mc-btn"); if (b) b.focus(); break; }
       case "map-full": toggleMapFull(); break;
@@ -2849,6 +3556,8 @@
   function initReadOnly(payload) {
     state.plan = payload.plan || legacyToPlan(payload);
     state.view = payload;
+    if (payload.needs_reconfirm != null) state.needsReconfirm = !!payload.needs_reconfirm;
+    if (payload.undo_count != null) state.undoCount = Number(payload.undo_count) || 0;
     state.planStatus = VIEW && !payload.plan_id ? "승인 대기" : "확정";
     if (payload.session_id) state.sessionId = payload.session_id;
     if (payload.draft_version) state.draftVersion = payload.draft_version;
@@ -2866,6 +3575,21 @@
     renderSide();
     if (!VIEW) loadExpenses();
     if (PRINT) printWhenReady();
+    // 이 브라우저가 계획 주인이면(내 여행 계획 목록에 있으면) /view 에서 바로 고칠 수 있다
+    if (VIEW && !DEMO_VIEW && payload.session_id && Trips.list().indexOf(payload.session_id) >= 0 && !PRINT) {
+      state.owner = true;
+      loadMode();
+      fetch("/trips/" + encodeURIComponent(payload.session_id)).then((r) => (r.ok ? r.json() : null)).then((j) => {
+        if (!j) return;
+        if (j.draft_version) state.draftVersion = j.draft_version;
+        if ("needs_reconfirm" in j) state.needsReconfirm = !!j.needs_reconfirm;
+        if (j.undo_count != null) state.undoCount = Number(j.undo_count) || 0;
+        if (j.plan_id) state.view.plan_id = j.plan_id;
+        if (j.status === "확정") state.planStatus = "확정";
+        renderBrochure({}); renderSide();
+      }).catch(() => {});
+      renderBrochure({}); renderSide();
+    }
   }
 
   /* ───────── 시작 ───────── */
@@ -2889,6 +3613,8 @@
     document.addEventListener("scroll", () => { if (TP.trigger) { if (TP.trigger.isConnected) tpPlace(); else tpClose(false); } }, true);
 
     document.addEventListener("change", onPackChange);
+    document.addEventListener("pointerdown", tlPointerDown);
+    document.addEventListener("keydown", tlKeydown);
     document.addEventListener("keydown", (e) => {
       if (e.key !== "Escape") return;
       const mc = $("#map-panel .map-ctrl");

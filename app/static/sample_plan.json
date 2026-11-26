@@ -217,6 +217,20 @@
    "saved_min": 0,
    "user_ordered_days": [],
    "note": ""
+  },
+  "origin_point": {
+   "name": "판교동",
+   "label": "판교동 (경기도 성남시 분당구)",
+   "lat": 37.3947,
+   "lng": 127.1112,
+   "approx": true
+  },
+  "end_point": {
+   "name": "판교동",
+   "label": "판교동 (경기도 성남시 분당구)",
+   "lat": 37.3947,
+   "lng": 127.1112,
+   "approx": true
   }
  },
  "places": [
@@ -1232,7 +1246,10 @@
      "reason": "국가정원 근처 꼬막정식 한상",
      "lat": 34.9404037998,
      "lng": 127.5067937306,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "lunch",
+     "swap_hint": true,
+     "swap_kind": "식당"
     },
     {
      "order": 2,
@@ -1246,7 +1263,10 @@
      "reason": "평지 산책로가 많아 부모님과 걷기 편해요",
      "lat": 34.9286032064,
      "lng": 127.4996986297,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "place",
+     "swap_hint": false,
+     "swap_kind": "관광지"
     },
     {
      "order": 3,
@@ -1260,7 +1280,10 @@
      "reason": "갈대밭 데크길에서 겨울 철새를 볼 수 있어요",
      "lat": 34.8858016084,
      "lng": 127.5092830428,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "place",
+     "swap_hint": false,
+     "swap_kind": "관광지"
     },
     {
      "order": 4,
@@ -1274,7 +1297,10 @@
      "reason": "벌교 꼬막 전문",
      "lat": 34.9049513051,
      "lng": 127.3437302284,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "dinner",
+     "swap_hint": true,
+     "swap_kind": "식당"
     },
     {
      "order": 5,
@@ -1288,7 +1314,10 @@
      "reason": "순천 시내 숙소",
      "lat": 34.8913154256,
      "lng": 127.5077431163,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "stay",
+     "swap_hint": true,
+     "swap_kind": "숙소"
     }
    ],
    "legs": [
@@ -1394,7 +1423,25 @@
     }
    ],
    "day_distance_km": 67.1,
-   "day_travel_min": 125
+   "day_travel_min": 125,
+   "start_point": {
+    "name": "판교동",
+    "label": "판교동 (경기도 성남시 분당구)",
+    "lat": 37.3947,
+    "lng": 127.1112,
+    "approx": true,
+    "kind": "home",
+    "role": "출발",
+    "time": "07:30",
+    "leg": {
+     "mode": "KTX·SRT",
+     "label": "판교동 → 순천/구례",
+     "depart": "07:30",
+     "arrive": "11:35",
+     "duration_min": 245,
+     "estimated": true
+    }
+   }
   },
   {
    "day": 2,
@@ -1414,7 +1461,10 @@
      "reason": "국내 최대 목조건물 각황전이 있는 천년 고찰",
      "lat": 35.2554193399,
      "lng": 127.4972330786,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "place",
+     "swap_hint": false,
+     "swap_kind": "관광지"
     },
     {
      "order": 2,
@@ -1428,7 +1478,10 @@
      "reason": "화엄사 아래 산채 정식",
      "lat": 35.2379943532,
      "lng": 127.4877332751,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "lunch",
+     "swap_hint": true,
+     "swap_kind": "식당"
     },
     {
      "order": 3,
@@ -1442,7 +1495,10 @@
      "reason": "요청하신 곳 — 오산 절벽 위 암자, 섬진강 전망",
      "lat": 35.1801260865484,
      "lng": 127.480604895138,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "place",
+     "swap_hint": false,
+     "swap_kind": "관광지"
     },
     {
      "order": 4,
@@ -1456,7 +1512,10 @@
      "reason": "구례에서 저녁까지 여는 식당",
      "lat": 35.166688,
      "lng": 127.453659,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "dinner",
+     "swap_hint": true,
+     "swap_kind": "식당"
     },
     {
      "order": 5,
@@ -1470,7 +1529,10 @@
      "reason": "이틀째 숙소",
      "lat": 34.8913154256,
      "lng": 127.5077431163,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "stay",
+     "swap_hint": true,
+     "swap_kind": "숙소"
     }
    ],
    "legs": [
@@ -1596,7 +1658,10 @@
      "reason": "조선 읍성 마을, 평지 산책",
      "lat": 34.9060616206,
      "lng": 127.3417276358,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "place",
+     "swap_hint": false,
+     "swap_kind": "관광지"
     },
     {
      "order": 2,
@@ -1610,7 +1675,10 @@
      "reason": "벌교 꼬막 정식",
      "lat": 34.9049513051,
      "lng": 127.3437302284,
-     "source": "한국관광공사 TourAPI"
+     "source": "한국관광공사 TourAPI",
+     "role": "lunch",
+     "swap_hint": true,
+     "swap_kind": "식당"
     }
    ],
    "legs": [
@@ -1656,7 +1724,25 @@
     }
    ],
    "day_distance_km": 20.1,
-   "day_travel_min": 40
+   "day_travel_min": 40,
+   "end_point": {
+    "name": "판교동",
+    "label": "판교동 (경기도 성남시 분당구)",
+    "lat": 37.3947,
+    "lng": 127.1112,
+    "approx": true,
+    "kind": "home",
+    "role": "도착",
+    "time": "15:40",
+    "leg": {
+     "mode": "KTX·SRT",
+     "label": "순천/구례 → 판교동",
+     "depart": "13:00",
+     "arrive": "15:40",
+     "duration_min": 160,
+     "estimated": true
+    }
+   }
   }
  ],
  "totals": {
@@ -1667,7 +1753,7 @@
   "long_distance": {
    "outbound": {
     "mode": "KTX·SRT",
-    "label": "경기 → 순천/구례",
+    "label": "판교동 → 순천/구례",
     "depart": "07:30",
     "arrive": "11:35",
     "duration_min": 245,
@@ -1675,7 +1761,7 @@
    },
    "inbound": {
     "mode": "KTX·SRT",
-    "label": "순천/구례 → 경기 성남시 분당구 판교동",
+    "label": "순천/구례 → 판교동",
     "depart": "13:00",
     "arrive": "15:40",
     "duration_min": 160,

@@ -1538,7 +1538,9 @@ def load_trip(session_id: str) -> dict | None:
         return None
     plan = st["plan"]
     conds = plan["trip"]["checklist"]
-    out = {"session_id": session_id, "status": "확정" if st.get("plan_id") and st.get("status") == "확정" else "승인 대기",
+    confirmed = bool(st.get("plan_id")) and (st.get("status") == "확정" or (
+        st.get("draft_version") and store.confirmed_version(session_id) == st.get("draft_version")))
+    out = {"session_id": session_id, "status": "확정" if confirmed else "승인 대기",
            "stage": "refine", "answer": st.get("answer") or "", "plan": plan, "conditions": conds,
            "progress": brochure.progress(conds), "draft_version": st.get("draft_version"), "plan_id": st.get("plan_id")}
     out.update(_edit_meta(session_id, st))

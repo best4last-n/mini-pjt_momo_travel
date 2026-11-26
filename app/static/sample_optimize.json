@@ -1,0 +1,351 @@
+{
+ "days": [
+  {
+   "day": 1,
+   "date": "2026-12-12",
+   "before_min": 125,
+   "after_min": 107,
+   "saved_min": 18,
+   "before_km": 67.1,
+   "after_km": 60.7,
+   "before": [
+    {
+     "place_id": "2858584",
+     "name": "남녘들밥상",
+     "role": "lunch"
+    },
+    {
+     "place_id": "1919548",
+     "name": "순천만국가정원",
+     "role": "place"
+    },
+    {
+     "place_id": "126730",
+     "name": "순천만습지",
+     "role": "place"
+    },
+    {
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "role": "dinner"
+    },
+    {
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "role": "stay"
+    }
+   ],
+   "after": [
+    {
+     "place_id": "2858584",
+     "name": "남녘들밥상",
+     "role": "lunch"
+    },
+    {
+     "place_id": "126730",
+     "name": "순천만습지",
+     "role": "place"
+    },
+    {
+     "place_id": "1919548",
+     "name": "순천만국가정원",
+     "role": "place"
+    },
+    {
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "role": "dinner"
+    },
+    {
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "role": "stay"
+    }
+   ],
+   "user_ordered": true
+  },
+  {
+   "day": 2,
+   "date": "2026-12-13",
+   "before_min": 165,
+   "after_min": 165,
+   "saved_min": 0,
+   "before_km": 107.8,
+   "after_km": 107.8,
+   "before": [
+    {
+     "place_id": "127923",
+     "name": "화엄사",
+     "role": "place"
+    },
+    {
+     "place_id": "132899",
+     "name": "그옛날산채식당",
+     "role": "lunch"
+    },
+    {
+     "place_id": "317559",
+     "name": "사성암(구례)",
+     "role": "place"
+    },
+    {
+     "place_id": "2906086",
+     "name": "구례역대합실",
+     "role": "dinner"
+    },
+    {
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "role": "stay"
+    }
+   ],
+   "after": [
+    {
+     "place_id": "127923",
+     "name": "화엄사",
+     "role": "place"
+    },
+    {
+     "place_id": "132899",
+     "name": "그옛날산채식당",
+     "role": "lunch"
+    },
+    {
+     "place_id": "317559",
+     "name": "사성암(구례)",
+     "role": "place"
+    },
+    {
+     "place_id": "2906086",
+     "name": "구례역대합실",
+     "role": "dinner"
+    },
+    {
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "role": "stay"
+    }
+   ],
+   "user_ordered": false
+  },
+  {
+   "day": 3,
+   "date": "2026-12-14",
+   "before_min": 40,
+   "after_min": 40,
+   "saved_min": 0,
+   "before_km": 20.1,
+   "after_km": 20.1,
+   "before": [
+    {
+     "place_id": "127931",
+     "name": "순천 낙안읍성",
+     "role": "place"
+    },
+    {
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "role": "lunch"
+    }
+   ],
+   "after": [
+    {
+     "place_id": "127931",
+     "name": "순천 낙안읍성",
+     "role": "place"
+    },
+    {
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "role": "lunch"
+    }
+   ],
+   "user_ordered": false
+  }
+ ],
+ "total_saved_min": 18,
+ "note": "도로 거리는 직선거리 기반 추정이에요. 식사·숙소 시간대는 지켜요.",
+ "scope": "day",
+ "all": {
+  "scope": "all",
+  "days": [
+   {
+    "day": 1,
+    "date": "2026-12-12",
+    "before_min": 125,
+    "after_min": 107,
+    "saved_min": 18,
+    "before_km": 67.1,
+    "after_km": 60.7,
+    "before": [
+     {
+      "place_id": "2858584",
+      "name": "남녘들밥상",
+      "role": "lunch"
+     },
+     {
+      "place_id": "1919548",
+      "name": "순천만국가정원",
+      "role": "place"
+     },
+     {
+      "place_id": "126730",
+      "name": "순천만습지",
+      "role": "place"
+     },
+     {
+      "place_id": "3444492",
+      "name": "최대감벌교꼬막",
+      "role": "dinner"
+     },
+     {
+      "place_id": "2050523",
+      "name": "순천만민속한옥펜션",
+      "role": "stay"
+     }
+    ],
+    "after": [
+     {
+      "place_id": "2858584",
+      "name": "남녘들밥상",
+      "role": "lunch"
+     },
+     {
+      "place_id": "126730",
+      "name": "순천만습지",
+      "role": "place"
+     },
+     {
+      "place_id": "1919548",
+      "name": "순천만국가정원",
+      "role": "place"
+     },
+     {
+      "place_id": "3444492",
+      "name": "최대감벌교꼬막",
+      "role": "dinner"
+     },
+     {
+      "place_id": "127923",
+      "name": "화엄사",
+      "role": "place",
+      "from_day": 2
+     },
+     {
+      "place_id": "2050523",
+      "name": "순천만민속한옥펜션",
+      "role": "stay"
+     }
+    ],
+    "user_ordered": true
+   },
+   {
+    "day": 2,
+    "date": "2026-12-13",
+    "before_min": 165,
+    "after_min": 165,
+    "saved_min": 0,
+    "before_km": 107.8,
+    "after_km": 107.8,
+    "before": [
+     {
+      "place_id": "127923",
+      "name": "화엄사",
+      "role": "place"
+     },
+     {
+      "place_id": "132899",
+      "name": "그옛날산채식당",
+      "role": "lunch"
+     },
+     {
+      "place_id": "317559",
+      "name": "사성암(구례)",
+      "role": "place"
+     },
+     {
+      "place_id": "2906086",
+      "name": "구례역대합실",
+      "role": "dinner"
+     },
+     {
+      "place_id": "2050523",
+      "name": "순천만민속한옥펜션",
+      "role": "stay"
+     }
+    ],
+    "after": [
+     {
+      "place_id": "132899",
+      "name": "그옛날산채식당",
+      "role": "lunch"
+     },
+     {
+      "place_id": "317559",
+      "name": "사성암(구례)",
+      "role": "place"
+     },
+     {
+      "place_id": "2906086",
+      "name": "구례역대합실",
+      "role": "dinner"
+     },
+     {
+      "place_id": "2050523",
+      "name": "순천만민속한옥펜션",
+      "role": "stay"
+     }
+    ],
+    "user_ordered": false
+   },
+   {
+    "day": 3,
+    "date": "2026-12-14",
+    "before_min": 40,
+    "after_min": 40,
+    "saved_min": 0,
+    "before_km": 20.1,
+    "after_km": 20.1,
+    "before": [
+     {
+      "place_id": "127931",
+      "name": "순천 낙안읍성",
+      "role": "place"
+     },
+     {
+      "place_id": "3444492",
+      "name": "최대감벌교꼬막",
+      "role": "lunch"
+     }
+    ],
+    "after": [
+     {
+      "place_id": "127931",
+      "name": "순천 낙안읍성",
+      "role": "place"
+     },
+     {
+      "place_id": "3444492",
+      "name": "최대감벌교꼬막",
+      "role": "lunch"
+     }
+    ],
+    "user_ordered": false
+   }
+  ],
+  "total_saved_min": 25,
+  "total_before_min": 330,
+  "total_after_min": 305,
+  "total_before_km": 195.0,
+  "total_after_km": 187.8,
+  "moved": [
+   {
+    "place_id": "127923",
+    "name": "화엄사",
+    "from_day": 2,
+    "to_day": 1
+   }
+  ],
+  "note": "식사·숙소는 그대로 두고 관광지만 날짜를 옮겼어요. 휴무일과 하루 강도를 지켜요."
+ }
+}
