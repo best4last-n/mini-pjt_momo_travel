@@ -612,9 +612,17 @@ def edit_node(state: State) -> State:
             days[di].insert(j, pk)
             spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {di + 1})
             changes.append(f"{di + 1}일차에서 {name}의 순서를 바꿨어요(직접 정한 순서를 최우선으로 지켜요)")
-    elif op == "add":
+    elif op in ("add", "replace"):
         cand = e.get("candidate") if isinstance(e.get("candidate"), dict) else None
         man = e.get("manual") if isinstance(e.get("manual"), dict) else None
+        tdi = ti = None
+        if op == "replace":      # 일정 속 장소를 대안으로 바꾸기(자리·역할·머무는 시간 유지)
+            tdi, ti = locate(e.get("target"))
+            if tdi is None:
+                return {"status": "승인 대기", "answer": "바꿀 장소가 일정에 없어요.", "trace": _t(state, "edit", e, "대상 없음")}
+            ch = e.get("choice") if isinstance(e.get("choice"), dict) else {}
+            pid = ch.get("place_id") or pid
+            cand = ch.get("candidate") if isinstance(ch.get("candidate"), dict) else cand
         if not pid and not cand and man:      # 검색에 없을 때 직접 추가(이름 + 주소 또는 지도 좌표)
             from . import geo, placesearch
             nm = guardrails.mask_pii(str(man.get("name") or "").strip()[:40])[0]
@@ -661,14 +669,24 @@ def edit_node(state: State) -> State:
             return {"status": "승인 대기", "answer": "그 장소를 찾지 못했어요.", "trace": _t(state, "edit", e, "없는 id")}
         if locate(pid)[0] is not None:
             return {"status": "승인 대기", "answer": "이미 일정에 있는 곳이에요.", "trace": _t(state, "edit", e, "중복")}
-        if e.get("day"):
-            to = max(1, min(nd, int(e["day"]))) - 1
-        else:   # 관광지가 가장 적은 날
-            to = min(range(nd), key=lambda k: sum(1 for x in days[k] if x.role == "place"))
-        kind = (pl.get(pid) or {}).get("kind")
-        insert(to, PickItem(place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
-                            reason=next((r for p_, r in (state.get("ranked") or []) if p_ == pid), "") or "직접 추가하신 곳"))
         name = (pl.get(pid) or {}).get("title") or next((w["title"] for w in spec.user_waypoints if w["place_id"] == pid), pid)
+        if op == "replace":
+            old = days[tdi][ti]
+            oname = (pl.get(old.place_id) or {}).get("title") or next(
+                (w["title"] for w in spec.user_waypoints if w["place_id"] == old.place_id), old.place_id)
+            days[tdi][ti] = PickItem(place_id=pid, role=old.role, stay_minutes=old.stay_minutes,
+                                     reason=f"{oname} 대신 직접 고르신 곳")
+            spec.waypoint_ids = [w for w in spec.waypoint_ids if w != old.place_id]
+            spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {tdi + 1})
+            to = tdi
+        else:
+            if e.get("day"):
+                to = max(1, min(nd, int(e["day"]))) - 1
+            else:   # 관광지가 가장 적은 날
+                to = min(range(nd), key=lambda k: sum(1 for x in days[k] if x.role == "place"))
+            kind = (pl.get(pid) or {}).get("kind")
+            insert(to, PickItem(place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
+                                reason=next((r for p_, r in (state.get("ranked") or []) if p_ == pid), "") or "직접 추가하신 곳"))
         spec.waypoint_ids = list(dict.fromkeys([*spec.waypoint_ids, pid]))
         np_ = (pl.get(pid) or next((w for w in spec.user_waypoints if w["place_id"] == pid), {}))
         if np_.get("lat"):
@@ -677,9 +695,12 @@ def edit_node(state: State) -> State:
             far_km = _km(data.region_center(spec.region), (np_["lat"], np_["lng"]))
             if far_km > MAX_KM:
                 changes.append(f"{np_.get('title', '이곳')}은(는) 여행 지역에서 약 {far_km:,.0f}km 떨어져 있어 오가는 이동이 길어요(추정)")
-        if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
-            days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
-        changes.append(f"{to + 1}일차에 {_josa(name, '을를')} 추가했어요")
+        if op == "replace":
+            changes.append(f"{to + 1}일차 {oname} 자리에 {_josa(name, '을를')} 넣었어요(순서·머무는 시간은 그대로)")
+        else:
+            if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
+                days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
+            changes.append(f"{to + 1}일차에 {_josa(name, '을를')} 추가했어요")
     else:
         return {"status": "오류", "answer": "앗, 모르는 편집 요청이에요.", "trace": _t(state, "edit", e, "알 수 없는 op")}
     out = _reschedule(state, spec, days, changes, "edit")

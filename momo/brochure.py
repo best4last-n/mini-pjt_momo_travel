@@ -8,7 +8,7 @@ from __future__ import annotations
 from collections import Counter
 from datetime import date
 
-from . import data, hours, travel
+from . import alternatives, data, hours, travel
 
 KIND_KO = {"attraction": "관광", "restaurant": "음식점", "lodging": "숙박", "festival": "축제"}
 CHECK_OPTIONS = {
@@ -227,6 +227,10 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
                     "stay_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
                     "hours_status": it["hours_status"], "reason": it.get("reason") or "",
                     "lat": it.get("lat"), "lng": it.get("lng"), "source": it.get("source")}
+            _pl = data.places(spec.region).get(it.get("place_id")) or next(
+                (w for w in spec.user_waypoints if w["place_id"] == it.get("place_id")), {"title": it["place_name"]})
+            stop["swap_kind"] = alternatives.kind_label(_pl, it["type"])
+            stop["swap_hint"] = alternatives.swap_hint(_pl, it["type"])
             stops.append(stop)
             if prev is not None and it["travel_minutes_from_prev"]:
                 a, b = _coord(prev), _coord(it)

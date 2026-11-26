@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass, field
 from datetime import date
 
-from . import data, hours, retrieve, travel
+from . import data, guardrails, hours, retrieve, travel
 from .config import (BUFFER_MIN, DAY_END, DAY_START, DEFAULT_DEPART, DINNER, HOME_LIMIT, LUNCH, MAX_REGEN)
 from .llm import MOMO_PERSONA, structured
 from .schemas import ItineraryItem, PlanPick
@@ -219,9 +219,9 @@ def candidate_lines(spec: TripSpec, cands: dict[str, dict]) -> str:
             else:
                 per_day.append(f"{i}일차 {hours.fmt(info.open)}~{hours.fmt(info.close)}"
                                + (f"(휴게 {','.join(hours.fmt(a) + '~' + hours.fmt(b) for a, b in info.breaks)})" if info.breaks else ""))
-        summ = (p.get("summary") or "")[:90]
+        summ = guardrails.safe_external(p.get("summary") or "")
         tag = " [실내]" if p["kind"] == "attraction" and is_indoor(p) else ""
-        lines.append(f"- id={pid} | {p['title']}{tag} | {KIND_KO[p['kind']]} | 좌표 {p.get('lat', 0):.3f},{p.get('lng', 0):.3f} "
+        lines.append(f"- id={pid} | {guardrails.safe_external(p['title'], 60)}{tag} | {KIND_KO[p['kind']]} | 좌표 {p.get('lat', 0):.3f},{p.get('lng', 0):.3f} "
                      f"| {' / '.join(per_day)} | {summ}")
     return "\n".join(lines)
 

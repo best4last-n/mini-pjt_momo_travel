@@ -74,9 +74,33 @@ def public_contacts() -> set[str]:
 _PUBLIC: set[str] | None = None
 
 
+B64 = re.compile(r"[A-Za-z0-9+/]{16,}={0,2}")
+
+
+def _decoded(text: str) -> list[str]:
+    """base64로 감싼 우회 시도: 디코딩되는 토큰만 꺼낸다."""
+    import base64
+    out = []
+    for tok in B64.findall(text or ""):
+        try:
+            out.append(base64.b64decode(tok + "=" * (-len(tok) % 4), validate=True).decode("utf-8"))
+        except Exception:
+            continue
+    return out
+
+
 def detect_injection(text: str) -> bool:
-    compact = re.sub(r"\s+", " ", text or "")
-    return bool(INJECTION.search(compact))
+    """직접 인젝션: 원문·띄어쓰기 제거본(글자 사이 띄우기 우회)·base64 디코딩본을 모두 검사."""
+    t = text or ""
+    for cand in (re.sub(r"\s+", " ", t), re.sub(r"\s+", "", t), *_decoded(t)):
+        if INJECTION.search(cand):
+            return True
+    return False
+
+
+def safe_external(text: str, limit: int = 90) -> str:
+    """간접 인젝션: 외부 데이터(장소 설명·이름)에 지시문이 보이면 프롬프트에 넣지 않는다."""
+    return "(설명 생략: 지시문 의심)" if detect_injection(text) else (text or "")[:limit]
 
 
 def check_output(text: str) -> bool:

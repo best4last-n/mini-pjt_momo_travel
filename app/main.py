@@ -15,6 +15,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.concurrency import run_in_threadpool
 from fastapi.staticfiles import StaticFiles
 
 from momo import agent, guardrails, store
@@ -185,6 +186,76 @@ async def places_search(q: str = "", region: str = "", session_id: str = ""):
     if region not in data_regions():
         return JSONResponse(status_code=400, content={"error": "지역을 알려 주세요", "results": []})
     return placesearch.search(q[:40], region, near)
+
+
+@app.get("/places/alternatives")
+async def places_alternatives(session_id: str = "", place_id: str = "", q: str = "", limit: int = 20):
+    """일정 속 장소의 대안 top N(거리·그날 운영·취향·인기·정보 점수). 바꾸기는 edit op=replace."""
+    from momo import alternatives, planner
+    st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values if session_id else None
+    if not st or not st.get("spec") or not st.get("itinerary"):
+        return JSONResponse(status_code=400, content={"error": "일정이 있는 상담에서만 바꿀 곳을 찾을 수 있어요.", "items": []})
+    spec = agent.spec_from_dict(st["spec"])
+    out = await run_in_threadpool(alternatives.alternatives, spec, st["itinerary"], place_id, q[:40], max(1, min(30, limit)))
+    if out.get("error"):
+        return JSONResponse(status_code=404, content=out)
+    return out
+
+
+MAP_LAYERS = {"Base": "png", "Satellite": "jpeg", "Hybrid": "png", "white": "png", "midnight": "png"}
+TILE_DIR = Path(__file__).resolve().parent.parent / "data" / "tile_cache"
+
+
+@app.get("/map/layers")
+async def map_layers():
+    """지도 종류: OpenStreetMap + 브이월드(일반·위성·위성+지명·흰색·야간, 키가 있을 때). 브이월드 타일은 서버 경유(키 비노출)."""
+    import os
+    osm = {"id": "osm", "label": "OpenStreetMap", "url": "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+           "attribution": "© OpenStreetMap contributors", "max_zoom": 19}
+    layers = [osm]
+    if os.environ.get("VWORLD_API_KEY"):
+        vw = {"attribution": "© 브이월드(국토교통부)", "min_zoom": 6, "max_zoom": 19}
+        layers += [{"id": "vw-base", "label": "브이월드 일반", "url": "/tiles/vworld/Base/{z}/{y}/{x}", **vw},
+                   {"id": "vw-sat", "label": "브이월드 위성", "url": "/tiles/vworld/Satellite/{z}/{y}/{x}", **vw},
+                   {"id": "vw-hybrid", "label": "위성 + 지명", "url": "/tiles/vworld/Satellite/{z}/{y}/{x}",
+                    "overlay_url": "/tiles/vworld/Hybrid/{z}/{y}/{x}", **vw},
+                   {"id": "vw-white", "label": "브이월드 흰색", "url": "/tiles/vworld/white/{z}/{y}/{x}", **vw},
+                   {"id": "vw-night", "label": "브이월드 야간", "url": "/tiles/vworld/midnight/{z}/{y}/{x}", **vw}]
+    return {"layers": layers, "default": "vw-base" if len(layers) > 1 else "osm",
+            "external_3d": {"label": "브이월드 3D로 보기", "url": "https://map.vworld.kr/map/ws3dmap.do"}}
+
+
+@app.get("/tiles/vworld/{layer}/{z}/{y}/{x}")
+async def vworld_tile(layer: str, z: int, y: int, x: int):
+    """브이월드 WMTS 타일 프록시(디스크 캐시). 실패하면 204 → 화면이 OSM으로 바꾼다."""
+    import os
+    from fastapi import Response
+    ext = MAP_LAYERS.get(layer)
+    key = os.environ.get("VWORLD_API_KEY")
+    if not ext or not key or not (6 <= z <= 19):
+        return Response(status_code=204)
+    f = TILE_DIR / layer / str(z) / str(y) / f"{x}.{ext}"
+    media = "image/jpeg" if ext == "jpeg" else "image/png"
+    hdr = {"Cache-Control": "public, max-age=604800"}
+    if f.exists():
+        return Response(f.read_bytes(), media_type=media, headers=hdr)
+
+    def fetch():
+        import requests
+        try:
+            r = requests.get(f"https://api.vworld.kr/req/wmts/1.0.0/{key}/{layer}/{z}/{y}/{x}.{ext}", timeout=20)
+            return r.content if r.status_code == 200 and r.headers.get("content-type", "").startswith("image") else None
+        except Exception:
+            return None
+    body = await run_in_threadpool(fetch)
+    if not body:
+        return Response(status_code=204)
+    try:
+        f.parent.mkdir(parents=True, exist_ok=True)
+        f.write_bytes(body)
+    except Exception:
+        pass
+    return Response(body, media_type=media, headers=hdr)
 
 
 def data_regions():

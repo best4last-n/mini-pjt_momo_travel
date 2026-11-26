@@ -281,7 +281,8 @@ def user_place_from_candidate(c: dict) -> dict:
                                                                                          ("wikimedia", "위키미디어 공용"))
     imgs = [{"url": c["image"], "source": src[0], "license": "출처 사이트 이용 조건", "credit": src[1]}] if c.get("image") else []
     return {"contentid": pid, "place_id": pid, "title": c.get("name") or "사용자 지정 장소", "place_url": c.get("place_url"),
-            "lat": c.get("lat"), "lng": c.get("lng"), "kind": "attraction", "source": "사용자 지정",
+            "lat": c.get("lat"), "lng": c.get("lng"),
+            "kind": c.get("category") if c.get("category") in ("restaurant", "lodging") else "attraction", "source": "사용자 지정",
             "addr": c.get("address") or "", "summary": None, "image_url": c.get("image"), "images": imgs}
 
 
@@ -392,12 +393,12 @@ def vworld_key() -> str | None:
 
 @lru_cache(maxsize=512)
 def vworld_search(q: str, kind: str = "place", lat: float | None = None, lng: float | None = None, deg: float = 0.6,
-                  addr_type: str = "road") -> tuple:
+                  addr_type: str = "road", size: int = 15) -> tuple:
     """브이월드 검색 2.0 — kind=place(상호·시설) / address(도로명·지번). lat·lng가 있으면 그 주변 bbox로 제한."""
     key = vworld_key()
     if not key or not q:
         return ()
-    params = {"service": "search", "request": "search", "version": "2.0", "crs": "EPSG:4326", "size": 15, "page": 1,
+    params = {"service": "search", "request": "search", "version": "2.0", "crs": "EPSG:4326", "size": size, "page": 1,
               "query": q, "type": kind, "format": "json", "errorformat": "json", "key": key}
     if kind == "address":
         params["category"] = addr_type
