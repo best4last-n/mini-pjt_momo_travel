@@ -49,9 +49,7 @@ def parse_budget(text: str | None) -> tuple[int | None, bool]:
 def fmt_won(n: int | None) -> str:
     if n is None:
         return "확인 필요"
-    if n >= 10000 and n % 10000 == 0:
-        return f"{n // 10000:,}만 원"
-    return f"{n:,}원"
+    return f"{n:,}원"     # 표·합계에서 단위가 섞이지 않게 항상 원 단위
 
 
 def parse_fee(text: str | None) -> int | None:

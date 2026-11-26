@@ -1,0 +1,1528 @@
+{
+ "trip": {
+  "title": "순천/구례 1박 2일",
+  "regions": [
+   "순천/구례"
+  ],
+  "region_id": "suncheon_gurye",
+  "start_date": "2026-12-12",
+  "nights": 1,
+  "days": 2,
+  "origin": "서울 강남구",
+  "transport": {
+   "long_distance": "KTX·SRT",
+   "local": "렌터카",
+   "note": "모든 이동시간은 직선거리 기반 추정"
+  },
+  "intensity": "보통",
+  "companions": {
+   "type": "노약자",
+   "count": 4,
+   "note": "부모님 동반"
+  },
+  "assumptions": [
+   "여행 강도는 '보통'으로 가정했어요",
+   "현지 이동은 렌터카로 가정했어요"
+  ],
+  "checklist": [
+   {
+    "key": "region",
+    "label": "여행 지역",
+    "value": "순천/구례",
+    "status": "confirmed",
+    "input": "select",
+    "options": [
+     "순천/구례",
+     "경주",
+     "수원"
+    ],
+    "hint": "지역을 바꾸면 일정을 새로 짜요."
+   },
+   {
+    "key": "start_date",
+    "label": "출발일",
+    "value": "12월 12일(토)",
+    "iso": "2026-12-12",
+    "status": "confirmed",
+    "input": "date",
+    "options": [],
+    "hint": "날짜에 따라 휴무일·운영시간·축제가 달라져요."
+   },
+   {
+    "key": "length",
+    "label": "여행 길이",
+    "value": "1박 2일",
+    "status": "confirmed",
+    "input": "select",
+    "options": [
+     "당일치기",
+     "1박 2일"
+    ],
+    "hint": "지금은 당일~1박 2일까지 꼼꼼히 검증해요."
+   },
+   {
+    "key": "origin",
+    "label": "출발지",
+    "value": "서울 강남구",
+    "status": "confirmed",
+    "input": "text",
+    "options": [
+     "서울",
+     "경기 수원",
+     "대전",
+     "광주",
+     "부산",
+     "대구"
+    ],
+    "hint": "오가는 시간을 계산해 첫날·마지막 날 일정을 맞춰요. 비어 있으면 현지 도착 기준으로만 짜요."
+   },
+   {
+    "key": "long_transport",
+    "label": "장거리 이동",
+    "value": "KTX·SRT",
+    "status": "confirmed",
+    "input": "select",
+    "options": [
+     "자차",
+     "KTX·SRT",
+     "고속·시외버스"
+    ],
+    "hint": "구례는 관광지 사이 버스가 드물어요. KTX로 순천역까지 온 뒤 역에서 렌터카를 빌리는 조합을 가장 추천해요."
+   },
+   {
+    "key": "local_transport",
+    "label": "현지 이동",
+    "value": "렌터카",
+    "status": "assumed",
+    "input": "select",
+    "options": [
+     "자차",
+     "렌터카",
+     "대중교통"
+    ],
+    "hint": "구례는 관광지 사이 버스가 드물어요. KTX로 순천역까지 온 뒤 역에서 렌터카를 빌리는 조합을 가장 추천해요."
+   },
+   {
+    "key": "intensity",
+    "label": "여행 강도",
+    "value": "보통",
+    "status": "assumed",
+    "input": "select",
+    "options": [
+     "빡빡",
+     "보통",
+     "여유"
+    ],
+    "hint": "빡빡 하루 4~5곳(08~20시) · 보통 3~4곳(09~18:30) · 여유 2~3곳(10~17:30)"
+   },
+   {
+    "key": "companions",
+    "label": "동반자",
+    "value": "노약자 4명 · 부모님 동반",
+    "status": "confirmed",
+    "input": "select",
+    "options": [
+     "보통",
+     "노약자",
+     "어린이·유아"
+    ],
+    "hint": "노약자는 계단·경사 적은 곳, 어린이는 체험·넓은 야외를 우선해요."
+   },
+   {
+    "key": "budget",
+    "label": "최대 예산",
+    "value": "100만 원",
+    "status": "confirmed",
+    "input": "text",
+    "options": [
+     "30만 원",
+     "50만 원",
+     "100만 원",
+     "1인 20만 원"
+    ],
+    "hint": "교통·유류비·통행료·식비·입장료·숙박을 더한 예상 경비와 비교해 넘치면 알려 드려요."
+   },
+   {
+    "key": "interests",
+    "label": "관심사 (선택)",
+    "value": "없음",
+    "status": "optional",
+    "input": "text",
+    "options": [
+     "자연",
+     "사찰",
+     "역사",
+     "체험",
+     "카페",
+     "사진",
+     "맛집"
+    ],
+    "hint": "말씀하시면 추천 순위에 반영해요."
+   }
+  ],
+  "progress": {
+   "percent": 78,
+   "confirmed": 7,
+   "total": 9,
+   "assumed": [
+    "현지 이동",
+    "여행 강도"
+   ],
+   "missing": [],
+   "label": "78% 진행 중"
+  }
+ },
+ "places": [
+  {
+   "id": "1919548",
+   "rank": 1,
+   "name": "순천만국가정원",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 국가정원1호길 47 (오천동)",
+   "lat": 34.9286032064,
+   "lng": 127.4996986297,
+   "tour_content_id": "1919548",
+   "in_itinerary": true,
+   "reason": "평지 산책로가 많아 부모님과 걷기 편해요",
+   "summary": "순천만국가정원은 2013년 순천만국제정원박람회 개최를 계기로 조성된 대한민국 제1호 국가정원입니다. 약 93만㎡ 면적에 세계 각국의 전통정원, 테마정원, 어린이 동물원, 테라피 가든, 역사관 등이 조성되어 있으며, 스카이큐브와 관람차를 통해 편리하게 이동하며 관람할 수 있습니다. 정원교육, 디지털 인형극, 정원 워케이션 등 다양한 체험 프로그램도 사전 예약을 통해 이용 가능합니다.",
+   "highlights": [
+    "대한민국 제1호 국가정원으로 926,992㎡ 면적에 세계 전통정원과 테마정원이 조성되어 있어요",
+    "스카이큐브 하늘택시와 관람차로 넓은 정원을 편리하게 이동하며 관람할 수 있어요",
+    "어린이 동물원, 테라피 가든, 역사관 등 다양한 테마 공간이 마련되어 있어요",
+    "정원교육, 디지털 인형극, 정원 워케이션 등 사전 예약 체험 프로그램을 운영해요"
+   ],
+   "guide_tips": "넓은 면적이라 스카이큐브를 이용하면 편리하게 이동하실 수 있어요. 봄철에는 튤립과 유채꽃이 만개해 인생사진 명소로 인기가 높으니 비눗방울 같은 소품을 준비하시면 좋아요. 정원교육이나 디지털 인형극 같은 체험 프로그램은 사전 예약이 필요하니 미리 계획하세요.",
+   "stay_min": null,
+   "hours": "09:00~19:00",
+   "hours_status": "확인됨",
+   "closed": "매월 마지막 주 월요일",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-749-3114",
+   "companion_notes": "스카이큐브와 관람차가 운영되어 넓은 정원을 편하게 둘러보실 수 있어요. 구체적인 동선과 휴게시설 위치는 현장 확인이 필요해요.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/76/3479276_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/76/3479276_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/77/3479277_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/77/3479277_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/73/3479273_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/3479273_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/75/3479275_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/75/3479275_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "스카이큐브",
+     "distance_km": 0.3,
+     "place_id": "2612804",
+     "note": "스카이큐브는 순천만정원 꿈의 다리에서 순천만 생태공원까지 약 4.6km 구간을 왕복 운행하는 소형 무인궤도열"
+    },
+    {
+     "name": "죽도봉공원",
+     "distance_km": 2.8,
+     "place_id": "126330",
+     "note": "순천 죽도봉공원은 순천 시가지를 한눈에 조망할 수 있는 녹음이 우거진 동산으로, 예로부터 전죽 밭이었으며 그"
+    }
+   ],
+   "foods": [
+    {
+     "name": "남녘들밥상",
+     "distance_km": 1.5,
+     "place_id": "2858584",
+     "note": "꼬막정식",
+     "kind": "식당"
+    },
+    {
+     "name": "금빈회관",
+     "distance_km": 2.8,
+     "place_id": "2858600",
+     "note": "돼지떡갈비 한정식",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "127923",
+   "rank": 2,
+   "name": "화엄사",
+   "category": "관광",
+   "address": "전남광주통합특별시 구례군 마산면 화엄사로 539",
+   "lat": 35.2554193399,
+   "lng": 127.4972330786,
+   "tour_content_id": "127923",
+   "in_itinerary": true,
+   "reason": "국내 최대 목조건물 각황전이 있는 천년 고찰",
+   "summary": "화엄사는 544년 연기조사가 창건한 천년 고찰로, 지리산 자락에 위치하며 국보 4점과 보물 5점을 포함한 많은 문화유산을 보유하고 있다. 특히 국내 최대 규모의 목조건물인 각황전(국보)과 높이 6.3m의 석등(국보 제12호), 연기조사가 어머니의 명복을 빌며 세운 4사자 3층석탑(국보) 등이 유명하다. 일주문에서 천왕문, 보제루를 거쳐 대웅전과 각황전에 이르는 독특한 건물 배치가 특징이며, 주변에는 지리산국립공원과 섬진강 벚꽃길 등 다양한 관광지가 있다.",
+   "highlights": [
+    "각황전은 현존하는 국내 최대 규모 목조건물로, 그 앞 석등(높이 6.3m, 직경 2.8m)도 국내 최대이며 둘 다 국보로 지정되어 있습니다",
+    "4사자 3층석탑은 연기조사가 어머니 명복을 빌며 세운 탑으로, 네 마리 사자가 탑을 받치는 독특한 의장과 세련된 조각이 돋보이는 국보입니다",
+    "일주문-천왕문-보제루로 이어지는 독특한 배치로, 보제루 밑을 통과하지 않고 옆을 돌아가며 동·서 두 탑이 사선으로 보이는 특별한 공간 구성을 경험하실 수 있습니다",
+    "대웅전 양편 5층탑(보물)은 신라시대 뛰어난 조형성과 섬세한 장식이 눈길을 끄는 작품으로, 각황전·대웅전과 함께 국보 4점·보물 5점이 경내에 집중되어 있습니다"
+   ],
+   "guide_tips": "일주문부터 약 30° 꺾어 북동쪽으로 들어가 천왕문을 지나면 보제루 옆을 돌아 경내로 진입하는데, 이때 동·서 두 탑이 사선으로 보이는 독특한 배치를 감상하세요. 각황전 앞 국내 최대 석등과 왼편 효대 언덕의 4사자 3층석탑, 대웅전 양편 5층탑 순으로 둘러보시면 국보·보물급 문화재를 효율적으로 관람하실 수 있습니다. 일몰 후 입장이 금지되므로 오후 늦은 시간 방문 시 주의하시고, 4월에는 하동에서 화엄사까지 19번국도 35km 벚꽃 드라이브 코스를 함께 즐기시면 좋습니다.",
+   "stay_min": null,
+   "hours": "00:00~18:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-783-7600",
+   "companion_notes": "일주문부터 보제루, 각황전까지 경사와 계단이 있고 효대 언덕의 4사자 3층석탑은 별도 언덕에 위치하므로 체력 안배가 필요합니다. 주차장에서 경내까지 거리와 구체적인 경사도는 현장 확인이 필요합니다.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/65/3563965_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/66/3563966_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/66/3563966_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/67/3563967_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/67/3563967_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/68/3563968_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/68/3563968_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "구례 관광특구",
+     "distance_km": 0.2,
+     "place_id": "126632",
+     "note": "구례 관광특구는 국립공원 제1호인 지리산국립공원과 청정 하천 섬진강을 중심으로 한 대단위 관광 지구다. 지리"
+    }
+   ],
+   "foods": [
+    {
+     "name": "지리산수라간",
+     "distance_km": 2.0,
+     "place_id": "2783349",
+     "note": "다슬기 강된장비빔밥",
+     "kind": "식당"
+    },
+    {
+     "name": "그옛날산채식당",
+     "distance_km": 2.1,
+     "place_id": "132899",
+     "note": "산채정식",
+     "kind": "식당"
+    },
+    {
+     "name": "송이식당",
+     "distance_km": 2.7,
+     "place_id": "2788013",
+     "note": "산채정식",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "126730",
+   "rank": 3,
+   "name": "순천만습지",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 순천만길 513-25",
+   "lat": 34.8858016084,
+   "lng": 127.5092830428,
+   "tour_content_id": "126730",
+   "in_itinerary": true,
+   "reason": "갈대밭 데크길에서 겨울 철새를 볼 수 있어요",
+   "summary": "순천만은 전남 순천시와 고흥군, 여수시로 둘러싸인 우리나라 남해안 중서부의 만으로, 행정구역상 해수역만 75㎢가 넘는 넓은 지역입니다. 간조시 드러나는 갯벌 면적은 12㎢, 전체 갯벌 면적은 22.6㎢에 달하며, 동천과 이사천 합류 지점부터 갯벌 앞까지 5.4㎢ 규모의 거대한 갈대 군락이 펼쳐져 있습니다.",
+   "highlights": [
+    "22.6㎢ 규모의 광활한 갯벌과 5.4㎢에 달하는 국내 최대 갈대 군락지",
+    "동천과 이사천이 만나 순천만 갯벌로 이어지는 하천-습지 생태계 연결 구조",
+    "갈대숲 갯벌 탐험, 순천만 조류 탐험 등 습지 생태 체험 프로그램 운영",
+    "야간 천문대 별빛 체험 프로그램(사전 인터넷 접수, 계절별 탄력 운영)"
+   ],
+   "guide_tips": "계절별로 관람 시간이 다르니 확인하세요. 여름(5~8월)은 오후 7시, 봄·가을(3~4월/9~10월)은 오후 6시, 겨울(11~2월)은 오후 5시가 입장 마감이며, 마감 후 1시간까지 관람 가능합니다. 갈대 군락과 갯벌을 모두 보려면 2~3시간 정도 여유 있게 계획하시고, 야간 천문대는 별도 사전 예약이 필요합니다. 매월 마지막 주 월요일은 휴무예요.",
+   "stay_min": null,
+   "hours": "08:00~17:00",
+   "hours_status": "확인됨",
+   "closed": "매월 마지막 주 월요일",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-749-3114",
+   "companion_notes": "22.6㎢ 규모의 넓은 갯벌과 갈대밭을 도보로 관람하므로 체력 안배가 필요합니다. 주차장과 탐방로 접근성은 현장 확인이 필요해요.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/14/4088614_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/10/4088610_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/10/4088610_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/13/4088613_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/13/4088613_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/11/4088611_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/11/4088611_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "순천만습지천문대",
+     "distance_km": 0.0,
+     "place_id": "2795593",
+     "note": "순천만습지천문대는 국내 최초의 평지천문대로서 철새 탐조와 천체 관찰을 동시에 할 수 있는 복합형 체험관입니다"
+    },
+    {
+     "name": "용산전망대",
+     "distance_km": 1.7,
+     "place_id": "228886",
+     "note": "용산전망대는 순천만의 S자 곡선 수로와 갈대, 갯벌이 어우러진 낙조를 감상할 수 있는 곳으로 많은 사진작가들"
+    }
+   ],
+   "foods": [
+    {
+     "name": "순천만전라도밥상",
+     "distance_km": 0.2,
+     "place_id": "2858543",
+     "note": "순천만 전라도밥상",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "317559",
+   "rank": 4,
+   "name": "사성암(구례)",
+   "category": "관광",
+   "address": "전남광주통합특별시 구례군 문척면 사성암길 303",
+   "lat": 35.1801260865484,
+   "lng": 127.480604895138,
+   "tour_content_id": "317559",
+   "in_itinerary": true,
+   "reason": "요청하신 곳 — 오산 절벽 위 암자, 섬진강 전망",
+   "summary": "사성암은 구례읍에서 약 2㎞ 남쪽인 죽마리 오산 꼭대기에 위치해 있다. 이곳은 원래 오산암이라 불렀는데, 성왕 22년 (544) 연기조사가 처음 건립하였다고 전해지고 있다. 원효대사, 도선국사, 진각국사, 의상대사 4명의 고승이 수도하였다고 하여 사성암이라 부르고 있다. (관광공사 소개 인용)",
+   "highlights": [
+    "높이 20m 바위 사이에 박힌 듯한 약사전과 암벽 계단이 산과 하나 되어 만드는 독특한 건축 경관",
+    "약사전 아래로 섬진강·구례읍·지리산 능선이 한눈에 펼쳐지는 조망",
+    "원효대사가 손톱으로 새겼다는 전설이 전해지는 마애여래입상이 약사전 내 암벽에 직접 새겨져 있음",
+    "원효·도선·진각·의상 4명의 고승이 수도한 곳으로 544년 연기조사가 창건한 천년 고찰"
+   ],
+   "guide_tips": "오산 정상까지 걸어 올라가거나 마을버스(왕복 3,400원, 13세 이하 2,800원)를 이용하실 수 있어요. 정상 주차장은 협소해 주차가 제한적이니 마을버스 이용을 권해드립니다. 약사전에서 내려다보는 섬진강과 지리산 조망이 압권이니 사진 촬영 포인트로 꼭 기억하세요.",
+   "stay_min": null,
+   "hours": "09:00~18:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-781-4544",
+   "companion_notes": "오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/54/4054454_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/55/4054455_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/55/4054455_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/56/4054456_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/56/4054456_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/57/4054457_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/57/4054457_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "오산(구례)",
+     "distance_km": 0.0,
+     "place_id": "126637",
+     "note": "오산은 해발 531m의 산으로 지리산을 마주하고 있으며, 예부터 '소금강'이라 불릴 만큼 빼어난 바위 형상과"
+    },
+    {
+     "name": "농업기술센터",
+     "distance_km": 2.6,
+     "place_id": "129447",
+     "note": "구례군 농업기술센터에는 지리산 자생식물 표본과 힐링의 숲이 있는 식물표본전시관, 식물 세밀화 공모전 수장작을"
+    }
+   ],
+   "foods": [
+    {
+     "name": "남촌회관",
+     "distance_km": 2.7,
+     "place_id": "134246",
+     "note": "메기탕",
+     "kind": "식당"
+    },
+    {
+     "name": "구례역대합실",
+     "distance_km": 2.9,
+     "place_id": "2906086",
+     "note": "지리산흑돼지안심돈까스",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": true
+  },
+  {
+   "id": "127931",
+   "rank": 5,
+   "name": "순천 낙안읍성",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 낙안면 충민길 30",
+   "lat": 34.9060616206,
+   "lng": 127.3417276358,
+   "tour_content_id": "127931",
+   "in_itinerary": false,
+   "reason": "조선 읍성 마을, 평지 산책",
+   "summary": "낙안읍성은 조선 태조 6년(1397) 토성으로 축조된 후 인조 4년(1626) 임경업 장군이 군수로 부임하여 현재의 석성으로 중수한 곳으로, 높이 4m, 총길이 1,410m의 성곽이 400년 가까이 원형을 유지하고 있다. 성과 동헌, 객사, 초가 등이 원형대로 보존되어 성과 마을이 함께 국내 최초로 사적에 지정되었으며, 지금도 많은 세대가 실제 생활하고 있는 민속 전통마을이다.",
+   "highlights": [
+    "조선 태조 6년(1397) 토성으로 시작해 인조 4년(1626) 임경업 장군이 석성으로 중수한 1,410m 길이의 성곽이 400년 가까이 끊긴 곳 없이 보존되어 있습니다",
+    "성과 마을이 함께 국내 최초로 사적 지정된 곳으로, 지금도 주민들이 실제 거주하며 생활하는 살아있는 민속마을입니다",
+    "남부 지방 특유의 툇마루·토방·섬돌 위 장독·낮은 돌담과 호박넝쿨이 어우러진 초가집들이 옹기종기 모여 있어, 전시용이 아닌 서민들의 진짜 삶의 모습을 볼 수 있습니다",
+    "가야금·대장간·서각 등 전통 문화 체험 프로그램이 운영되며, 드라마 '용의 눈물', '태조왕건' 등 사극 촬영지로도 유명합니다"
+   ],
+   "guide_tips": "동문·서문·남문 중 한 곳으로 입장해 성 안 초가마을을 둘러본 뒤, 성곽 위로 올라가 걸으면 초가지붕이 모인 마을 전경을 한눈에 담을 수 있습니다. 성곽 총길이가 1,410m로 천천히 둘러보면 1시간 30분~2시간 정도 소요되며, 오전 일찍 방문하면 한적하게 관람하실 수 있습니다. 계절별로 운영시간이 다르니(1월/11~12월 09:00~17:30, 2~4월/10월 09:00~18:00, 5~9월 08:30~18:30) 미리 확인하세요.",
+   "stay_min": null,
+   "hours": "09:00~17:30",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-749-8831",
+   "companion_notes": "넓은 평야 지대에 조성된 성곽으로 급경사는 없으나, 성곽 위를 걷는 구간은 높이 4m 정도이며 1,410m 거리를 도보로 이동해야 하므로 체력 안배가 필요합니다. 주차장 위치와 성문까지 거리는 현장 확인이 필요합니다.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/81/4099881_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/77/4099877_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/77/4099877_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/87/4099887_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/87/4099887_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/84/4099884_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/84/4099884_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [],
+   "foods": [
+    {
+     "name": "최대감벌교꼬막",
+     "distance_km": 0.2,
+     "place_id": "3444492",
+     "note": "대감정식(짱뚱어탕 포함), 꼬막정식",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "126267",
+   "rank": 6,
+   "name": "선암사계곡",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 승주읍 죽학리",
+   "lat": 34.992281,
+   "lng": 127.341399,
+   "tour_content_id": "126267",
+   "in_itinerary": false,
+   "reason": "천년 고찰, 숲길 산책",
+   "summary": "선암사계곡은 순천 조계산 동쪽 기슭에 위치한 잔잔하고 맑은 물로 유명한 계곡으로, 굽이굽이 흘러 상사호까지 이어집니다. 계곡을 따라 형성된 고즈넉한 숲길을 15~20분 정도 걷다 보면 선암사에 도착하게 되며, 길목에서 조선 숙종 39년(1713년) 호암대사가 만든 아치형 석교인 승선교를 만날 수 있습니다.",
+   "highlights": [
+    "조계산 동쪽 기슭을 따라 굽이굽이 흘러 상사호까지 이어지는 맑은 계곡물",
+    "선암사까지 계곡 물소리 들으며 걷는 15~20분의 고즈넉한 숲길",
+    "조선 숙종 39년(1713년) 호암대사가 만든 승선교(높이 7m, 길이 14m의 화강암 아치형 석교)가 계곡 위에 놓여 있음",
+    "선암사길을 따라 계곡과 나란히 이어지는 산책로, 순천야생차체험관도 길목에 위치"
+   ],
+   "guide_tips": "선암사 매표소에서 계곡을 따라 형성된 숲길을 걸으면 15~20분 정도 소요되며, 계곡 물소리를 들으며 선암사까지 자연스럽게 이어집니다. 순천야생차체험관 인근에서 계곡 위 승선교(1713년 건립)를 만날 수 있어 사진 포인트로 좋습니다. 선암사 관람과 연계하면 좋으며, 계곡 이용 시간 제한은 없지만 선암사 이용시간(계절별 상이)을 참고하시면 됩니다.",
+   "stay_min": null,
+   "hours": "07:00~18:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "선사암 관광안내소 061-753-2955선사암 061-754-5247",
+   "companion_notes": "선암사 매표소에서 선암사까지 15~20분 정도 계곡을 따라 걷는 숲길이 있으니, 보행 속도를 고려해 여유있게 계획하시면 좋습니다. 주차장은 선암사 주차장 이용 가능합니다.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/71/3460071_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/74/3460074_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/74/3460074_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/73/3460073_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/3460073_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/72/3460072_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/72/3460072_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "선암사 [유네스코 세계유산]",
+     "distance_km": 1.0,
+     "place_id": "126369",
+     "note": "선암사는 백제 성왕 7년(529년)에 아도화상이 비로암을 짓고, 신라 경문왕 1년 도선국사가 창건한 사찰로 "
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "126371",
+   "rank": 7,
+   "name": "송광사(순천)",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 송광면 송광사안길 100",
+   "lat": 35.0023748995,
+   "lng": 127.2748324991,
+   "tour_content_id": "126371",
+   "in_itinerary": false,
+   "reason": "삼보사찰 중 하나",
+   "summary": "송광사는 조계산 북쪽 기슭에 위치한 승보사찰로, 신라 말 혜린선사가 길상사를 창건한 후 보조국사 지눌스님이 정혜결사를 옮겨와 수도와 참선의 도량으로 삼으면서 16국사를 배출한 사찰이다. 경내에는 약 80여 동의 건물이 있으며, 국보 3점과 보물 13점을 포함해 총 27점의 문화유산이 보존되어 있다.",
+   "highlights": [
+    "보조국사 지눌스님 이래 16국사를 배출한 승보사찰로, 해인사·통도사와 함께 한국 삼보사찰 중 하나입니다",
+    "국보 3점(국사전 등), 보물 13점(하사당·약사전·영산전 등), 천연기념물 쌍향수를 포함해 총 27점의 문화유산을 보존하고 있습니다",
+    "약 80여 동의 목조 건물이 조계산 북쪽 기슭에 자리해 대웅전·승보전·지장전이 장엄한 가람 배치를 이루고 있습니다",
+    "현재도 스님들의 독경과 목탁 소리가 이어지는 살아있는 수행 도량입니다"
+   ],
+   "guide_tips": "대웅전을 중심으로 좌우 승보전·지장전을 둘러본 뒤 국사전에서 16국사 진영을 참배하는 순서를 추천합니다. 경내 곳곳에서 향 피우는 모습과 스님들의 수행 모습을 볼 수 있어 이른 아침이나 저녁 예불 시간대에 방문하면 더욱 경건한 분위기를 느낄 수 있습니다. 천연기념물 쌍향수와 80여 동의 목조 건물이 어우러진 풍경이 사진 포인트입니다.",
+   "stay_min": null,
+   "hours": "09:00~17:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-755-0107",
+   "companion_notes": "약 80여 동의 건물이 넓게 분포해 있어 경내 이동 거리가 상당합니다. 주차장에서 경내까지의 거리와 각 전각 사이 이동 동선을 고려해 충분한 시간 여유를 두고 방문하시길 권합니다.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/93/3577593_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/92/3577592_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/92/3577592_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/94/3577594_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/94/3577594_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/95/3577595_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/95/3577595_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "조계산도립공원",
+     "distance_km": 0.6,
+     "place_id": "126240",
+     "note": "조계산은 순천시에 위치한 소백산맥 끝자락의 산으로, 승보사찰인 송광사와 선암사 두 거찰을 품고 있으며 197"
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "2469439",
+   "rank": 8,
+   "name": "순천 드라마촬영장",
+   "category": "관광",
+   "address": "전남광주통합특별시 순천시 비례골길 24 (조례동)",
+   "lat": 34.9583877769,
+   "lng": 127.5378062234,
+   "tour_content_id": "2469439",
+   "in_itinerary": false,
+   "reason": "순천 시내 실내외 체험",
+   "summary": "순천 드라마촬영장은 1960~80년대 한국의 모습을 재현한 국내 최대 규모의 영화·드라마 촬영장입니다. 60년대 순천 읍내 거리, 70년대 서울 봉천동 달동네, 80년대 서울 변두리 거리로 구성되어 있으며, 현재까지 80여 편의 작품이 촬영되었습니다. 골목을 다니며 촬영장을 관람하고 교복 대여 체험을 할 수 있습니다.",
+   "highlights": [
+    "1960년대 순천 읍내, 1970년대 봉천동 달동네, 1980년대 서울 변두리까지 3개 시대 거리가 시대별로 재현된 국내 최대 규모 촬영장",
+    "영화 <타짜>, 드라마 <에덴의 동쪽> 등 80여 편의 유명 작품이 촬영된 실제 촬영 세트장",
+    "옛날 교복 대여 체험과 옛날 오락실 체험으로 시간여행하듯 추억을 만들 수 있는 곳",
+    "골목골목 돌아다니며 감성 사진을 찍기 좋은 레트로 포토존이 곳곳에 마련되어 있음"
+   ],
+   "guide_tips": "입장 마감이 오후 5시이므로 여유 있게 둘러보려면 오후 3시 이전 방문을 추천합니다. 60년대 읍내 거리부터 시작해 70년대 달동네, 80년대 변두리 순서로 관람하면 시대 흐름을 자연스럽게 느낄 수 있어요. 교복 대여 체험을 원하시면 입장 후 바로 신청하시고, 골목 곳곳에서 영화 속 주인공처럼 감성 사진을 남겨보세요.",
+   "stay_min": null,
+   "hours": "09:00~17:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-749-4540",
+   "companion_notes": "달동네 세트는 경사진 골목과 계단이 많아 편한 신발 착용이 필요하며, 무릎이 불편하신 분은 평지 위주인 60년대 읍내 거리 관람을 권장합니다.",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/26/4066426_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/27/4066427_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/27/4066427_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/28/4066428_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/28/4066428_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/29/4066429_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/29/4066429_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "조례호수공원",
+     "distance_km": 1.7,
+     "place_id": "2737298",
+     "note": "조례호수공원은 호숫가 산책로를 따라 광장, 분수대, 벤치, 등산로가 마련되어 있으며, 작은 도서관인 '호수공"
+    }
+   ],
+   "foods": [
+    {
+     "name": "고구려초밥 금당본점",
+     "distance_km": 1.6,
+     "place_id": "2858619",
+     "note": "고구려초밥",
+     "kind": "식당"
+    },
+    {
+     "name": "명지원",
+     "distance_km": 1.6,
+     "place_id": "643817",
+     "note": "한우갈비살",
+     "kind": "식당"
+    },
+    {
+     "name": "뱀부스",
+     "distance_km": 1.7,
+     "place_id": "2858565",
+     "note": "런치코스",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "2858584",
+   "rank": null,
+   "name": "남녘들밥상",
+   "category": "음식점",
+   "address": "전남광주통합특별시 순천시 하풍동길 21 (풍덕동, 오션팰리스)",
+   "lat": 34.9404037998,
+   "lng": 127.5067937306,
+   "tour_content_id": "2858584",
+   "in_itinerary": true,
+   "reason": "국가정원 근처 꼬막정식 한상",
+   "summary": "남녘들밥상은 순천 국가정원 인근에 위치한 한정식 전문점으로, 순천의 대표 식재료인 꼬막과 미나리를 활용한 다양한 요리를 선보입니다. 기본 홀과 룸이 마련되어 있어 가족 모임이나 중요한 손님 접대에 적합하며, 꼬막정식에서는 꼬막무침, 양념 꼬막 등 다채로운 꼬막 요리를 맛볼 수 있습니다.",
+   "highlights": [],
+   "guide_tips": "",
+   "stay_min": null,
+   "hours": "11:00~20:00",
+   "hours_status": "확인됨",
+   "closed": "매주 수요일",
+   "fee": null,
+   "parking": "가능",
+   "contact": "0507-1389-3341",
+   "companion_notes": "",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/74/2858574_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/72/2858572_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/72/2858572_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/73/2858573_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/2858573_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/75/2858575_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/75/2858575_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "순천만국가정원",
+     "distance_km": 1.5,
+     "place_id": "1919548",
+     "note": "순천만국가정원은 2013년 순천만국제정원박람회 개최를 계기로 조성된 대한민국 제1호 국가정원입니다. 약 93"
+    },
+    {
+     "name": "스카이큐브",
+     "distance_km": 1.6,
+     "place_id": "2612804",
+     "note": "스카이큐브는 순천만정원 꿈의 다리에서 순천만 생태공원까지 약 4.6km 구간을 왕복 운행하는 소형 무인궤도열"
+    },
+    {
+     "name": "죽도봉공원",
+     "distance_km": 1.8,
+     "place_id": "126330",
+     "note": "순천 죽도봉공원은 순천 시가지를 한눈에 조망할 수 있는 녹음이 우거진 동산으로, 예로부터 전죽 밭이었으며 그"
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "3444492",
+   "rank": null,
+   "name": "최대감벌교꼬막",
+   "category": "음식점",
+   "address": "전남광주통합특별시 순천시 낙안면 삼일로 63",
+   "lat": 34.9049513051,
+   "lng": 127.3437302284,
+   "tour_content_id": "3444492",
+   "in_itinerary": true,
+   "reason": "벌교 꼬막 전문",
+   "summary": "최대감벌교꼬막은 다양한 꼬막 요리를 한 자리에서 즐길 수 있는 꼬막 전문 식당입니다. 꼬막 정식으로 잘 알려져 있으며, 전라도식의 푸짐하고 정갈한 한상차림이 특징입니다.",
+   "highlights": [],
+   "guide_tips": "",
+   "stay_min": null,
+   "hours": "09:00~20:00",
+   "hours_status": "확인됨",
+   "closed": "매주 2번째 수요일 정기휴무",
+   "fee": null,
+   "parking": null,
+   "contact": "0507-1359-3262",
+   "companion_notes": "",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/10/3444310_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/14/3444314_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/14/3444314_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/13/3444313_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/13/3444313_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/12/3444312_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/12/3444312_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "순천 낙안읍성",
+     "distance_km": 0.2,
+     "place_id": "127931",
+     "note": "낙안읍성은 조선 태조 6년(1397) 토성으로 축조된 후 인조 4년(1626) 임경업 장군이 군수로 부임하여"
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "2050523",
+   "rank": null,
+   "name": "순천만민속한옥펜션",
+   "category": "숙박",
+   "address": "전남광주통합특별시 순천시 대대2길 33 (대대동)",
+   "lat": 34.8913154256,
+   "lng": 127.5077431163,
+   "tour_content_id": "2050523",
+   "in_itinerary": true,
+   "reason": "순천 시내 숙소",
+   "summary": "순천만민속한옥펜션은 순천만 인근 높은 지대에 위치해 순천만생태공원을 한눈에 조망할 수 있는 숙소입니다. 객실은 원룸과 독채로 구성되어 있으며, 황토 바닥과 국산 소나무 마감으로 건강하게 머무를 수 있습니다. 순천만자연생태공원과 용산전망대를 도보로 이동할 수 있으며, 남도 가정식을 맛볼 수 있습니다.",
+   "highlights": [],
+   "guide_tips": "",
+   "stay_min": null,
+   "hours": "체크인 16:00",
+   "hours_status": "확인됨",
+   "closed": null,
+   "fee": null,
+   "parking": null,
+   "contact": null,
+   "companion_notes": "",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/37/4167937_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/38/4167938_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/38/4167938_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/40/4167940_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/40/4167940_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/39/4167939_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/39/4167939_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type1",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [],
+   "foods": [
+    {
+     "name": "순천만전라도밥상",
+     "distance_km": 0.4,
+     "place_id": "2858543",
+     "note": "순천만 전라도밥상",
+     "kind": "식당"
+    }
+   ],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  },
+  {
+   "id": "132899",
+   "rank": null,
+   "name": "그옛날산채식당",
+   "category": "음식점",
+   "address": "전남광주통합특별시 구례군 마산면 화엄사로 320",
+   "lat": 35.2379943532,
+   "lng": 127.4877332751,
+   "tour_content_id": "132899",
+   "in_itinerary": true,
+   "reason": "화엄사 아래 산채 정식",
+   "summary": "그옛날산채식당은 전남 구례군에 위치한 산채정식 전문점으로, 지리산 자락에서 채취한 각종 나물을 조미료 없이 고유의 맛과 향을 살려 제공합니다. 취나물, 봄동 김치 등 계절별 신선한 나물과 더덕, 도라지, 토란대, 죽순, 석이버섯 등 지리산의 다양한 산채를 맛볼 수 있습니다.",
+   "highlights": [],
+   "guide_tips": "",
+   "stay_min": null,
+   "hours": "09:00~20:00",
+   "hours_status": "확인됨",
+   "closed": "연중무휴",
+   "fee": null,
+   "parking": "가능",
+   "contact": "061-782-3223",
+   "companion_notes": "",
+   "images": [
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/65/1972365_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/64/1972364_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/64/1972364_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/67/1972367_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/67/1972367_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    },
+    {
+     "url": "https://tong.visitkorea.or.kr/cms/resource/66/1972366_image2_1.jpg",
+     "thumb": "https://tong.visitkorea.or.kr/cms/resource/66/1972366_image2_1.jpg",
+     "source": "tourapi",
+     "license": "Type3",
+     "credit": "한국관광공사"
+    }
+   ],
+   "nearby_sights": [
+    {
+     "name": "화엄사",
+     "distance_km": 2.1,
+     "place_id": "127923",
+     "note": "화엄사는 544년 연기조사가 창건한 천년 고찰로, 지리산 자락에 위치하며 국보 4점과 보물 5점을 포함한 많"
+    },
+    {
+     "name": "구례 관광특구",
+     "distance_km": 2.3,
+     "place_id": "126632",
+     "note": "구례 관광특구는 국립공원 제1호인 지리산국립공원과 청정 하천 섬진강을 중심으로 한 대단위 관광 지구다. 지리"
+    },
+    {
+     "name": "당몰샘",
+     "distance_km": 2.6,
+     "place_id": "126767",
+     "note": "당몰샘은 전국 최장수 마을로 꼽히는 상사 마을의 식수원으로, 지리산 약초 뿌리가 녹아든다는 말이 전해질 정도"
+    }
+   ],
+   "foods": [],
+   "source": "한국관광공사 TourAPI",
+   "added_by_user": false
+  }
+ ],
+ "itinerary": [
+  {
+   "day": 1,
+   "date": "2026-12-12",
+   "weekday": "토",
+   "theme": "순천 권역",
+   "stops": [
+    {
+     "order": 1,
+     "place_id": "2858584",
+     "name": "남녘들밥상",
+     "type": "meal",
+     "arrive": "12:00",
+     "depart": "13:00",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "국가정원 근처 꼬막정식 한상",
+     "lat": 34.9404037998,
+     "lng": 127.5067937306,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 2,
+     "place_id": "1919548",
+     "name": "순천만국가정원",
+     "type": "place",
+     "arrive": "13:15",
+     "depart": "15:15",
+     "stay_min": 120,
+     "hours_status": "확인됨",
+     "reason": "평지 산책로가 많아 부모님과 걷기 편해요",
+     "lat": 34.9286032064,
+     "lng": 127.4996986297,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 3,
+     "place_id": "126730",
+     "name": "순천만습지",
+     "type": "place",
+     "arrive": "15:40",
+     "depart": "16:40",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "갈대밭 데크길에서 겨울 철새를 볼 수 있어요",
+     "lat": 34.8858016084,
+     "lng": 127.5092830428,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 4,
+     "place_id": "3444492",
+     "name": "최대감벌교꼬막",
+     "type": "meal",
+     "arrive": "18:00",
+     "depart": "19:00",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "벌교 꼬막 전문",
+     "lat": 34.9049513051,
+     "lng": 127.3437302284,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 5,
+     "place_id": "2050523",
+     "name": "순천만민속한옥펜션",
+     "type": "stay",
+     "arrive": "19:45",
+     "depart": "19:45",
+     "stay_min": 0,
+     "hours_status": "확인됨",
+     "reason": "순천 시내 숙소",
+     "lat": 34.8913154256,
+     "lng": 127.5077431163,
+     "source": "한국관광공사 TourAPI"
+    }
+   ],
+   "legs": [
+    {
+     "from": "도착 지점",
+     "from_name": "도착 지점",
+     "to": "2858584",
+     "to_name": "남녘들밥상",
+     "mode": "자동차",
+     "distance_km": 19.6,
+     "duration_min": 35,
+     "estimated": true,
+     "path": [
+      [
+       35.072398806940164,
+       127.46794397484388
+      ],
+      [
+       34.9404037998,
+       127.5067937306
+      ]
+     ]
+    },
+    {
+     "from": "2858584",
+     "from_name": "남녘들밥상",
+     "to": "1919548",
+     "to_name": "순천만국가정원",
+     "mode": "자동차",
+     "distance_km": 1.9,
+     "duration_min": 5,
+     "estimated": true,
+     "path": [
+      [
+       34.9404037998,
+       127.5067937306
+      ],
+      [
+       34.9286032064,
+       127.4996986297
+      ]
+     ]
+    },
+    {
+     "from": "1919548",
+     "from_name": "순천만국가정원",
+     "to": "126730",
+     "to_name": "순천만습지",
+     "mode": "자동차",
+     "distance_km": 6.3,
+     "duration_min": 15,
+     "estimated": true,
+     "path": [
+      [
+       34.9286032064,
+       127.4996986297
+      ],
+      [
+       34.8858016084,
+       127.5092830428
+      ]
+     ]
+    },
+    {
+     "from": "126730",
+     "from_name": "순천만습지",
+     "to": "3444492",
+     "to_name": "최대감벌교꼬막",
+     "mode": "자동차",
+     "distance_km": 19.8,
+     "duration_min": 35,
+     "estimated": true,
+     "path": [
+      [
+       34.8858016084,
+       127.5092830428
+      ],
+      [
+       34.9049513051,
+       127.3437302284
+      ]
+     ]
+    },
+    {
+     "from": "3444492",
+     "from_name": "최대감벌교꼬막",
+     "to": "2050523",
+     "to_name": "순천만민속한옥펜션",
+     "mode": "자동차",
+     "distance_km": 19.5,
+     "duration_min": 35,
+     "estimated": true,
+     "path": [
+      [
+       34.9049513051,
+       127.3437302284
+      ],
+      [
+       34.8913154256,
+       127.5077431163
+      ]
+     ]
+    }
+   ],
+   "day_distance_km": 67.1,
+   "day_travel_min": 125
+  },
+  {
+   "day": 2,
+   "date": "2026-12-13",
+   "weekday": "일",
+   "theme": "구례 권역",
+   "stops": [
+    {
+     "order": 1,
+     "place_id": "127923",
+     "name": "화엄사",
+     "type": "place",
+     "arrive": "10:10",
+     "depart": "11:40",
+     "stay_min": 90,
+     "hours_status": "확인됨",
+     "reason": "국내 최대 목조건물 각황전이 있는 천년 고찰",
+     "lat": 35.2554193399,
+     "lng": 127.4972330786,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 2,
+     "place_id": "132899",
+     "name": "그옛날산채식당",
+     "type": "meal",
+     "arrive": "12:00",
+     "depart": "13:00",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "화엄사 아래 산채 정식",
+     "lat": 35.2379943532,
+     "lng": 127.4877332751,
+     "source": "한국관광공사 TourAPI"
+    },
+    {
+     "order": 3,
+     "place_id": "317559",
+     "name": "사성암(구례)",
+     "type": "place",
+     "arrive": "13:30",
+     "depart": "14:30",
+     "stay_min": 60,
+     "hours_status": "확인됨",
+     "reason": "요청하신 곳 — 오산 절벽 위 암자, 섬진강 전망",
+     "lat": 35.1801260865484,
+     "lng": 127.480604895138,
+     "source": "한국관광공사 TourAPI"
+    }
+   ],
+   "legs": [
+    {
+     "from": "2050523",
+     "from_name": "순천만민속한옥펜션",
+     "to": "127923",
+     "to_name": "화엄사",
+     "mode": "자동차",
+     "distance_km": 52.6,
+     "duration_min": 70,
+     "estimated": true,
+     "path": [
+      [
+       34.8913154256,
+       127.5077431163
+      ],
+      [
+       35.2554193399,
+       127.4972330786
+      ]
+     ]
+    },
+    {
+     "from": "127923",
+     "from_name": "화엄사",
+     "to": "132899",
+     "to_name": "그옛날산채식당",
+     "mode": "자동차",
+     "distance_km": 2.8,
+     "duration_min": 10,
+     "estimated": true,
+     "path": [
+      [
+       35.2554193399,
+       127.4972330786
+      ],
+      [
+       35.2379943532,
+       127.4877332751
+      ]
+     ]
+    },
+    {
+     "from": "132899",
+     "from_name": "그옛날산채식당",
+     "to": "317559",
+     "to_name": "사성암(구례)",
+     "mode": "자동차",
+     "distance_km": 8.4,
+     "duration_min": 20,
+     "estimated": true,
+     "path": [
+      [
+       35.2379943532,
+       127.4877332751
+      ],
+      [
+       35.1801260865484,
+       127.480604895138
+      ]
+     ]
+    }
+   ],
+   "day_distance_km": 63.8,
+   "day_travel_min": 100
+  }
+ ],
+ "totals": {
+  "local": {
+   "distance_km": 130.9,
+   "travel_min": 225
+  },
+  "long_distance": {
+   "outbound": {
+    "mode": "KTX·SRT",
+    "label": "서울 → 순천/구례",
+    "depart": "08:00",
+    "arrive": "10:50",
+    "duration_min": 170,
+    "estimated": true
+   },
+   "inbound": {
+    "mode": "KTX·SRT",
+    "label": "순천/구례 → 서울",
+    "depart": "14:30",
+    "arrive": "17:20",
+    "duration_min": 170,
+    "estimated": true
+   }
+  }
+ },
+ "warnings": [
+  "2일차 순천만민속한옥펜션 → 화엄사 이동이 약 70분으로 '보통' 강도 권장(60분)보다 길어요",
+  "화엄사: 일주문부터 보제루, 각황전까지 경사와 계단이 있고 효대 언덕의 4사자 3층석탑은 별도 언덕에 위치하므로 체력 안배가 필요합니다. 주차장에서 경내까지 거리와 구체적인 경사도는 현장 확인이 필요합니다.",
+  "사성암(구례): 오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요."
+ ],
+ "costs": {
+  "currency": "KRW",
+  "people": 4,
+  "people_assumed": false,
+  "items": [
+   {
+    "category": "장거리 교통",
+    "label": "KTX·SRT 서울 강남구↔순천/구례 왕복 4명",
+    "amount": 323200,
+    "basis": "1인 편도 약 40,400원 × 2회 × 4명 (거리 기준 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "렌터카",
+    "label": "렌터카 2일",
+    "amount": 140000,
+    "basis": "하루 70,000원 × 2일 (보험 포함 기준가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "유류비",
+    "label": "현지 이동 약 131km",
+    "amount": 18500,
+    "basis": "131km ÷ 12km/L × 1,700원/L",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "식비",
+    "label": "1일차 점심 · 남녘들밥상",
+    "amount": 48000,
+    "basis": "1인 12,000원 × 4명 (평균 단가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "입장료",
+    "label": "순천만국가정원",
+    "amount": null,
+    "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
+    "estimated": true,
+    "unknown": true
+   },
+   {
+    "category": "입장료",
+    "label": "순천만습지",
+    "amount": null,
+    "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
+    "estimated": true,
+    "unknown": true
+   },
+   {
+    "category": "식비",
+    "label": "1일차 저녁 · 최대감벌교꼬막",
+    "amount": 60000,
+    "basis": "1인 15,000원 × 4명 (평균 단가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "숙박",
+    "label": "순천만민속한옥펜션 1박 1실",
+    "amount": 100000,
+    "basis": "1박 객실 100,000원 기준가 × 1실 (실제 요금은 예약 시 확인)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "입장료",
+    "label": "화엄사",
+    "amount": null,
+    "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
+    "estimated": true,
+    "unknown": true
+   },
+   {
+    "category": "식비",
+    "label": "2일차 점심 · 그옛날산채식당",
+    "amount": 48000,
+    "basis": "1인 12,000원 × 4명 (평균 단가 추정)",
+    "estimated": true,
+    "unknown": false
+   },
+   {
+    "category": "입장료",
+    "label": "사성암(구례)",
+    "amount": null,
+    "basis": "관광공사 요금 정보 없음 — 현장 확인 필요",
+    "estimated": true,
+    "unknown": true
+   }
+  ],
+  "total": 737700,
+  "per_person": 184400,
+  "budget": 1000000,
+  "over_budget": false,
+  "over_by": 0,
+  "note": "모든 금액은 추정이에요. 입장료는 관광공사 요금 정보에 금액이 있을 때만 넣었고, 없으면 '확인 필요'로 두었어요."
+ }
+}

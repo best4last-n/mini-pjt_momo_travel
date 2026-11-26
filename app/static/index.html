@@ -1,90 +1,88 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-season="winter">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>모모의 여행 상담소</title>
+<meta name="description" content="우체부 철새 모모가 운영시간·휴무일까지 확인한 국내 여행 일정을 엽서처럼 배달해 드려요.">
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
-<header><h1>✉ 모모의 여행 상담소</h1><p>우체부 철새 모모가 운영시간·휴무일까지 확인한 국내 여행 일정을 짜 드려요 (경주 · 순천/구례 · 수원)</p></header>
-<main>
-  <div id="log"><div class="msg momo">안녕하세요, 우체부 철새 모모예요! 가고 싶은 지역, 날짜, 함께 가는 분을 알려 주세요.
-예) 12월 12일 토요일에 아이 둘이랑 경주 1박 2일 가요. 서울에서 차로 출발해요</div></div>
-  <div id="plan"></div>
-  <div class="actions" id="actions"></div>
-</main>
-<form id="f">
-  <button type="button" id="mic" class="mic" aria-label="음성으로 입력" aria-pressed="false" hidden>🎤</button>
-  <textarea id="q" placeholder="모모에게 편지 쓰기… (마이크로 말해도 돼요)"></textarea><button>보내기</button>
-  <p id="mic-note" class="mic-note" hidden></p>
-</form>
-<script src="/static/cards.js"></script>
-<script>
-let sessionId = null, draftVersion = null;
-const log = document.getElementById("log"), planEl = document.getElementById("plan"), actions = document.getElementById("actions");
-function say(text, who) { const d = document.createElement("div"); d.className = "msg " + who; d.textContent = text; log.appendChild(d); d.scrollIntoView({block: "end"}); return d; }
-async function send(body) {
-  if (body.question) say(body.question, "me");
-  const wait = say("모모가 날아가서 알아보는 중이에요…", "momo");
-  try {
-    const r = await fetch("/query", { method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...body, session_id: sessionId, draft_version: draftVersion }) });
-    const j = await r.json();
-    wait.remove();
-    sessionId = j.session_id || sessionId;
-    say(j.answer, "momo");
-    actions.innerHTML = "";
-    if (j.chips) { const c = document.createElement("div"); c.className = "chips";
-      j.chips.forEach(t => { const b = document.createElement("button"); b.type = "button"; b.textContent = t;
-        b.onclick = () => send({ question: t }); c.appendChild(b); }); log.appendChild(c); }
-    if (j.itinerary && j.itinerary.length) renderItinerary(planEl, j.itinerary);
-    if (j.status === "승인 대기") {
-      draftVersion = j.draft_version || draftVersion;
-      const b = document.createElement("button"); b.className = "primary"; b.type = "button"; b.textContent = "확정할게요";
-      b.onclick = () => send({ question: "", action: "approve" }); actions.appendChild(b);
-    }
-    if (j.status === "확정") {
-      actions.innerHTML = `<a href="${j.share_url}" target="_blank">공유 링크 열기</a><a href="${j.ics_url}">캘린더(.ics) 받기</a>`;
-    }
-  } catch (e) { wait.textContent = "앗, 연결이 끊겼어요. 다시 보내 주실래요?"; }
-}
-// 음성 입력: 브라우저 내장 음성 인식(Web Speech API). 인식 결과는 입력창에만 채우고, 보내기는 사용자가 확인 후 누름
-(function voice() {
-  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const mic = document.getElementById("mic"), note = document.getElementById("mic-note"), q = document.getElementById("q");
-  if (!SR) {
-    note.textContent = "이 브라우저는 음성 인식을 지원하지 않아요. 휴대폰 키보드의 마이크(받아쓰기)를 써 주세요.";
-    note.hidden = false;
-    return;
-  }
-  mic.hidden = false;
-  let rec = null, base = "";
-  const stop = () => { if (rec) rec.stop(); };
-  mic.onclick = () => {
-    if (rec) { stop(); return; }
-    rec = new SR();
-    rec.lang = "ko-KR"; rec.interimResults = true; rec.continuous = false;
-    base = q.value ? q.value.trim() + " " : "";
-    rec.onresult = e => {
-      let text = "";
-      for (const r of e.results) text += r[0].transcript;
-      q.value = base + text;
-    };
-    rec.onerror = e => {
-      note.textContent = e.error === "not-allowed" || e.error === "service-not-allowed"
-        ? "마이크 권한이 꺼져 있어요. 브라우저 설정에서 마이크를 허용해 주세요(휴대폰은 https 주소에서만 돼요)."
-        : "잘 못 들었어요. 마이크를 다시 눌러 말씀해 주세요.";
-      note.hidden = false;
-    };
-    rec.onend = () => { rec = null; mic.classList.remove("on"); mic.setAttribute("aria-pressed", "false");
-      if (q.value.trim()) { note.textContent = "받아 적은 내용을 확인하고 '보내기'를 눌러 주세요."; note.hidden = false; q.focus(); } };
-    mic.classList.add("on"); mic.setAttribute("aria-pressed", "true");
-    note.textContent = "듣고 있어요… 말씀이 끝나면 자동으로 멈춰요. (음성은 브라우저의 음성 인식 서비스에서 글자로 바뀌어요)";
-    note.hidden = false;
-    rec.start();
-  };
-})();
-document.getElementById("f").onsubmit = e => { e.preventDefault(); const q = document.getElementById("q"); if (!q.value.trim()) return; send({ question: q.value.trim() }); q.value = ""; };
-</script>
+<a class="skip" href="#q">입력창으로 건너뛰기</a>
+<div class="app">
+  <section class="convo" aria-label="모모와의 상담">
+    <header class="desk-bar">
+      <div id="desk" class="desk" data-mood="idle"></div>
+      <div class="desk-title">
+        <h1 class="display">모모의 여행 상담소</h1>
+        <p class="desk-sub">경주 · 순천/구례 · 수원 — 운영시간·휴무일까지 확인해요</p>
+        <p id="mood-line" class="mood-line" aria-live="polite">편지를 기다리고 있어요</p>
+      </div>
+      <nav class="desk-nav" aria-label="계획 관리">
+        <button type="button" class="btn sm ghost" data-act="trips-open" aria-haspopup="dialog">내 여행 계획</button>
+        <button type="button" class="btn sm ghost" data-act="new-chat">새 상담</button>
+      </nav>
+      <div class="airmail" aria-hidden="true"></div>
+    </header>
+
+    <div class="m-condbar">
+      <button type="button" class="m-toggle" data-act="m-cond" aria-expanded="false" aria-controls="m-cond-slot">
+        <span class="m-t">여행 조건</span><span id="m-cond-sum" class="sum"></span>
+        <svg class="ico chev" aria-hidden="true" focusable="false"><use href="#ico-chev"/></svg>
+      </button>
+      <div class="m-prog-wrap"><div class="prog compact" id="m-prog"><div class="prog-top"><span class="prog-l"></span><span class="prog-n"></span></div>
+        <div class="prog-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-label="여행 조건 확정 진행률"><span class="prog-fill"></span></div></div></div>
+      <div id="m-cond-slot" class="m-body" hidden></div>
+    </div>
+
+    <div id="scroller" class="scroller">
+      <div id="thread" class="thread" aria-live="polite" aria-relevant="additions">
+        <div id="brochure" class="brochure" hidden></div>
+      </div>
+    </div>
+
+    <form id="composer" class="composer" autocomplete="off">
+      <div class="composer-row">
+        <button type="button" id="mic" class="mic" aria-label="음성으로 입력" aria-pressed="false" hidden>🎤</button>
+        <label class="sr" for="q">모모에게 보낼 말</label>
+        <textarea id="q" rows="1" placeholder="모모에게 편지 쓰기… (마이크로 말해도 돼요)"></textarea>
+        <button id="send" class="send" type="submit"><span>보내기</span><svg class="ico" aria-hidden="true" focusable="false"><use href="#ico-send"/></svg></button>
+      </div>
+      <p id="mic-note" class="mic-note" hidden></p>
+    </form>
+  </section>
+
+  <aside id="side" class="side" aria-label="여행 정보">
+    <section id="cond-panel" class="panel cond-panel" aria-label="여행 조건"></section>
+    <section id="cost-panel" class="panel cost-panel" aria-label="예상 경비" hidden></section>
+    <section id="map-panel" class="panel map-panel" aria-label="지도">
+      <div id="map-tabs" class="map-tabs" role="tablist" aria-label="날짜별 지도"></div>
+      <div class="map-box">
+        <div id="map" class="map" aria-label="방문 순서 지도"></div>
+        <div id="map-empty" class="map-empty"><svg class="bird big" aria-hidden="true" focusable="false"><use href="#momo-bird"/></svg><p>계획서가 나오면 여기에 날짜별 동선을 그려 드릴게요.</p></div>
+      </div>
+      <p class="legend">점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요.</p>
+    </section>
+    <section id="act-panel" class="panel act-panel" aria-label="합계와 확정" hidden></section>
+  </aside>
+</div>
+
+<dialog id="trips" class="drawer" aria-labelledby="trips-h">
+  <div class="drawer-h">
+    <h2 id="trips-h" class="display">내 여행 계획</h2>
+    <button type="button" class="btn sm ghost" data-act="new-chat">새 여행 상담</button>
+    <button type="button" class="x" data-act="trips-close" aria-label="닫기">×</button>
+  </div>
+  <div id="trips-body" class="drawer-b"></div>
+</dialog>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="/static/app.js"></script>
 </body>
 </html>

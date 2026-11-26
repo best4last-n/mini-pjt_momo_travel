@@ -430,3 +430,7 @@
   - API: /trips, /trips/{sid}, /plan/{id}.html·.docx·/report·/expenses(GET/POST/DELETE).
   - E2E 확인: intake → 계획(89%) → 사성암 추가 → 강도 변경(100%) → 확정 → 공유·HTML(142KB)·DOCX(120KB)·리포트 → 지출 입력 → 목록·불러오기 모두 200. 경주 계획에서 동선 최적화로 이동 45분 단축.
 - **서브에이전트**: general-purpose · A안 화면(index/app.js/style.css/share.html — 2단 레이아웃, Leaflet 지도·스크롤 연동, 브로셔 카드, 신호등 정보창, 편집 버튼, 경비 카드·정산 화면, 모모 데스크 애니메이션, 진행률, 내 여행 계획, 인쇄 CSS, 데모 모드) 작업 중. 계약은 SendMessage로 5회 전달.
+
+### [2026-11-26 13:00] 개편 화면(A안) 완료·실제 브라우저 검증
+- **서브에이전트 결과**(general-purpose, 화면 전담): app/static/index.html·app.js·style.css·share.html 재작성 — 항공우편 띠·엽서형 여행 개요(우표·소인)·승차권형 장거리 카드·일자별 타임라인(지도와 같은 색)·사진 썸네일 카드·"모모의 이유"·자세히 접기·편집 버튼(▲▼·다른 날로·빼기 2단 확인)·후보 '일정에 넣기'·이름으로 추가, 오른쪽 신호등 조건(눌러서 수정)·진행률 바·예상 경비 카드·Leaflet 지도(날짜 탭·순번 마커·점선·구간 라벨·스크롤 연동), 모바일 상단 조건 바·접이식 지도, 모모 안내 데스크 SVG 애니메이션(대기·생각·기쁨·질문·사과·도장), 100% 미만 '지금 조건 그대로 확정', 내 여행 계획 드로어(localStorage), 공유 페이지 경비 정산·리포트 링크, 인쇄 CSS, ?demo=1. jsdom으로 동작 검증, 실제 렌더링은 미확인으로 보고.
+- **Claude 검증·수정**: Playwright 설치 후 실제 Chromium 캡처(evaluation/screenshots/pc_1280·mobile_360·pc_1280_cards·pc_1280_bottom·share_expenses·report·print_sample.pdf). 발견·수정: PC에서 왼쪽 스크롤 영역에 min-height:0이 없어 문서가 5,379px로 늘어남 → 수정, scrollIntoView가 overflow:hidden 바깥 틀을 밀어 모모 데스크가 가려짐 → overflow:clip, 조건 목록이 길어 지도가 첫 화면 밖 → PC 조건 행 촘촘히. 콘솔 오류 0, 가로 스크롤 없음(1280·360). 리포트 금액 표기 통일. 서버 재시작(새 백엔드·화면 반영).

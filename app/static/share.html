@@ -1,22 +1,64 @@
 <!doctype html>
-<html lang="ko">
+<html lang="ko" data-season="winter">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__TITLE__</title>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>__TITLE__ · 모모의 여행 상담소</title>
+<meta name="color-scheme" content="light dark">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Jua&family=Noto+Sans+KR:wght@400;500;700&display=swap">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="">
 <link rel="stylesheet" href="/static/style.css">
 </head>
-<body>
-<header><h1>✉ __TITLE__</h1><p id="sub"></p></header>
-<main>
-  <div id="plan"></div>
-  <p class="src">장소·운영시간·사진 출처: 한국관광공사 TourAPI(공공누리). 이동시간은 직선거리 기반 추정이에요. ·
-    <a href="/plan/__PLAN_ID__.ics">캘린더(.ics) 받기</a></p>
-</main>
-<script src="/static/cards.js"></script>
-<script>
-const P = __DATA__;
-document.getElementById("sub").textContent = `${P.region_label} · ${P.start} 출발` + (P.departure_sido ? ` · 출발지 ${P.departure_sido}` : "") + " · 읽기 전용";
-renderItinerary(document.getElementById("plan"), P.itinerary);
-</script>
+<body class="read-only">
+<div class="app">
+  <section class="convo" aria-label="여행 계획서">
+    <header class="desk-bar share-bar">
+      <div class="desk mini"><svg class="bird" aria-hidden="true" focusable="false"><use href="#momo-bird"/></svg></div>
+      <div class="desk-title">
+        <h1 class="display">__TITLE__</h1>
+        <p class="desk-sub">모모의 여행 상담소가 배달한 확정 계획서 · 읽기 전용</p>
+      </div>
+      <nav class="desk-nav noprint" aria-label="바로가기">
+        <a class="btn sm ghost" href="/">나도 상담하기</a>
+      </nav>
+      <div class="airmail" aria-hidden="true"></div>
+    </header>
+
+    <div class="m-condbar">
+      <button type="button" class="m-toggle" data-act="m-cond" aria-expanded="false" aria-controls="m-cond-slot">
+        <span class="m-t">여행 조건</span><span id="m-cond-sum" class="sum"></span>
+        <svg class="ico chev" aria-hidden="true" focusable="false"><use href="#ico-chev"/></svg>
+      </button>
+      <div id="m-cond-slot" class="m-body" hidden></div>
+    </div>
+
+    <div id="scroller" class="scroller">
+      <div id="thread" class="thread">
+        <div id="brochure" class="brochure" hidden></div>
+        <section id="expenses" class="expenses" aria-labelledby="exp-h" hidden></section>
+      </div>
+    </div>
+  </section>
+
+  <aside id="side" class="side" aria-label="여행 정보">
+    <section id="cond-panel" class="panel cond-panel" aria-label="여행 조건"></section>
+    <section id="cost-panel" class="panel cost-panel" aria-label="예상 경비" hidden></section>
+    <section id="map-panel" class="panel map-panel" aria-label="지도">
+      <div id="map-tabs" class="map-tabs" role="tablist" aria-label="날짜별 지도"></div>
+      <div class="map-box">
+        <div id="map" class="map" aria-label="방문 순서 지도"></div>
+        <div id="map-empty" class="map-empty" hidden><p>지도에 그릴 일정이 없어요.</p></div>
+      </div>
+      <p class="legend">점선은 방문 순서(직선)예요. 실제 도로와 다를 수 있어요.</p>
+    </section>
+    <section id="act-panel" class="panel act-panel" aria-label="내려받기" hidden></section>
+  </aside>
+</div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script>window.MOMO_BOOT = { readOnly: true, planId: "__PLAN_ID__", payload: __DATA__ };</script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="/static/app.js"></script>
 </body>
 </html>
