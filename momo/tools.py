@@ -66,6 +66,8 @@ def festivals(region: str, start: date, end: date) -> list[dict]:
         if s <= end.strftime("%Y%m%d") and e >= start.strftime("%Y%m%d"):
             add_context(p["contentid"], place_doc_text(p))
             out.append({"name": p["title"], "start": s, "end": e, "source": "한국관광공사 TourAPI"})
+    add_context(f"tool:search_festivals:{region}", f"축제 조회 결과({data.region_label(region)} {start.isoformat()}~{end.isoformat()}, "
+                f"관광공사 수집 스냅샷 2026-12-01~2027-02-28): " + (", ".join(f"{x['name']}({x['start']}~{x['end']})" for x in out) or "해당 기간 축제·행사 없음"))
     return out
 
 
@@ -92,12 +94,15 @@ def weather(region: str, days: list[date]) -> dict:
             rows = [f"{t[5:]} 최저 {lo:.0f}도/최고 {hi:.0f}도, 강수확률 {pp}%" for t, lo, hi, pp in
                     zip(dd["time"], dd["temperature_2m_min"], dd["temperature_2m_max"], dd["precipitation_probability_max"])]
             rain = any((pp or 0) >= 60 for pp in dd["precipitation_probability_max"])
-            return {"kind": "forecast", "text": "예보(Open-Meteo): " + " · ".join(rows), "rain": rain}
+            text = "예보(Open-Meteo): " + " · ".join(rows)
+            add_context("tool:get_weather", f"날씨 도구 결과: {text}")
+            return {"kind": "forecast", "text": text, "rain": rain}
         except Exception:
             pass
     m = days[0].month
-    return {"kind": "seasonal", "rain": False,
-            "text": f"여행 날짜가 예보 범위(약 16일) 밖이라 계절 평년 안내예요: {SEASONAL.get(m, '계절에 맞는 옷차림을 준비하세요')}"}
+    text = f"여행 날짜가 예보 범위(약 16일) 밖이라 계절 평년 안내예요: {SEASONAL.get(m, '계절에 맞는 옷차림을 준비하세요')}"
+    add_context("tool:get_weather", f"날씨 도구 결과: {text}")
+    return {"kind": "seasonal", "rain": False, "text": text}
 
 
 def season_of(d: date) -> str:

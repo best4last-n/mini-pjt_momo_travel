@@ -26,7 +26,12 @@ from .config import DEFAULT_DEPART, STATE_DB, today
 from .llm import MOMO_PERSONA, chat, structured
 from .schemas import DayPick, ParsedRequest, PickItem
 
-SUPPORTED_LABEL = "경주, 순천/구례"
+def supported_label() -> str:
+    return ", ".join(data.region_label(r) for r in data.available_regions())
+
+
+def supported_ids() -> str:
+    return ", ".join(data.available_regions())
 
 
 class State(TypedDict, total=False):
@@ -243,6 +248,7 @@ def _run_plan(state: State, spec: planner.TripSpec, request: str, notes: list[st
             p = data.places(spec.region).get(it.get("place_id") or "")
             if p:
                 tools.add_context(p["contentid"], tools.place_doc_text(p))
+        _add_tool_contexts(spec, items, res, notes, w)
         contexts = tools.CONTEXTS.get()
     finally:
         tools.CONTEXTS.reset(token)
@@ -269,6 +275,27 @@ def _run_plan(state: State, spec: planner.TripSpec, request: str, notes: list[st
                   "weather": "rain" if w.get("rain") else ("snow" if spec.start.month in (12, 1, 2) else "clear")},
         "extra": {"draft_version": version, "violations": viol},
     }
+
+
+def _add_tool_contexts(spec: planner.TripSpec, items: list, res: dict, notes: list[str], w: dict) -> None:
+    """일정을 만들 때 쓴 도구·코드 판정 결과도 근거 문서로 남긴다(장소 문서 외의 근거: 조건·날씨·이동·운영 판정)."""
+    tools.add_context("agent:conditions", (
+        f"조건 구조화 결과: 지역 {data.region_label(spec.region)}, 시작일 {spec.start.isoformat()}"
+        f"({'월화수목금토일'[spec.start.weekday()]}), {spec.nights}박 {spec.nights + 1}일, 출발지 {spec.departure or '모름'}, "
+        f"이동수단 {spec.transport}, 동행 {spec.companions or '정보 없음'}, 취향 {', '.join(spec.preferences) or '없음'}. "
+        f"적용한 안내: {' / '.join(notes) or '없음'}"))
+    tools.add_context("tool:get_weather", f"날씨 도구 결과: {w['text']}")
+    legs = []
+    for it in items:
+        if it["type"] == "move":
+            legs.append(f"{it['place_name']} 이동 {it['start_time']}~{it['end_time']} (직선거리×1.3÷80km/h 추정)")
+        elif it["travel_minutes_from_prev"]:
+            legs.append(f"{it['date']} {it['place_name']}까지 이동 약 {it['travel_minutes_from_prev']}분 ({it['travel_source']}, 직선거리×1.3÷30km/h 추정)")
+    tools.add_context("tool:estimate_travel", "이동시간 추정 결과: " + " / ".join(legs))
+    checks = [f"{it['date']} {it['start_time']}~{it['end_time']} {it['place_name']}: 운영 {it.get('hours_text') or it['hours_status']}"
+              f" ({it['hours_status']})" for it in items if it["type"] != "move"]
+    tools.add_context("tool:validate_plan", f"규칙 검사 결과(위반 {len(res['violations'])}건, 재생성 {res['regenerations']}회): "
+                      + " / ".join(checks))
 
 
 def modify_node(state: State) -> State:
@@ -336,28 +363,28 @@ def _region_reply(state: State, why: str, p: ParsedRequest) -> State:
     if p.departure and data.norm_sido(p.departure):
         pre += f"출발지는 {_dep_label(p.departure)} 기준으로만 쓸게요(상세 주소는 저장하지 않아요). "
     if why == "missing":
-        return {"status": "되묻기", "answer": pre + "좋아요, 어디로 날아가 볼까요? 지금은 경주와 순천/구례 일정을 꼼꼼히 짜 드릴 수 있어요. "
+        return {"status": "되묻기", "answer": pre + f"좋아요, 어디로 날아가 볼까요? 지금은 {supported_label()} 일정을 꼼꼼히 짜 드릴 수 있어요. "
                 "가고 싶은 지역과 함께, 당일치기인지 1박 2일인지, 어디서 출발하시는지도 같이 알려 주시면 바로 정리해 드릴게요!",
-                "extra": {"chips": ["경주", "순천/구례", "당일치기", "1박 2일", "자차", "대중교통"]},
+                "extra": {"chips": [*[data.region_label(r) for r in data.available_regions()], "당일치기", "1박 2일", "자차", "대중교통"]},
                 "trace": _t(state, "ask_back", "지역 없음", "되묻기 1회(지역·길이·출발지·이동수단)")}
     if why == "overseas":
         return {"status": "정보", "answer": f"{p.region_text or '해외'} 여행이군요! 해외 일정(가벼운 모드)은 아직 준비 중이에요. "
                 "해외는 운영시간을 제가 검증할 수 없어서, 현지에서 꼭 한 번 더 확인해 주셔야 해요. "
-                f"지금은 국내 {SUPPORTED_LABEL} 일정을 꼼꼼히 짜 드릴 수 있어요.",
+                f"지금은 국내 {supported_label()} 일정을 꼼꼼히 짜 드릴 수 있어요.",
                 "theme": {"scope": "overseas"},
                 "trace": _t(state, "plan", "해외", "가벼운 모드 미구현 → 안내")}
     name = p.region_text or "그 지역"
     extra = " 수원은 데이터를 준비하고 있어서 곧 함께 안내해 드릴 수 있어요." if why == "unprepared" else ""
     return {"status": "정보", "answer": f"{name}은(는) 아직 제가 자세히 날아 본 곳이 아니라, 운영시간·휴무일까지 검증한 정밀 일정은 "
-            f"준비된 지역({SUPPORTED_LABEL})만 가능해요.{extra} 대신 준비된 지역으로 짜 드리거나, "
+            f"준비된 지역({supported_label()})만 가능해요.{extra} 대신 준비된 지역으로 짜 드리거나, "
             f"{name}은 관광공사 '대한민국 구석구석'에서 기본 정보를 먼저 살펴보시는 걸 추천해요.",
-            "extra": {"chips": ["경주 1박 2일", "순천/구례 당일치기"]},
+            "extra": {"chips": [f"{data.region_label(r)} 1박 2일" for r in data.available_regions()]},
             "trace": _t(state, "plan", "지원 범위 밖 지역", why)}
 
 
-INFO_SYSTEM = MOMO_PERSONA + f"""
-정보 질문(운영시간·휴무일·축제·날씨·장소 추천·예약 문의)에 도구로 확인한 사실만 답한다. 오늘은 {{today}}.
-- 지원 지역: {SUPPORTED_LABEL} (region 값: gyeongju, suncheon_gurye). 그 밖은 준비 안 된 지역이라고 안내.
+INFO_SYSTEM = MOMO_PERSONA + """
+정보 질문(운영시간·휴무일·축제·날씨·장소 추천·예약 문의)에 도구로 확인한 사실만 답한다. 오늘은 {today}.
+- 지원 지역: {supported} (region 값: {region_ids}). 그 밖은 준비 안 된 지역이라고 안내.
 - 운영시간·휴무일을 말할 때는 '출처: 한국관광공사'를 쓰고, 변동될 수 있으니 방문 전 확인을 권한다.
 - 실시간 좌석 확인·예약·결제는 대신 할 수 없다고 먼저 말하고, 직접 확인 방법(전화·예약 앱)과 도구로 찾은 후보 식당(이름·운영시간·연락처)을 안내한다.
 - 오늘 영업·휴무 여부는 도구 결과의 today_status(코드 판정: 확인됨/휴무/확인 필요)를 그대로 따른다. 휴무인 곳은 '오늘 휴무'라고 알리고 후보에서 뺀다.
@@ -377,7 +404,7 @@ def info_node(state: State) -> State:
 
     @tool
     def retrieve_places(query: str, region: str) -> str:
-        """지역 안의 관광지·음식점·숙박 장소를 검색한다. region은 gyeongju 또는 suncheon_gurye."""
+        """지역 안의 관광지·음식점·숙박 장소를 검색한다. region은 지원 지역 id(gyeongju, suncheon_gurye, suwon)."""
         hits = retrieve.search(query, region if region in data.available_regions() else None, k=5)
         out = []
         for h in hits:
@@ -414,7 +441,8 @@ def info_node(state: State) -> State:
         return json.dumps(tools.weather(region, days), ensure_ascii=False)
 
     agent = create_agent(chat(0.2, 1500), tools=[retrieve_places, get_operating_info, search_festivals, get_weather],
-                         system_prompt=INFO_SYSTEM.replace("{today}", _today_label()))
+                         system_prompt=INFO_SYSTEM.replace("{today}", _today_label()).replace("{supported}", supported_label())
+                         .replace("{region_ids}", supported_ids()))
     token = tools.CONTEXTS.set([])
     try:
         res = agent.invoke({"messages": [("user", f"{state['question']}\n(추정 지역: {region or '미상'})")]},
