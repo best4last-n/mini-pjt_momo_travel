@@ -145,3 +145,23 @@ def test_optimizer_groups_nearby_places_across_meal_and_days():
     breakfasts = [it for it in items if "조식" in (it.get("notes") or [])]
     assert len(breakfasts) == 1 and breakfasts[0]["date"] == spec.days[1].isoformat()   # 숙박 다음 날 아침
     assert all("11:30" <= t <= "14:00" for t in lunches)                      # 점심 시각 지킴
+
+
+def test_replan_guard_and_diff(seeded, monkeypatch):
+    from momo.schemas import ParsedRequest
+
+    class _S:
+        def invoke(self, *_a, **_k):
+            return ParsedRequest(intent="plan", region_text="순천", month=12, day=20, nights=1)
+    monkeypatch.setattr(agent, "structured", lambda *_a, **_k: _S())
+    r = agent.handle_query("순천으로 12월 20일 1박 2일 다시 짜 줘", "sw")
+    assert r["status"] == "되묻기" and r["replan_choice"]["options"][0]["key"] == "update"
+    assert any("지역" in d for d in r["replan_choice"]["diffs"])
+    assert len(r["itinerary"]) == 0 or r["draft_version"] == "v1"                    # 아직 덮어쓰지 않음
+    # 편집하면 바뀐 점(빠짐·이동시간)이 계산되고 다시 열어도 남는다
+    e = agent.handle_query("빼기", "sw", "edit", edit={"op": "remove", "place_id": _id("천마총")})
+    assert e["plan_diff"]["removed"][0]["name"].startswith("천마총") and "빠짐 1곳" in e["plan_diff"]["summary"]
+    t = agent.load_trip("sw")
+    assert t["plan_diff"]["removed"] and t["plan"]["diff"]["summary"] == e["plan_diff"]["summary"]
+    msgs = store.list_messages("sw")
+    assert [m["role"] for m in msgs][-2:] == ["user", "momo"] and msgs[-1]["plan_no"] >= 1

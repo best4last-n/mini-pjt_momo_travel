@@ -84,7 +84,8 @@ def _run(prep: dict) -> dict:
                               set_req=body.get("set") if action == "set" else None,
                               start_req=body.get("start") if action == "start" else None,
                               cost_req=body.get("cost") if action == "cost" else None,
-                              pack_req=body.get("pack") if action == "pack" else None)
+                              pack_req=body.get("pack") if action == "pack" else None,
+                              replan="update" if body.get("replan") == "update" else None)
     if prep["notice"]:
         resp["answer"] = prep["notice"] + "\n\n" + resp["answer"]
     return resp
@@ -200,6 +201,14 @@ async def places_alternatives(session_id: str = "", place_id: str = "", q: str =
     if out.get("error"):
         return JSONResponse(status_code=404, content=out)
     return out
+
+
+@app.get("/trips/{session_id}/messages")
+async def trip_messages(session_id: str, limit: int = 300):
+    """상담 기록(사용자 요청·모모 답변) — 새로 고침·다시 열기 때 대화를 그대로 복원."""
+    from momo import store
+    await run_in_threadpool(agent.backfill_messages, session_id)      # 기록 기능 전 대화는 이력에서 한 번 복원
+    return {"session_id": session_id, "messages": store.list_messages(session_id, max(1, min(1000, limit)))}
 
 
 @app.post("/trips/{session_id}/undo")

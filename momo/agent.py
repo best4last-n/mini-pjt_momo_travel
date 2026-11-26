@@ -40,6 +40,7 @@ class State(TypedDict, total=False):
     question: str
     action: str | None
     draft_version_in: str | None
+    replan: str | None           # 대량 재수립 확인 결과: "update"(이 계획을 새 버전으로)
     session_id: str
     parsed: dict
     status: str
@@ -263,6 +264,25 @@ def plan_node(state: State) -> State:
         return {"status": "되묻기", "answer": f"앗, {err}. 혹시 어느 날짜를 말씀하신 걸까요? 날짜를 다시 알려 주시면 바로 짜 드릴게요!",
                 "extra": {"chips": ["2월 28일", "3월 1일", "다른 날짜 입력"]},
                 "trace": _t(state, "parse_conditions", "날짜 검증", err)}
+    old = state.get("spec") if state.get("itinerary") else None
+    if old and state.get("replan") != "update":
+        diffs = []
+        if old.get("region") != region:
+            diffs.append(f"지역 {data.region_label(old['region'])} → {data.region_label(region)}")
+        if (p.month and p.day or p.relative_date) and old.get("start") != start.isoformat():
+            diffs.append(f"출발일 {old['start']} → {start.isoformat()}")
+        if p.nights is not None and int(old.get("nights") or 0) != p.nights:
+            diffs.append(f"기간 {old.get('nights')}박 → {p.nights}박")
+        if diffs:
+            return {"status": "되묻기", "stage": "plan",
+                    "answer": ("지금 만들어 둔 일정이 있어요. 이번 요청은 " + ", ".join(diffs) + "(으)로 일정을 크게 새로 짜는 내용이에요. "
+                               "어떻게 할까요?\n\n- **이 계획을 새 버전으로 고치기**: 지금 계획을 바탕으로 다시 짜요(바뀐 점을 한눈에 보여 드려요, 되돌리기 가능)\n"
+                               "- **새 여행으로 따로 시작하기**: 지금 계획은 '내 여행 계획'에 그대로 두고 새 상담을 열어요"),
+                    "extra": {"replan_choice": {"question": q, "diffs": diffs,
+                                                "options": [{"key": "update", "label": "이 계획을 새 버전으로 고치기"},
+                                                            {"key": "new", "label": "새 여행으로 따로 시작하기"}]},
+                              "chips": ["이 계획을 새 버전으로 고치기", "새 여행으로 따로 시작하기"]},
+                    "trace": _t(state, "replan_guard", q[:120], "초안 있음 + 지역·날짜·기간 변경 → 사용자에게 확인")}
     nights = p.nights
     if nights is None:
         nights = 1
@@ -1523,7 +1543,8 @@ def graph():
 
 def handle_query(question: str, session_id: str | None = None, action: str | None = None,
                  draft_version: str | None = None, edit: dict | None = None, set_req: dict | None = None,
-                 start_req: dict | None = None, cost_req: dict | None = None, pack_req: dict | None = None) -> dict:
+                 start_req: dict | None = None, cost_req: dict | None = None, pack_req: dict | None = None,
+                 replan: str | None = None) -> dict:
     """POST /query 본체. 질문은 그래프에 들어가기 전에 마스킹(LangSmith 업로드 전 포함)."""
     new_session = not session_id
     sid = session_id or uuid.uuid4().hex
@@ -1534,11 +1555,12 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     if set_req and isinstance(set_req.get("value"), str):
         set_req = {**set_req, "value": guardrails.mask_pii(set_req["value"])[0]}
     snap = None
-    if action in ("edit", "set"):        # 되돌리기용: 편집 직전 상태
-        cur = graph().get_state(cfg).values or {}
+    cur = graph().get_state(cfg).values or {}
+    prev_items, prev_dv = cur.get("itinerary") or [], cur.get("draft_version")
+    if action in ("edit", "set") or (replan == "update" and cur.get("itinerary")):   # 되돌리기용: 편집·재수립 직전 상태
         if cur.get("itinerary"):
             snap = {k: cur.get(k) for k in UNDO_KEYS}
-    out = graph().invoke({"question": masked, "action": action, "draft_version_in": draft_version,
+    out = graph().invoke({"question": masked, "action": action, "draft_version_in": draft_version, "replan": replan,
                           "session_id": sid, "edit": edit, "set_req": set_req, "start_req": start_req,
                           "cost_req": cost_req, "pack_req": pack_req}, cfg)
     answer = out.get("answer", "")
@@ -1554,6 +1576,12 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     if snap and out.get("draft_version") and out.get("draft_version") != snap.get("draft_version"):
         store.push_snapshot(sid, snap)          # 실제로 바뀐 편집만 되돌리기 목록에
     resp.update(_edit_meta(sid, out))
+    if prev_items and out.get("itinerary") and out.get("draft_version") and out.get("draft_version") != prev_dv:
+        dif = plan_diff(prev_items, out["itinerary"], spec_from_dict(out["spec"]) if out.get("spec") else None)
+        store.save_diff(sid, out["draft_version"], dif)
+        resp["plan_diff"] = dif
+        if resp.get("plan"):
+            _tag_plan(resp["plan"], dif)
     resp["quick_replies"] = resp.get("quick_replies") or resp.get("chips") or []
     from . import richtext
     if out.get("plan_out"):
@@ -1561,11 +1589,104 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
     else:
         resp["answer_html"] = richtext.md_to_html(answer)
     store.save_answer(sid, resp["answer_html"], (out.get("plan") or {}).get("trip", {}).get("title") or "모모의 답변")
+    # 상담 기록: 사용자가 보낸 것(채팅·버튼 편집·조건 변경 모두)과 모모 답변을 그대로 남긴다(다시 보기·다시 보내기)
+    kind = action or "chat"
+    utext = masked.strip() or _action_label(action, edit, set_req, start_req, cost_req, pack_req)
+    if utext and action != "pack":
+        store.log_message(sid, "user", kind, utext)
+    if action != "pack":
+        store.log_message(sid, "momo", kind, answer, resp.get("status") or "", resp["answer_html"], resp.get("draft_version"))
+    resp["plan_no"] = store.plan_no(sid)
     if out.get("plan") and (out.get("plan_out") or out.get("status") == "확정"):
         store.upsert_trip(sid, out["plan"], out.get("status") or "", out.get("plan_id") if out.get("status") == "확정" else None)
     if new_session:
         resp["trace"].insert(0, {"step": "session", "input": "", "output": "새 세션 시작"})
     return resp
+
+
+def backfill_messages(session_id: str) -> int:
+    """기록 기능 전에 나눈 대화: 체크포인트 이력(실제 대화 실행분만)에서 요청·답변을 복원해 기록에 넣는다."""
+    from datetime import datetime, timedelta, timezone
+    if store.list_messages(session_id, 1):
+        return 0
+    runs = []
+    for s in graph().get_state_history({"configurable": {"thread_id": session_id}}):
+        if s.next != () or (s.metadata or {}).get("source") != "loop":
+            continue
+        v = s.values or {}
+        if not (v.get("answer") or v.get("question")) or v.get("action") == "pack":
+            continue
+        try:
+            ts = datetime.fromisoformat(s.created_at).astimezone(timezone(timedelta(hours=9))).isoformat(timespec="seconds")
+        except Exception:
+            ts = None
+        runs.append((ts, v))
+    from . import richtext
+    for ts, v in reversed(runs):
+        kind = v.get("action") or "chat"
+        q = (v.get("question") or "").strip() or _action_label(v.get("action"), v.get("edit"), v.get("set_req"),
+                                                              v.get("start_req"), v.get("cost_req"), v.get("pack_req"))
+        if q:
+            store.log_message(session_id, "user", kind, q, created=ts)
+        store.log_message(session_id, "momo", kind, v.get("answer") or "", v.get("status") or "",
+                          richtext.md_to_html(v.get("answer") or ""), v.get("draft_version"), created=ts)
+    return len(runs)
+
+
+def _action_label(action, edit, set_req, start_req, cost_req, pack_req) -> str:
+    """질문 글 없이 버튼으로 보낸 요청을 사람이 읽을 수 있게."""
+    if action == "approve":
+        return "[확정] 이 계획으로 확정할게요"
+    if action == "edit" and edit:
+        return f"[일정 편집] {edit.get('op')}"
+    if action == "set" and set_req:
+        ch = set_req.get("changes") or [set_req]
+        return "[조건 변경] " + ", ".join(f"{SET_LABEL.get(c.get('key'), c.get('key'))}: {c.get('value')}" for c in ch if isinstance(c, dict))
+    if action == "start" and start_req:
+        return f"[여행 시작] {start_req.get('region')} {start_req.get('start_date')}~{start_req.get('end_date')}"
+    if action == "cost":
+        return "[경비] 비용 항목 변경"
+    return ""
+
+
+def _place_rows(items: list) -> dict:
+    """{장소 키: (이름, 일차)} — 이동·아침·주변 식사 자리표시는 빼고."""
+    days = sorted({it["date"] for it in items})
+    out = {}
+    for it in items:
+        if it["type"] == "move" or "조식" in (it.get("notes") or []) or it.get("source") == "식사 안내":
+            continue
+        key = it.get("place_id") or it["place_name"]
+        out.setdefault(key, (it["place_name"], days.index(it["date"]) + 1))
+    return out
+
+
+def plan_diff(prev: list, new: list, spec=None) -> dict:
+    """이전 초안 → 새 초안: 추가·빠짐·날짜 이동·이동시간 변화(분)."""
+    a, b = _place_rows(prev), _place_rows(new)
+    added = [{"place_id": k, "name": v[0], "day": v[1]} for k, v in b.items() if k not in a]
+    removed = [{"place_id": k, "name": v[0], "day": v[1]} for k, v in a.items() if k not in b]
+    moved = [{"place_id": k, "name": v[0], "from_day": a[k][1], "to_day": v[1]} for k, v in b.items() if k in a and a[k][1] != v[1]]
+    tb, ta = sum(_travel_by_day(prev).values()), sum(_travel_by_day(new).values())
+    parts = ([f"추가 {len(added)}곳"] if added else []) + ([f"빠짐 {len(removed)}곳"] if removed else []) \
+        + ([f"날짜 이동 {len(moved)}곳"] if moved else []) + ([f"이동시간 {'+' if ta > tb else '−'}{abs(ta - tb)}분"] if ta != tb else [])
+    big = len(added) + len(removed) + len(moved) >= 3
+    return {"added": added, "removed": removed, "moved": moved, "travel_before_min": tb, "travel_after_min": ta,
+            "summary": " · ".join(parts) or "장소는 그대로예요(시각만 다시 계산)", "big": big}
+
+
+def _tag_plan(plan: dict, dif: dict) -> None:
+    """일정 카드에 표시용 꼬리표: diff="new" / "moved"(from_day). 빠진 곳은 plan["diff"]에."""
+    new_ids = {x["place_id"] for x in dif["added"]}
+    mv = {x["place_id"]: x["from_day"] for x in dif["moved"]}
+    for d in plan.get("itinerary") or []:
+        for s in d.get("stops") or []:
+            k = s.get("place_id") or s.get("name")
+            if k in new_ids:
+                s["diff"] = "new"
+            elif k in mv:
+                s["diff"], s["from_day"] = "moved", mv[k]
+    plan["diff"] = dif
 
 
 UNDO_KEYS = ("itinerary", "spec", "plan", "draft_version", "violations", "ranked", "allowed", "answer")
@@ -1610,6 +1731,11 @@ def load_trip(session_id: str) -> dict | None:
            "stage": "refine", "answer": st.get("answer") or "", "plan": plan, "conditions": conds,
            "progress": brochure.progress(conds), "draft_version": st.get("draft_version"), "plan_id": st.get("plan_id")}
     out.update(_edit_meta(session_id, st))
+    dif = store.get_diff(session_id, st.get("draft_version"))
+    if dif:
+        out["plan_diff"] = dif
+        _tag_plan(out["plan"], dif)
+    out["plan_no"] = store.plan_no(session_id)
     if st.get("plan_id"):
         pid = st["plan_id"]
         out.update(share_url=f"/plan/{pid}", ics_url=f"/plan/{pid}.ics", html_url=f"/plan/{pid}.html",

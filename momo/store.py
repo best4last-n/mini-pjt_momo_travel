@@ -81,6 +81,64 @@ def _econn() -> sqlite3.Connection:
     return c
 
 
+def _mconn() -> sqlite3.Connection:
+    c = _conn()
+    c.execute("""CREATE TABLE IF NOT EXISTS messages (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, session_id TEXT, role TEXT, kind TEXT, text TEXT,
+        status TEXT, html TEXT, draft_version TEXT, created TEXT)""")
+    c.execute("CREATE INDEX IF NOT EXISTS idx_messages_sid ON messages(session_id, id)")
+    return c
+
+
+def log_message(session_id: str, role: str, kind: str, text: str, status: str = "", html: str = "",
+                draft_version: str | None = None, created: str | None = None) -> None:
+    """상담 기록 한 줄(사용자 요청·모모 답변). 개인정보는 호출 전에 가려 둔다."""
+    with _mconn() as c:
+        c.execute("INSERT INTO messages (session_id, role, kind, text, status, html, draft_version, created) VALUES (?,?,?,?,?,?,?,?)",
+                  (session_id, role, kind, (text or "")[:4000], status or "", (html or "")[:200000], draft_version,
+                   created or datetime.now(KST).isoformat(timespec="seconds")))
+
+
+def list_messages(session_id: str, limit: int = 300) -> list[dict]:
+    with _mconn() as c:
+        rows = c.execute("SELECT id, role, kind, text, status, html, draft_version, created FROM messages "
+                         "WHERE session_id=? ORDER BY id DESC LIMIT ?", (session_id, limit)).fetchall()
+    out, vers = [], {}
+    for r in reversed(rows):
+        if r[1] == "momo" and r[6] and r[6] not in vers:
+            vers[r[6]] = len(vers) + 1
+        out.append({"id": r[0], "role": r[1], "kind": r[2], "text": r[3], "status": r[4], "html": r[5],
+                    "draft_version": r[6], "plan_no": vers.get(r[6]) if r[6] else None, "created": r[7]})
+    return out
+
+
+def save_diff(session_id: str, draft_version: str, diff: dict) -> None:
+    with _conn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS diffs (session_id TEXT, draft_version TEXT, diff TEXT, PRIMARY KEY(session_id, draft_version))")
+        c.execute("INSERT OR REPLACE INTO diffs VALUES (?,?,?)", (session_id, draft_version, json.dumps(diff, ensure_ascii=False)))
+
+
+def get_diff(session_id: str, draft_version: str | None) -> dict | None:
+    if not draft_version:
+        return None
+    with _conn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS diffs (session_id TEXT, draft_version TEXT, diff TEXT, PRIMARY KEY(session_id, draft_version))")
+        row = c.execute("SELECT diff FROM diffs WHERE session_id=? AND draft_version=?", (session_id, draft_version)).fetchone()
+    return json.loads(row[0]) if row else None
+
+
+def plan_no(session_id: str) -> int:
+    """지금까지 나온 계획 버전 수(v1, v2…) — 모모 답변 기록의 서로 다른 draft_version 수."""
+    with _mconn() as c:
+        rows = c.execute("SELECT draft_version FROM messages WHERE session_id=? AND role='momo' AND draft_version IS NOT NULL "
+                         "ORDER BY id", (session_id,)).fetchall()
+    seen = []
+    for (dv,) in rows:
+        if dv and (not seen or seen[-1] != dv):
+            seen.append(dv)
+    return len(dict.fromkeys(seen))
+
+
 def save_answer(session_id: str, html_frag: str, title: str) -> None:
     """최신 답변 HTML(새 창으로 보기용)."""
     with _conn() as c:
