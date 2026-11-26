@@ -284,8 +284,13 @@ def ragas_eval(rnd: int) -> None:
     per = []
     for i, cid in enumerate(ids):
         per.append({"id": cid, **{k: _f(df.iloc[i].get(v)) for k, v in cols.items()}})
-    avg = {k: round(sum(x[k] for x in per if x[k] is not None) / max(1, sum(1 for x in per if x[k] is not None)), 3)
-           for k in cols}
+    avg = {}
+    for k in cols:      # 값이 하나도 없으면(호출 실패 등) 0이 아니라 None으로 남겨 실패를 드러냄
+        vals = [x[k] for x in per if x[k] is not None]
+        avg[k] = round(sum(vals) / len(vals), 3) if vals else None
+    failed = [x["id"] for x in per if all(x[k] is None for k in cols)]
+    if failed:
+        print(f"[RAGAS 경고] 전 지표 누락 {failed} — Bedrock 호출 실패 가능, 다른 Bedrock 작업과 동시에 돌리지 말 것")
     save(path(rnd, "ragas"), {"n": len(ids), "excluded_no_context": [c for c in resp if c not in ids],
                               "average": avg, "per_case": per})
     print("[RAGAS]", avg)
