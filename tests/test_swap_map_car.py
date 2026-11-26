@@ -102,3 +102,19 @@ def test_undo_restores_previous_order_and_reconfirm_flag(seeded):
     names = [s["name"] for d in u["plan"]["itinerary"] for s in d["stops"]]
     assert names == before and u["undo_count"] == 0
     assert c.post("/trips/sw/undo").status_code == 404
+
+
+def test_whole_trip_optimize_moves_across_days_respecting_rules():
+    """2일 일정에서 서로 먼 곳이 날짜가 엇갈려 있으면 전체 최적화가 날짜를 바꿔 묶는다(휴무·상한 지킴)."""
+    spec = planner.TripSpec(region="gyeongju", start=SAT, nights=1, intensity="보통")
+    a1, a2 = _id("경주 첨성대"), _id("천마총")             # 시내
+    far = [pid for pid, p in data.places("gyeongju").items() if p["kind"] == "attraction" and p.get("lat")
+           and abs(p["lat"] - data.places("gyeongju")[a1]["lat"]) + abs(p["lng"] - data.places("gyeongju")[a1]["lng"]) > 0.15][:2]
+    days = [[PickItem(place_id=a1, stay_minutes=60, reason="r"), PickItem(place_id=far[0], stay_minutes=60, reason="r")],
+            [PickItem(place_id=far[1], stay_minutes=60, reason="r"), PickItem(place_id=a2, stay_minutes=60, reason="r")]]
+    rows, moved = agent.route_whole(spec, days)
+    assert sum(len([x for x in r if x.role == "place"]) for r in rows) == 4
+    assert all(len([x for x in r if x.role == "place"]) <= 4 for r in rows)
+    assert {x.place_id for x in rows[0]} in ({a1, a2}, set(far))                  # 가까운 곳끼리 같은 날
+    p = agent.route_proposal(spec, days, "all")
+    assert p["scope"] == "all" and p["total_after_km"] <= p["total_before_km"]

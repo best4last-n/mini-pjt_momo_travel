@@ -508,7 +508,86 @@ def _fill_meals(spec: planner.TripSpec, days: list[list]) -> list[list]:
     return days
 
 
-def route_proposal(spec: planner.TripSpec, days: list[list]) -> dict:
+def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], list[dict]]:
+    """전체 일정 동선 최적화: 날짜를 넘나들며 관광지를 옮기거나 맞바꿔 총 이동거리를 줄인다.
+    식사·숙소는 그 날 그 자리에 고정, 그 날 휴무인 곳으로는 옮기지 않음, 하루 관광지 수는 원래 ±1곳(강도 상한 안, 빈 날 없음).
+    한 곳 옮기기 / 두 곳 맞바꾸기를 개선이 없을 때까지 반복(최대 4바퀴). → (새 일정, 옮긴 목록)"""
+    from .travel import km as _km
+    center = data.region_center(spec.region)
+    nd = len(days)
+    cap_base = planner.INTENSITY.get(spec.intensity, planner.INTENSITY["보통"])[2]
+    orig = [sum(1 for x in row if x.role == "place") for row in days]
+    caps = [min(max(cap_base, o), o + 1) for o in orig]        # 하루 늘어도 1곳까지(강도 상한 안에서)
+    floors = [max(1 if o else 0, o - 1) for o in orig]          # 하루 줄어도 1곳까지, 빈 날 없음
+    pl = data.places(spec.region)
+
+    def open_on(pid, di):
+        p = pl.get(pid)
+        return not p or hours.parse_open(p, spec.days[di]).status != "휴무"
+
+    def starts(rows):
+        out, last = [], None
+        for row in rows:
+            out.append(planner._pcoord(spec, last) if last else center)
+            last = next((x.place_id for x in row if x.role == "stay"), None) or last
+        return out
+
+    def day_km(row, start, di):
+        opt = planner.optimize_day(spec, list(row), start)
+        pts = [start] + [planner._pcoord(spec, x.place_id) for x in opt]
+        if di == nd - 1:
+            pts.append(center)          # 마지막 날은 귀가 출발점(지역 중심)까지
+        pts = [p for p in pts if p]
+        return sum(_km(a, b) for a, b in zip(pts, pts[1:])), opt
+
+    def insert_pos(row):
+        return next((i for i, x in enumerate(row) if x.role == "stay"), len(row))
+
+    rows = [list(r) for r in days]
+    st = starts(rows)
+    cost = [day_km(rows[i], st[i], i)[0] for i in range(nd)]
+    origin_day = {x.place_id: i for i, r in enumerate(rows) for x in r if x.role == "place"}
+    for _ in range(4):
+        improved = False
+        for i in range(nd):
+            for j in range(nd):
+                if i == j:
+                    continue
+                for a in [x for x in rows[i] if x.role == "place"]:
+                    if not open_on(a.place_id, j):
+                        continue
+                    # (1) 옮기기
+                    if (sum(1 for x in rows[j] if x.role == "place") < caps[j]
+                            and sum(1 for x in rows[i] if x.role == "place") > floors[i]):
+                        ri = [x for x in rows[i] if x is not a]
+                        rj = list(rows[j])
+                        rj.insert(insert_pos(rj), a)
+                        ci, cj = day_km(ri, st[i], i)[0], day_km(rj, st[j], j)[0]
+                        if ci + cj < cost[i] + cost[j] - 0.5:
+                            rows[i], rows[j], cost[i], cost[j], improved = ri, rj, ci, cj, True
+                            continue
+                    # (2) 맞바꾸기
+                    for b in [x for x in rows[j] if x.role == "place"]:
+                        if not open_on(b.place_id, i):
+                            continue
+                        ri = [b if x is a else x for x in rows[i]]
+                        rj = [a if x is b else x for x in rows[j]]
+                        ci, cj = day_km(ri, st[i], i)[0], day_km(rj, st[j], j)[0]
+                        if ci + cj < cost[i] + cost[j] - 0.5:
+                            rows[i], rows[j], cost[i], cost[j], improved = ri, rj, ci, cj, True
+                            break
+        if not improved:
+            break
+    rows = [day_km(rows[i], st[i], i)[1] for i in range(nd)]
+    moved = []
+    for i, r in enumerate(rows):
+        for x in r:
+            if x.role == "place" and origin_day.get(x.place_id, i) != i:
+                moved.append({"place_id": x.place_id, "from_day": origin_day[x.place_id] + 1, "to_day": i + 1})
+    return rows, moved
+
+
+def route_proposal(spec: planner.TripSpec, days: list[list], scope: str = "day") -> dict:
     """날짜별 동선 최적화 제안(적용 전 미리 보기): 지금 순서 vs 제안 순서, 이동 분·km."""
     from .travel import km as _km
     center = data.region_center(spec.region)
@@ -532,6 +611,15 @@ def route_proposal(spec: planner.TripSpec, days: list[list]) -> dict:
         starts.append(start)
         new_rows.append(planner.optimize_day(spec, list(row), start))
         last_stay = next((x.place_id for x in row if x.role == "stay"), None) or last_stay
+    moved = []
+    if scope == "all":
+        new_rows, moved = route_whole(spec, days)
+        allowed = {x.place_id for r in days for x in r} | {planner.MEAL_ID}
+        vb = len(planner.validate(spec, sched(days), allowed))
+        va = len(planner.validate(spec, sched(new_rows), allowed))
+        tb, ta = sum(_travel_by_day(sched(days)).values()), sum(_travel_by_day(sched(new_rows)).values())
+        if va > vb or ta >= tb:         # 규칙 위반이 늘거나 실제 이동이 줄지 않으면 날짜별 최적화로
+            new_rows, moved = [planner.optimize_day(spec, list(r), s) for r, s in zip(days, starts)], []
     before, after = _travel_by_day(sched(days)), _travel_by_day(sched(new_rows))
     out = []
     for i, d in enumerate(spec.days):
@@ -546,8 +634,18 @@ def route_proposal(spec: planner.TripSpec, days: list[list]) -> dict:
                     "after": [{"place_id": x.place_id, "name": nm(x.place_id), "role": x.role}
                               for x in (days[i] if same else new_rows[i]) if x.place_id != planner.MEAL_ID],
                     "user_ordered": (i + 1) in spec.user_ordered_days, "_row": days[i] if same else new_rows[i]})
-    return {"days": out, "total_saved_min": sum(r["saved_min"] for r in out),
-            "note": "식사·숙소 자리는 그대로 두고, 그 사이 관광지 순서를 이동이 가장 짧게 바꿔요(직선거리 기준 추정)."}
+    nmv = {m["place_id"]: m for m in moved}
+    for r in out:
+        for x in r["after"]:
+            if x["place_id"] in nmv:
+                x["from_day"] = nmv[x["place_id"]]["from_day"]
+    tb, ta = sum(r["before_min"] for r in out), sum(r["after_min"] for r in out)
+    return {"scope": scope, "days": out, "total_saved_min": max(0, tb - ta), "total_before_min": tb, "total_after_min": ta,
+            "total_before_km": round(sum(r["before_km"] for r in out), 1), "total_after_km": round(sum(r["after_km"] for r in out), 1),
+            "moved": [{**m, "name": nm(m["place_id"])} for m in moved],
+            "note": ("전체 일정 기준: 날짜를 넘나들며 가까운 곳끼리 묶어요. 식사·숙소 자리는 그대로, 그 날 쉬는 곳으로는 옮기지 않고, "
+                     "하루 관광지 수는 여행 강도 상한을 지켜요(직선거리 기준 추정)." if scope == "all" else
+                     "일별 기준: 날짜는 그대로 두고 그날 안에서 관광지 순서만 이동이 가장 짧게 바꿔요(직선거리 기준 추정).")}
 
 
 def _travel_by_day(items: list) -> dict:
@@ -773,14 +871,24 @@ def edit_node(state: State) -> State:
         changes.append(f"{moved}개 날의 순서를 직접 정하신 대로 바꿨어요(직접 정한 순서를 최우선으로 지켜요)" if moved
                        else "순서는 그대로예요")
     elif op == "optimize":       # 동선 최적화(식사·숙소 자리는 고정, 그 사이 관광지 순서만)
-        targets = [int(e["day"])] if e.get("day") else list(range(1, nd + 1))
-        prop = route_proposal(spec, days)
-        for r in prop["days"]:
-            if r["day"] in targets and r["saved_min"] > 0:
-                days[r["day"] - 1] = r["_row"]
+        whole = e.get("scope") == "all"
+        targets = list(range(1, nd + 1)) if whole or not e.get("day") else [int(e["day"])]
+        prop = route_proposal(spec, days, "all" if whole else "day")
+        if whole:
+            if prop["total_saved_min"] > 0:
+                days[:] = [r["_row"] for r in prop["days"]]
+            saved = prop["total_saved_min"]
+        else:
+            for r in prop["days"]:
+                if r["day"] in targets and r["saved_min"] > 0:
+                    days[r["day"] - 1] = r["_row"]
+            saved = sum(r["saved_min"] for r in prop["days"] if r["day"] in targets)
         spec.user_ordered_days = [d for d in spec.user_ordered_days if d not in targets]
-        saved = sum(r["saved_min"] for r in prop["days"] if r["day"] in targets)
-        changes.append(f"동선을 최적화해 이동을 약 {saved}분 줄였어요" if saved > 0 else "이미 가장 짧은 동선이에요")
+        if saved > 0:
+            changes.append(f"{'전체 일정' if whole else '일별'} 동선을 최적화해 이동을 약 {saved}분 줄였어요")
+            changes += [f"{m['name']}: {m['from_day']}일차 → {m['to_day']}일차" for m in prop.get("moved") or []][:6]
+        else:
+            changes.append("이미 가장 짧은 동선이에요")
     else:
         return {"status": "오류", "answer": "앗, 모르는 편집 요청이에요.", "trace": _t(state, "edit", e, "알 수 없는 op")}
     out = _reschedule(state, spec, days, changes, "edit")

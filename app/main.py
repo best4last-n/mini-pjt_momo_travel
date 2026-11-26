@@ -215,13 +215,14 @@ async def trip_undo(session_id: str):
 
 
 @app.get("/route/optimize")
-async def route_optimize(session_id: str = ""):
+async def route_optimize(session_id: str = "", scope: str = "day"):
     """동선 최적화 미리 보기(저장 안 함). 적용은 edit op=optimize(제안대로) 또는 op=order(직접 끌어 정한 순서)."""
     st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values if session_id else None
     if not st or not st.get("spec") or not st.get("itinerary"):
         return JSONResponse(status_code=400, content={"error": "일정이 있는 상담에서만 동선을 볼 수 있어요.", "days": []})
     spec = agent.spec_from_dict(st["spec"])
-    out = await run_in_threadpool(agent.route_proposal, spec, agent._day_picks(spec, st["itinerary"]))
+    out = await run_in_threadpool(agent.route_proposal, spec, agent._day_picks(spec, st["itinerary"]),
+                                  "all" if scope == "all" else "day")
     for r in out["days"]:
         r.pop("_row", None)
     return out
