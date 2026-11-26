@@ -251,6 +251,11 @@ def road_alerts(path: list, d: date) -> dict:
     return {"events": events[:12], "cautions": cautions[:12], "delay_min": min(30, delay)}
 
 
+# OSRM 기본 차량 속도는 국내 고속도로(제한 100~110km/h)보다 낮게 잡혀, 고속도로 구간이 실제 길찾기보다 10~15% 길게 나옴
+# (판교→구례 OSRM 220분 · 실제 약 3시간 10~20분, 2026-11-26 사용자 지적) → 고속도로 구간만 보정
+EXPRESS_FACTOR = 0.88
+
+
 @lru_cache(maxsize=128)
 def _drive_cached(a: tuple, b: tuple, d: date, depart_min: int, outbound: bool, bucket: int) -> dict | None:
     r = osrm(a, b)
@@ -263,6 +268,7 @@ def _drive_cached(a: tuple, b: tuple, d: date, depart_min: int, outbound: bool, 
     segs, t, used = [], float(depart_min), set()
     roads = r.get("roads") or [{"ref": "", "name": "", "km": r["distance_km"], "min": r["duration_min"], "bbox": [0, 0, 0, 0]}]
     jobs = []
+    roads = [{**s, "min": s["min"] * (EXPRESS_FACTOR if "고속도로" in (s.get("name") or "") else 1.0)} for s in roads]
     for s in roads:                       # 구간마다 들어서는 시각(혼잡 계수로 근사)
         jobs.append((s, d + timedelta(days=int(t // 1440)), int(t % 1440) // 60))
         t += s["min"] * f
@@ -298,7 +304,8 @@ def _drive_cached(a: tuple, b: tuple, d: date, depart_min: int, outbound: bool, 
     live = "실시간 소통" in used
     if used:
         why = (" + ".join(sorted(used)) + " 반영") + (f", 나머지 구간은 {why}" if any(s["source"] == "평균 혼잡" and s["km"] >= 5 for s in segs) else "")
-    return {"distance_km": r["distance_km"], "free_min": r["duration_min"], "factor": round(base / max(1, r["duration_min"]), 2),
+    free = round(sum(s["min"] for s in roads))
+    return {"distance_km": r["distance_km"], "free_min": free, "factor": round(base / max(1, free), 2),
             "reason": why, "rests": rests, "total_min": total, "path": r["path"], "live": live,
             "segments": [s for s in segs if s["km"] >= 3], "events": alerts["events"], "cautions": alerts["cautions"],
             "event_delay_min": alerts["delay_min"], "its_used": sorted(used),

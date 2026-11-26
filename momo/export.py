@@ -63,8 +63,14 @@ def to_docx(plan_id: str, payload: dict, summary: dict | None = None) -> bytes:
 
     places = _places(plan)
     long = (plan.get("totals") or {}).get("long_distance") or {}
+    n_days = len(plan.get("itinerary", []))
     for day in plan.get("itinerary", []):
         doc.add_heading(f"{day['day']}일차 · {day['date']}({day.get('weekday', '')}) · {day.get('theme', '')}", level=1)
+        if day["day"] == 1:          # 출발 지점(항상, 모르면 미정)
+            sp = day.get("start_point") or {}
+            q = doc.add_paragraph()
+            q.add_run(f"🏠 출발 지점  {sp.get('time') or ''}  ").bold = True
+            q.add_run(sp.get("label") or sp.get("name") or "미정 — 여행 조건에서 출발지를 정해 주세요")
         if day["day"] == 1 and long.get("outbound"):
             o = long["outbound"]
             doc.add_paragraph(f"[{o['mode']}] {o['label']} {o['depart']}→{o['arrive']} (약 {o['duration_min']}분, 추정)")
@@ -75,7 +81,7 @@ def to_docx(plan_id: str, payload: dict, summary: dict | None = None) -> bytes:
                 doc.add_paragraph(f"▶ {lg['distance_km']}km · 약 {lg['duration_min']}분 · {lg['mode']}(추정)").runs[0].font.size = Pt(8.5)
             p = places.get(s.get("place_id")) or {}
             para = doc.add_paragraph()
-            run = para.add_run(f"{s['arrive']}–{s['depart']}  {s['name']}")
+            run = para.add_run(f"{s.get('arrive_label') or s['arrive']}–{s.get('depart_label') or s['depart']}  {s['name']}")
             run.bold = True
             run.font.size = Pt(11.5)
             if p.get("category"):
@@ -110,6 +116,11 @@ def to_docx(plan_id: str, payload: dict, summary: dict | None = None) -> bytes:
     if long.get("inbound"):
         i = long["inbound"]
         doc.add_paragraph(f"[{i['mode']}] {i['label']} {i['depart']}→{i['arrive']} (약 {i['duration_min']}분, 추정)")
+    if n_days:                       # 최종 복귀 지점(항상, 모르면 미정)
+        ep = (plan.get("itinerary") or [{}])[-1].get("end_point") or {}
+        q = doc.add_paragraph()
+        q.add_run(f"🏁 최종 복귀 지점  {ep.get('time') or ''}  ").bold = True
+        q.add_run((ep.get("label") or ep.get("name") or "미정 — 출발지(또는 여행 후 도착지)를 정해 주세요") + (" 도착" if ep.get("time") else ""))
 
     c = plan.get("costs")
     if c:

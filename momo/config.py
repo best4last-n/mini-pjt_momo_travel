@@ -21,7 +21,8 @@ AWS_REGION = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 
 DAY_START = 9 * 60            # 하루 기본 09:00
 DAY_END = 20 * 60             # 하루 기본 20:00
-HOME_LIMIT = 22 * 60          # 22:00 귀가 상한
+HOME_LIMIT = 22 * 60          # 22:00 귀가 상한(마지막 날 집 도착)
+STAY_LIMIT = 26 * 60          # 숙소 도착은 다음 날 02:00까지 문제 없음(22:00~02:00 늦은 체크인 허용, 사용자 결정 2026-11-26)
 BUFFER_MIN = 10               # 시간 겹침 여유
 DEFAULT_DEPART = 8 * 60       # 기본 출발 08:00
 LUNCH = (12 * 60, 14 * 60)

@@ -213,8 +213,17 @@ def parse_open(place: dict, d: date) -> OpenInfo:
 
 
 def fmt(minutes: int) -> str:
-    minutes = max(0, min(minutes, 24 * 60))
+    minutes = max(0, min(minutes, 26 * 60))       # 자정 넘은 숙소 도착은 24:30·25:40처럼(다음 날 02:00까지)
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
+
+
+def label(hm: str) -> str:
+    """화면 표시용: '25:40' → '익일 01:40', 그 밖은 그대로."""
+    try:
+        m = parse_hm(hm)
+    except Exception:
+        return hm
+    return f"익일 {fmt(m - 24 * 60)}" if m >= 24 * 60 else hm
 
 
 def parse_hm(s: str) -> int:

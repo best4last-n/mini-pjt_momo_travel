@@ -31,8 +31,8 @@ class ParsedRequest(BaseModel):
     past_trip_reference: bool = Field(False, description="'작년에 갔던 곳 빼고'처럼 지난 여행 기록을 참고하라는 요청이면 true")
     modify_instruction: str | None = Field(None, description="수정 요청 내용 요약(예: 2일차 오후를 실내 위주로). 아니면 null")
     send_request: bool = Field(False, description="문자·이메일·카톡 등으로 보내 달라는 요청이 있으면 true")
-    intensity: Literal["빡빡", "보통", "여유"] | None = Field(
-        None, description="여행 강도. '많이/최대한/빡빡하게'=빡빡, '여유롭게/쉬엄쉬엄/천천히'=여유, 말하지 않았으면 null")
+    intensity: Literal["강행군", "빡빡", "보통", "여유"] | None = Field(
+        None, description="여행 강도. '새벽부터 밤까지/강행군/체력 자신 있게/한 곳이라도 더'=강행군, '많이/최대한/빡빡하게'=빡빡, '여유롭게/쉬엄쉬엄/천천히'=여유, 말하지 않았으면 null")
     long_transport: Literal["자차", "KTX·SRT", "고속·시외버스", "비행기"] | None = Field(
         None, description="출발지에서 여행지까지 이동. 차·자가용=자차, KTX·SRT·기차=KTX·SRT, 고속·시외버스=고속·시외버스, 비행기·항공=비행기. 없으면 null")
     local_transport: Literal["자차", "렌터카", "대중교통"] | None = Field(

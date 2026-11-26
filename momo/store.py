@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import secrets
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timedelta
 from zoneinfo import ZoneInfo
 
 from .config import STATE_DB
@@ -125,6 +125,46 @@ def list_messages(session_id: str, limit: int = 300) -> list[dict]:
     return out
 
 
+def delete_messages(session_id: str, mid: int | None = None) -> list[int]:
+    """'내 요청 기록' 삭제. mid가 있으면 그 요청과 바로 뒤 모모 답변(다음 요청 전까지)만, 없으면 이 여행의 기록 전체.
+    일정(계획) 자체는 바뀌지 않는다. 전체 삭제 뒤에는 체크포인트 이력에서 다시 복원하지 않도록 표시를 남긴다."""
+    with _mconn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS msg_cleared (session_id TEXT PRIMARY KEY, cleared TEXT)")
+        if mid is None:
+            ids = [r[0] for r in c.execute("SELECT id FROM messages WHERE session_id=?", (session_id,))]
+            c.execute("DELETE FROM messages WHERE session_id=?", (session_id,))
+            c.execute("INSERT OR REPLACE INTO msg_cleared VALUES (?,?)", (session_id, datetime.now(KST).isoformat(timespec="seconds")))
+            return ids
+        row = c.execute("SELECT role FROM messages WHERE session_id=? AND id=?", (session_id, int(mid))).fetchone()
+        if not row:
+            return []
+        ids = [int(mid)]
+        if row[0] == "user":
+            nxt = c.execute("SELECT MIN(id) FROM messages WHERE session_id=? AND role='user' AND id>?", (session_id, int(mid))).fetchone()[0]
+            q = "SELECT id FROM messages WHERE session_id=? AND role!='user' AND id>?" + (" AND id<?" if nxt else "")
+            ids += [r[0] for r in c.execute(q, (session_id, int(mid), *([nxt] if nxt else [])))]
+        c.execute(f"DELETE FROM messages WHERE session_id=? AND id IN ({','.join('?' * len(ids))})", (session_id, *ids))
+        c.execute("INSERT OR REPLACE INTO msg_cleared VALUES (?,?)", (session_id, datetime.now(KST).isoformat(timespec="seconds")))
+        return ids
+
+
+def last_message_id(session_id: str) -> int:
+    with _mconn() as c:
+        return c.execute("SELECT COALESCE(MAX(id), 0) FROM messages WHERE session_id=?", (session_id,)).fetchone()[0]
+
+
+def delete_messages_after(session_id: str, mid: int) -> None:
+    """중지된 요청이 남긴 기록 지우기(그 요청 시작 시점의 마지막 id 뒤)."""
+    with _mconn() as c:
+        c.execute("DELETE FROM messages WHERE session_id=? AND id>?", (session_id, int(mid)))
+
+
+def messages_cleared(session_id: str) -> bool:
+    with _mconn() as c:
+        c.execute("CREATE TABLE IF NOT EXISTS msg_cleared (session_id TEXT PRIMARY KEY, cleared TEXT)")
+        return c.execute("SELECT 1 FROM msg_cleared WHERE session_id=?", (session_id,)).fetchone() is not None
+
+
 def save_diff(session_id: str, draft_version: str, diff: dict) -> None:
     with _conn() as c:
         c.execute("CREATE TABLE IF NOT EXISTS diffs (session_id TEXT, draft_version TEXT, diff TEXT, PRIMARY KEY(session_id, draft_version))")
@@ -234,11 +274,12 @@ def to_ics(plan_id: str, payload: dict) -> bytes:
         y, m, d = map(int, it["date"].split("-"))
         sh, sm = map(int, it["start_time"].split(":"))
         eh, em = map(int, it["end_time"].split(":"))
+        base = datetime(y, m, d, tzinfo=KST)          # 자정 넘은 시각(24:30 = 다음 날 00:30)도 그대로 더함
         ev = Event()
         ev.add("uid", f"{plan_id}-{it['seq']}@momo")
         ev.add("summary", it["place_name"])
-        ev.add("dtstart", datetime(y, m, d, sh, sm, tzinfo=KST))
-        ev.add("dtend", datetime(y, m, d, min(eh, 23), em if eh < 24 else 59, tzinfo=KST))
+        ev.add("dtstart", base + timedelta(hours=sh, minutes=sm))
+        ev.add("dtend", base + timedelta(hours=eh, minutes=em))
         ev.add("dtstamp", datetime.now(KST))
         desc = [it.get("reason") or "", f"출처: {it.get('source')}"]
         if it.get("hours_status") == "확인 필요":

@@ -113,6 +113,13 @@ def plan_html(plan: dict, answer: str, changes: list[str] | None = None, status:
     long = (plan.get("totals") or {}).get("long_distance") or {}
     for d in plan.get("itinerary", []):
         rows = []
+        n_days = len(plan.get("itinerary", []))
+        if d["day"] == 1:           # 출발 지점은 항상 첫 줄(모르면 미정)
+            sp = d.get("start_point") or {}
+            rows.append(f'<tr class="mm-home"><td>{e(sp.get("time") or "—")}</td><td><span class="mm-tag t-move">🏠 출발</span></td>'
+                        f'<td><strong>{e(sp.get("name") or "출발지 미정")}</strong>'
+                        f'{"<br><small class=mm-muted>" + e(sp["label"]) + "</small>" if sp.get("label") and sp.get("label") != sp.get("name") else ""}'
+                        f'{"" if sp else "<br><small class=mm-muted>여행 조건에서 출발지를 정하면 오가는 시간까지 넣어요</small>"}</td><td>—</td><td class="mm-muted">출발 지점</td></tr>')
         if d["day"] == 1 and long.get("outbound"):
             o = long["outbound"]
             rows.append(f'<tr><td>{e(o["depart"])}–{e(o["arrive"])}</td><td><span class="mm-tag t-move">🚗 이동</span></td>'
@@ -126,13 +133,19 @@ def plan_html(plan: dict, answer: str, changes: list[str] | None = None, status:
             move = f"약 {lg['duration_min']}분 · {lg['distance_km']}km" if lg else "—"
             hours = p.get("hours") or ("운영시간 확인 필요" if s.get("hours_status") == "확인 필요" else "")
             badge = f' <span class="mm-tag t-place">⭐ {p["rank"]}위</span>' if p.get("rank") else ""
-            rows.append(f'<tr><td>{e(s["arrive"])}–{e(s["depart"])}</td><td><span class="mm-tag {cls}">{emo} {lab}</span></td>'
+            rows.append(f'<tr><td>{e(s.get("arrive_label") or s["arrive"])}–{e(s.get("depart_label") or s["depart"])}</td><td><span class="mm-tag {cls}">{emo} {lab}</span></td>'
                         f'<td>{img}<strong>{e(s["name"])}</strong>{badge}<br><small class="mm-muted">{e(s.get("reason") or "")}</small></td>'
                         f'<td>{e(move)}</td><td class="mm-muted">{e(hours)}</td></tr>')
         if d["day"] == len(plan.get("itinerary", [])) and long.get("inbound"):
             i_ = long["inbound"]
             rows.append(f'<tr><td>{e(i_["depart"])}–{e(i_["arrive"])}</td><td><span class="mm-tag t-move">🏠 귀가</span></td>'
                         f'<td><strong>{e(i_["label"])}</strong></td><td>약 {i_["duration_min"]}분</td><td class="mm-muted">{e(i_["mode"])} · 추정</td></tr>')
+        if d["day"] == n_days:      # 최종 복귀 지점은 항상 마지막 줄(모르면 미정)
+            ep = d.get("end_point") or {}
+            rows.append(f'<tr class="mm-home"><td>{e(ep.get("time") or "—")}</td><td><span class="mm-tag t-move">🏁 복귀</span></td>'
+                        f'<td><strong>{e(ep.get("name") or "복귀 지점 미정")}</strong>{" 도착" if ep.get("time") else ""}'
+                        f'{"<br><small class=mm-muted>" + e(ep["label"]) + "</small>" if ep.get("label") and ep.get("label") != ep.get("name") else ""}</td>'
+                        f'<td>—</td><td class="mm-muted">최종 복귀 지점</td></tr>')
         parts.append(f'<section class="mm-day"><h4>🗓 {d["day"]}일차 · {e(d["date"])}({e(d.get("weekday", ""))}) '
                      f'<small class="mm-muted">{e(d.get("theme", ""))} · 이동 약 {d.get("day_travel_min", 0)}분</small></h4>'
                      '<div class="mm-scroll"><table class="mm-table"><thead><tr><th>시간</th><th>구분</th><th>장소</th><th>이동</th><th>운영</th></tr></thead>'

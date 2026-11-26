@@ -25,7 +25,7 @@ TYPE_ID = {"식당": "39", "카페": "39", "숙소": "32", "관광지": "12"}
 VW_QUERY = {"카페": ["카페", "커피"], "식당": ["식당", "음식점"], "숙소": ["펜션", "호텔"], "관광지": ["관광지"]}
 RADIUS_KM = {"숙소": 25, "관광지": 20, "식당": 12, "카페": 12}
 WIDE_KM = {"숙소": 50}           # 후보가 적으면 넓혀 찾는 범위(숙소는 멀어도 묵을 만하다)
-QUERY_KM = {"숙소": 150}         # 이름으로 찾을 때 숙소는 더 멀리까지(먼 곳은 거리 표시)
+QUERY_KM = {"숙소": 250, "관광지": 250, "식당": 250, "카페": 250}   # 이름으로 찾을 때: 원래 장소에서 250km까지(2026-11-26, 기존 식당·카페 60km)
 COMPANION_WORDS = {
     "어린이": "아이|어린이|키즈|체험|놀이|가족", "아이": "아이|어린이|키즈|체험|놀이|가족", "노약자": "주차|휴식|평지|한정식|엘리베이터|부모",
     "부모": "주차|휴식|평지|한정식|엘리베이터|부모", "배우자": "분위기|전망|뷰|야경|산책|감성",
@@ -197,12 +197,17 @@ def _gather(spec, target: dict, kl: str, q: str) -> list[dict]:
             "image_url": h.get("firstimage2") or h.get("firstimage") or None, "kind": {"39": "restaurant", "32": "lodging"}.get(tid, "attraction")}})
     if q:          # 검색어가 있으면 그 결과만(종류 제한 없이, 원래 장소 근처 우선)
         out = []
-        for raw in placesearch.vworld_search(q, "place", round(near[0], 3), round(near[1], 3), 0.2, size=40):
+        # 원래 장소 근처(±22km)만 보던 제약 때문에 라플라타(구례)·한씨네대가추어탕(순천)이 안 나옴(2026-11-26)
+        # → 근처 + 전국(브이월드는 bbox 없이) 둘 다 찾고, 거리는 QUERY_KM(250km)으로 자른다
+        seen_vw = set()
+        for raw in (placesearch.vworld_search(q, "place", round(near[0], 3), round(near[1], 3), 0.2, size=40)
+                    + placesearch.vworld_search(q, "place", size=40)):
             c = _vw(raw, "숙소" if kl == "숙소" else None)
-            if c:
+            if c and (c["p"]["title"], round(c["p"]["lat"], 4)) not in seen_vw:
+                seen_vw.add((c["p"]["title"], round(c["p"]["lat"], 4)))
                 out.append({**c, "query_hit": True})
-        res = placesearch.search(q, spec.region, near=near, limit=20, expand=kl == "숙소")
-        for c in (res.get("results") or []) + ((res.get("far") or []) if kl == "숙소" else []):
+        res = placesearch.search(q, spec.region, near=near, limit=20, expand=True)
+        for c in (res.get("results") or []) + (res.get("far") or []):
             nm_cat = f"{c['name']} {c.get('vworld_category') or ''}"
             if re.search(r"(진출입|입구|주차|정류장|사무실|화장실)", nm_cat):
                 continue

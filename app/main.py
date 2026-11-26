@@ -110,10 +110,47 @@ _RUNNING: dict[str, str] = {}      # session_id → job_id
 _LOCK = threading.Lock()
 
 
+def _cancelled_reply(prep: dict) -> dict:
+    return {"answer": "요청을 멈췄어요. 일정은 요청하기 전 그대로예요. 고쳐서 다시 보내 주세요.", "status": "취소",
+            "contexts": [], "session_id": prep["sid"], "changes": [], "cancelled": True,
+            "trace": [{"step": "cancel", "input": "", "output": "사용자 중지 — 요청 전 상태로 되돌림"}]}
+
+
+def _rollback(prep: dict, before: dict, msg_id: int, undo_n: int) -> None:
+    """중지된 요청이 남긴 흔적을 지운다: 상태(체크포인트)·상담 기록·되돌리기 목록을 요청 전으로. 취소 사실만 기록."""
+    from momo import store
+    sid = prep["sid"]
+    cfg = {"configurable": {"thread_id": sid}}
+    after = agent.graph().get_state(cfg).values or {}
+    if before or after:
+        agent.graph().update_state(cfg, {k: before.get(k) for k in set(before) | set(after)}, as_node="guard_out")
+    store.delete_messages_after(sid, msg_id)
+    while store.undo_count(sid) > undo_n:
+        store.pop_snapshot(sid)
+    kind = prep["action"] or "chat"
+    store.log_message(sid, "user", kind, guardrails.mask_pii(prep["q"])[0], status="취소")
+    store.log_message(sid, "momo", kind, "요청을 멈췄어요. 일정은 요청하기 전 그대로예요.", status="취소")
+
+
 def _job(job_id: str, prep: dict) -> None:
+    from momo import cancel, store
+    ev = _JOBS[job_id]["cancel"]
+    token = cancel.CURRENT.set(ev)
+    sid = prep["sid"]
+    before = agent.graph().get_state({"configurable": {"thread_id": sid}}).values or {}
+    msg_id, undo_n = store.last_message_id(sid), store.undo_count(sid)
     try:
-        _JOBS[job_id]["response"] = _run(prep)
+        resp = _run(prep)
+        if ev.is_set():          # 멈춤을 누른 뒤에 끝났어도 결과를 쓰지 않고 되돌림
+            raise cancel.JobCancelled()
+        _JOBS[job_id]["response"] = resp
         _JOBS[job_id]["state"] = "done"
+    except cancel.JobCancelled:
+        try:
+            _rollback(prep, before, msg_id, undo_n)
+        except Exception:
+            log.exception("rollback failed")
+        _JOBS[job_id].update(state="cancelled", response=_cancelled_reply(prep))
     except InvalidRequest as e:
         _JOBS[job_id].update(state="error", response={"answer": e.answer, "status": "오류", "contexts": [],
                                                       "trace": [{"step": "error", "input": "", "output": e.kind}]})
@@ -123,6 +160,7 @@ def _job(job_id: str, prep: dict) -> None:
                                                       "status": "오류", "contexts": [],
                                                       "trace": [{"step": "error", "input": "", "output": type(e).__name__}]})
     finally:
+        cancel.CURRENT.reset(token)
         with _LOCK:
             if _RUNNING.get(prep["sid"]) == job_id:
                 _RUNNING.pop(prep["sid"], None)
@@ -140,7 +178,8 @@ async def query_async(request: Request):
             return JSONResponse(status_code=409, content={"answer": "이전 요청을 처리하는 중이에요", "job_id": running,
                                                           "session_id": prep["sid"], "state": "running"})
         job_id = uuid.uuid4().hex[:12]
-        _JOBS[job_id] = {"state": "running", "started": time.time(), "response": None, "session_id": prep["sid"]}
+        _JOBS[job_id] = {"state": "running", "started": time.time(), "response": None, "session_id": prep["sid"],
+                         "cancel": threading.Event()}
         _RUNNING[prep["sid"]] = job_id
     _EXEC.submit(_job, job_id, prep)
     return {"job_id": job_id, "session_id": prep["sid"], "state": "running"}
@@ -153,6 +192,19 @@ async def job_status(job_id: str):
         return JSONResponse(status_code=404, content={"state": "error", "response": {"answer": "작업을 찾지 못했어요.", "status": "오류"}})
     return {"state": j["state"], "elapsed_sec": round(time.time() - j["started"]), "session_id": j["session_id"],
             "response": j["response"] if j["state"] != "running" else None}
+
+
+@app.post("/jobs/{job_id}/cancel")
+async def job_cancel(job_id: str):
+    """요청 중지: 다음 단계(LLM 호출·재생성·장소 찾기) 직전에 멈추고 요청 전 상태로 되돌린다.
+    이미 끝난 요청은 멈출 수 없으니 '되돌리기'를 안내."""
+    j = _JOBS.get(job_id)
+    if not j:
+        return JSONResponse(status_code=404, content={"state": "error", "answer": "작업을 찾지 못했어요."})
+    if j["state"] != "running":
+        return {"state": j["state"], "answer": "이미 끝난 요청이라 멈출 수 없어요. 바뀐 내용은 '되돌리기'로 되돌릴 수 있어요."}
+    j["cancel"].set()
+    return {"state": "cancelling", "answer": "멈추는 중이에요. 지금 단계가 끝나는 대로 요청 전 상태로 되돌려요."}
 
 
 @app.get("/options")
@@ -173,20 +225,38 @@ async def answer_page(session_id: str):
 
 
 @app.get("/places/search")
-async def places_search(q: str = "", region: str = "", session_id: str = ""):
-    """장소 찾기(유사 이름·가까운 순·거리·주소·사진 미리보기)."""
-    from momo import placesearch
-    near = None
+async def places_search(q: str = "", region: str = "", session_id: str = "", leg: str = ""):
+    """장소 찾기(유사 이름·가까운 순·거리·주소·사진 미리보기). 전국에서 찾는다(2026-11-26: 오가는 길의 식당·장소도).
+    leg=out|back: 출발 지점 다음(가는 길)·복귀 지점 앞(오는 길)에 들를 곳 — 그 경로에서 가까운 순."""
+    from momo import placesearch, planner
+    near, spec = None, None
     if session_id:
         st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values
         if st and st.get("spec"):
             region = region or st["spec"]["region"]
-            pts = [(it["lat"], it["lng"]) for it in st.get("itinerary") or [] if it.get("lat")]
+            spec = agent.spec_from_dict(st["spec"])
+            pts = [(it["lat"], it["lng"]) for it in st.get("itinerary") or [] if it.get("lat") and it.get("type") != "move"]
             if pts:
                 near = (sum(a for a, _ in pts) / len(pts), sum(b for _, b in pts) / len(pts))
     if region not in data_regions():
         return JSONResponse(status_code=400, content={"error": "지역을 알려 주세요", "results": []})
-    return placesearch.search(q[:40], region, near)
+    ends = planner.route_ends(spec) if spec else {}
+    if leg in ("out", "back") and ends.get(leg):
+        a, b = ends[leg]
+        near = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
+    res = placesearch.search(q[:40], region, near, expand=True)
+    if spec:            # 먼 곳이어도 오가는 경로 가까이면 '가는 길/오는 길에 넣기'를 고를 수 있게
+        for c in res["results"] + res["far"]:
+            if c.get("lat") is not None:
+                rk = planner.route_km(spec, (c["lat"], c["lng"]))
+                c["route_km"] = rk
+                c["route_legs"] = sorted((k for k in rk if rk[k] <= 25), key=lambda k: (rk[k], k != "out"))
+    if leg in ("out", "back") and ends.get(leg):
+        allc = [c for c in res["results"] + res["far"] if (c.get("route_km") or {}).get(leg) is not None]
+        allc.sort(key=lambda c: (c["route_km"][leg] + (1 - c.get("similarity", 0)) * 40))
+        res.update(results=[{**c, "far": False} for c in allc[:10]], far=[], far_message="", leg=leg,
+                   note=("가는 길" if leg == "out" else "오는 길") + " 경로(직선)에서 가까운 순이에요. 전국에서 찾았어요.")
+    return res
 
 
 @app.get("/places/alternatives")
@@ -209,6 +279,24 @@ async def trip_messages(session_id: str, limit: int = 300):
     from momo import store
     await run_in_threadpool(agent.backfill_messages, session_id)      # 기록 기능 전 대화는 이력에서 한 번 복원
     return {"session_id": session_id, "messages": store.list_messages(session_id, max(1, min(1000, limit)))}
+
+
+@app.delete("/trips/{session_id}/messages")
+async def trip_messages_clear(session_id: str):
+    """내 요청 기록 전체 삭제(대화 기록만 — 일정은 그대로)."""
+    from momo import store
+    ids = await run_in_threadpool(store.delete_messages, session_id, None)
+    return {"session_id": session_id, "deleted": ids}
+
+
+@app.delete("/trips/{session_id}/messages/{mid}")
+async def trip_message_delete(session_id: str, mid: int):
+    """요청 하나 삭제(그 요청에 대한 모모 답변도 함께 — 일정은 그대로)."""
+    from momo import store
+    ids = await run_in_threadpool(store.delete_messages, session_id, mid)
+    if not ids:
+        return JSONResponse(status_code=404, content={"error": "그 기록을 찾지 못했어요."})
+    return {"session_id": session_id, "deleted": ids}
 
 
 @app.post("/trips/{session_id}/undo")

@@ -18,7 +18,7 @@ import requests
 from . import data, retrieve, travel
 
 UA = {"User-Agent": "momo-travel-counselor/0.1 (education project)"}
-MAX_KM = 60
+MAX_KM = 250                # 장소 찾기 범위: 여행 지역(또는 원래 장소)에서 250km 안은 '근처'로(2026-11-26 사용자 요청, 기존 60km)
 
 
 # 상호명 정규화: 업종어(카페·cafe·커피·베이커리·식당·본점·점 …)는 붙든 빠지든 같은 이름으로,
@@ -146,11 +146,37 @@ def _tour_hits(variant: str, region: str, nationwide: bool) -> list[dict]:
     from . import tourlive
     if not nationwide:
         return tourlive.search_candidates(variant, region)
+    return [json.loads(x) for x in _tour_nation(variant)]
+
+
+@lru_cache(maxsize=512)
+def _tour_nation(variant: str) -> tuple:
+    from . import tourlive
     try:
         hits = tourlive._client().call("searchKeyword2", keyword=variant, numOfRows=10, pageNo=1)
-        return [h for h in hits if h.get("contenttypeid") in tourlive.KIND]
+        return tuple(json.dumps(h, ensure_ascii=False) for h in hits if h.get("contenttypeid") in tourlive.KIND)
     except Exception:
-        return []
+        return ()
+
+
+def _warm(vs: list[str], near: tuple, region: str, nationwide: bool) -> None:
+    """전국 찾기는 관광공사·브이월드·OSM·카카오·네이버를 차례로 불러 처음엔 10~20초 걸렸다(2026-11-26).
+    같은 인자로 미리 동시에 불러 캐시를 채운다 — 뒤의 순서대로 도는 코드는 캐시에서 바로 읽는다."""
+    from concurrent.futures import ThreadPoolExecutor
+    la, lo = round(near[0], 3), round(near[1], 3)
+    label = data.region_label(region).split("/")[-1]
+    jobs = [(_photon, (v, near[0], near[1])) for v in vs]
+    jobs += [(vworld_search, (v, "place", la, lo)) for v in list(vs[:2]) + ([f"{vs[-1]} {label}"] if label else [])]
+    jobs += [(kakao_search, (v, la, lo, 20000)) for v in vs[:2]] + [(naver_local, (v,)) for v in vs[:2]]
+    if nationwide:
+        jobs += [(vworld_search, (v, "place")) for v in vs[:2]] + [(kakao_search, (v, la, lo, 0)) for v in vs[:2]]
+        jobs += [(_tour_nation, (v,)) for v in vs]
+    with ThreadPoolExecutor(max_workers=12) as ex:
+        for f in [ex.submit(fn, *a) for fn, a in jobs]:
+            try:
+                f.result()
+            except Exception:
+                pass
 
 
 def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expand: bool = False) -> dict:
@@ -223,6 +249,7 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
                        category=cat, key=f"osm:{ref}"), f"osm:{ref}")
 
     want_food = bool(FOOD_WORDS.search(q))
+    _warm(vs, near, region, expand)
     collect(nationwide=False)
     for c in vworld_sources(vs, near, False, data.region_label(region).split("/")[-1]) + extra_sources(vs, near, False):
         push(c, c["key"])
@@ -253,7 +280,7 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
         dedup.append(c)
     out = dedup
     local = [c for c in out if (c["distance_km"] is None or c["distance_km"] <= MAX_KM) and ok(c)]
-    far = [{**c, "far": True} for c in out if c["distance_km"] is not None and c["distance_km"] > MAX_KM and c["similarity"] >= 0.85]
+    far = [{**c, "far": True} for c in out if c["distance_km"] is not None and c["distance_km"] > MAX_KM and c["similarity"] >= 0.7]   # 전국: 오가는 길 장소도(2026-11-26)
     far.sort(key=lambda c: (-c["similarity"], c["distance_km"]))
     for c in out + far:
         c.pop("_score", None)
@@ -274,7 +301,7 @@ def search(q: str, region: str, near: tuple | None = None, limit: int = 8, expan
                "이름과 주소를 직접 넣거나 지도에서 위치를 찍어 '직접 추가'할 수 있어요.")
 
     return {"query": q, "sources": sources, "manual_add": not local, "variants": vs, "near": {"lat": near[0], "lng": near[1]}, "radius_km": MAX_KM,
-            "results": local[:limit], "far": far[:5], "far_message": msg,
+            "results": local[:limit], "far": far[:8], "far_message": msg,
             "note": "가까운 순으로 보여 드려요. 거리는 직선거리예요. 사진: 한국관광공사 또는 위키미디어 공용(있을 때만)."}
 
 
@@ -434,3 +461,72 @@ def vworld_sources(q_variants: list[str], near: tuple, nationwide: bool, region_
             out.append(_cand("브이월드", i.get("title") or "", lat, lng, addr, near, 0, category=cat,
                              key=f"vworld:{i.get('id') or (i.get('title'), round(lat, 5))}", vworld_category=catname))
     return out
+
+
+BRANCH_KM = 30            # 지점 고르기: 여행 지역 중심에서 이 거리 안의 같은 상호만(순천/구례처럼 넓은 지역 고려)
+# 프랜차이즈 표기 변형 → 대표 상호(사용자가 흔히 쓰는 줄임·오기 포함). 지점이 많은 곳은 이름만으로 넣지 않고 지점을 물어본다
+BRAND_ALIASES = {
+    "스벅": "스타벅스", "starbucks": "스타벅스", "파스쿠치": "파스쿠찌", "pascucci": "파스쿠찌", "투썸": "투썸플레이스",
+    "메가커피": "메가MGC커피", "메가엠지씨커피": "메가MGC커피", "이디야커피": "이디야", "ediya": "이디야", "빽다방": "빽다방",
+    "컴포즈": "컴포즈커피", "할리스커피": "할리스", "엔제리너스커피": "엔제리너스", "탐탐": "탐앤탐스", "커피빈앤티리프": "커피빈",
+    "폴바셋": "폴바셋", "맥날": "맥도날드", "mcdonalds": "맥도날드", "버거킹": "버거킹", "롯데리아": "롯데리아", "맘스터치": "맘스터치",
+    "파리바게트": "파리바게뜨", "빠리바게뜨": "파리바게뜨", "뚜레주르": "뚜레쥬르", "베스킨라빈스": "배스킨라빈스", "배라": "배스킨라빈스",
+    "던킨도너츠": "던킨", "공차": "공차", "설빙": "설빙", "본죽": "본죽", "교촌": "교촌치킨", "bbq": "BBQ", "bhc": "BHC",
+    "정지영커피": "정지영", "정지영카페": "정지영", "정지영로스터스": "정지영", "정지영로스터즈": "정지영", "정지영커피로스터즈": "정지영",
+}
+
+
+def brand_of(q: str) -> str:
+    """표기 변형을 대표 상호로(없으면 원문)."""
+    k = re.sub(r"\s+", "", (q or "")).lower()
+    return BRAND_ALIASES.get(k, q.strip())
+NOT_BRANCH = re.compile(r"(학원|사무소|변호사|법무|세무|헤어|미용|네일|병원|의원|약국|부동산|주식회사|\(주\))")
+
+
+def _food_or_cafe(c: dict) -> bool:
+    from .alternatives import kind_label
+    return kind_label(c) in ("식당", "카페")
+
+
+def branches(q: str, region: str, limit: int = 8) -> list[dict]:
+    """같은 상호의 지점이 여러 곳이면(예: 수원 '정지영' → 행궁본점·경수대로·대평로·애경점) 고를 선택지를, 아니면 [].
+    - 사용자가 쓴 이름이 들어간 같은 상호만(업종어 차이는 무시), 여행 지역 BRANCH_KM 안, 학원·미용실 같은 다른 업종 제외
+    - 같은 주소는 한 곳으로(관광공사 자료 우선), 주소가 서로 다른 곳이 2곳 이상일 때만
+    - 사용자가 지점명까지 정확히 쓴 경우(그 이름과 똑같은 곳이 한 곳뿐)는 묻지 않음"""
+    q0, q = q, brand_of(q)
+    nk = name_key(q)
+    if len(nk) < 2:
+        return []
+    try:
+        res = search(q, region, limit=8, expand=True)     # 이름 찾기와 같은 인자 → 캐시를 같이 써서 다시 검색하지 않음
+    except Exception:
+        return []
+    known = q != q0.strip() or q in BRAND_ALIASES.values()      # 사전에 있는 프랜차이즈
+    if known:                    # 프랜차이즈는 '스타벅스 순천'처럼 지역 이름을 붙여 한 번 더(전국 결과에 묻히지 않게)
+        from . import data as _data
+        town = re.split(r"[/·\s]", _data.region_label(region))[0]
+        try:
+            more = search(f"{q} {town}", region, limit=8, expand=False)
+            res = {"results": (res.get("results") or []) + (more.get("results") or []), "far": (res.get("far") or []) + (more.get("far") or [])}
+        except Exception:
+            pass
+    order = {"관광공사(수집)": 0, "관광공사": 0, "브이월드": 1, "카카오맵": 2, "네이버": 2, "OpenStreetMap": 3}
+    pool = [c for c in (res.get("results") or []) + (res.get("far") or [])
+            if name_key(c.get("name") or "").startswith(nk) and (c.get("distance_km") or 0) <= BRANCH_KM   # 상호가 이름 앞에(명소 'OO행궁점' 제외)
+            and not NOT_BRANCH.search(c.get("name") or "")
+            and (known or _food_or_cafe(c))]       # 절·공원 같은 관광지는 지점 고르기 대상 아님(사성암 오분류 2026-11-26)
+    pool.sort(key=lambda c: (order.get(c.get("source"), 3), c.get("distance_km") or 0))
+    seen, out = set(), []
+    for c in pool:
+        addr = re.sub(r"\s+|\(.*?\)", "", c.get("address") or "")[:24] or f"{c.get('lat')},{c.get('lng')}"
+        if addr in seen:
+            continue
+        seen.add(addr)
+        out.append(c)
+    if len(out) < 2:
+        return []
+    exact = [c for c in out if re.sub(r"\s+", "", c.get("name") or "") == re.sub(r"\s+", "", q0)]
+    if len(exact) == 1 and re.search(r"(점|지점|본점|호점)$", re.sub(r"\s+", "", q0)):   # '…행궁본점'처럼 지점명까지 썼으면
+        return []
+    return [{"name": c["name"], "address": (c.get("address") or "")[:40], "distance_km": c.get("distance_km"),
+             "source": c.get("source"), "candidate": c} for c in out[:limit]]

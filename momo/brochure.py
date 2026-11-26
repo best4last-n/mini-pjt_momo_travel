@@ -13,7 +13,7 @@ from . import alternatives, data, hours, travel
 
 KIND_KO = {"attraction": "관광", "restaurant": "음식점", "lodging": "숙박", "festival": "축제"}
 CHECK_OPTIONS = {
-    "intensity": ["빡빡", "보통", "여유"],
+    "intensity": ["강행군", "빡빡", "보통", "여유"],
     "companions": ["보통", "노약자", "어린이·유아"],
     "long_transport": ["자차", "KTX·SRT", "고속·시외버스", "비행기"],
     "local_transport": ["자차", "렌터카", "대중교통"],
@@ -96,6 +96,11 @@ def _lodging_notices(spec, days: list, places_by_id: dict) -> None:
         stays.append(st)
     for i, d in enumerate(days):
         st = stays[i]
+        if i < spec.nights:      # 다음 날로 이어지는 밤: 숙소 / 사용자가 고른 예외(차박·밤샘·야간 이동) / 빠짐(알림)
+            mode = (getattr(spec, "no_stay", None) or {}).get(str(i + 1))
+            d["night"] = ({"status": "stay"} if st else {"status": "none", "mode": mode} if mode
+                          else {"status": "missing", "message": "다음 날까지 여행이 이어져요. 이 밤 숙소를 넣어 주세요 — 차박·밤샘·야간 이동이면 '숙박 필요 없음'을 골라 주세요."})
+            d["night"]["options"] = ["차박", "밤샘", "야간 이동"]
         if st:
             p = places_by_id.get(st.get("place_id")) or {}
             t = lodging_times(p)
@@ -274,7 +279,7 @@ def checklist(spec) -> list[dict]:
          "hint": TRANSPORT_HINT.get(spec.region, "")},
         {"key": "intensity", "label": "여행 강도", "value": spec.intensity, "status": _status("intensity", a),
          "input": "select", "options": CHECK_OPTIONS["intensity"],
-         "hint": "빡빡 하루 4~5곳(08~20시) · 보통 3~4곳(09~18:30) · 여유 2~3곳(10~17:30)"},
+         "hint": "강행군 하루 최대 25곳(06:30~23:00, 새벽형·야행성 · 숙소는 다음 날 02시까지) · 빡빡 하루 4~5곳(08~20시) · 보통 3~4곳(09~18:30) · 여유 2~3곳(10~17:30)"},
         {"key": "companions", "label": "동반자", "value": spec.companion_type
          + (f" {spec.companion_count}명" if spec.companion_count else "")
          + (f" · {spec.companions}" if spec.companions else ""), "status": _status("companions", a),
@@ -345,18 +350,52 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
         stops, legs = [], []
         prev = stay_prev if di > 0 else None
         prev_name = stay_prev["place_name"] if (di > 0 and stay_prev) else None
+        route_prev = None             # 가는 길/오는 길에 들른 곳(동선에 포함: 집 → 들를 곳 → … → 첫 장소)
+        if di == 0:
+            hp = _planner().origin_point(spec)
+            if hp and hp.get("lat") is not None:
+                route_prev = {"lat": hp["lat"], "lng": hp["lng"], "place_name": hp.get("name") or "출발 지점", "end_time": None}
         for it in day_items:
+            leg0 = (it.get("notes") or [""])[0]
+            if it["type"] == "move" and leg0 in ("가는 길", "오는 길"):     # 출발 지점 다음·복귀 지점 앞(장거리 이동 중)
+                rp = route_prev if leg0 == "가는 길" else (prev if prev is not None else None)
+                if it.get("lat") is not None and rp is not None and rp.get("lat") is not None:
+                    a, b = _coord(rp), _coord(it)
+                    legs.append({"from": rp.get("place_id") or rp.get("place_name"), "from_name": rp.get("place_name"), "to": None,
+                                 "to_name": it["place_name"], "mode": spec.long_transport if leg0 == "가는 길" else mode_ko,
+                                 "distance_km": travel.distance_km(a, b) or 0.0,
+                                 "duration_min": it.get("travel_minutes_from_prev") or 0, "estimated": True, "long": True,
+                                 "path": [list(a), list(b)] if a and b else []})
+                if it.get("lat") is not None:
+                    route_prev = it
+                    if leg0 == "가는 길":
+                        prev, prev_name = it, it["place_name"]
+                stops.append({"order": len(stops) + 1, "place_id": None, "name": it["place_name"], "type": it.get("route_kind") or "place",
+                              "arrive": it["start_time"], "depart": it["end_time"],
+                              "arrive_label": hours.label(it["start_time"]), "depart_label": hours.label(it["end_time"]),
+                              "stay_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
+                              "hours_status": "확인 필요" if it.get("route_key") else "확인됨", "reason": it.get("reason") or "",
+                              "lat": it.get("lat"), "lng": it.get("lng"), "source": it.get("source"),
+                              "route": "out" if leg0 == "가는 길" else "back", "route_key": it.get("route_key"),
+                              "route_meal": it.get("route_meal"), "route_stay": it.get("route_stay"),
+                              "swap_hint": False, "swap_kind": None, "homepage": None, "fee_check": False})
+                continue
             if it["type"] == "move":
                 key = "outbound" if (it["notes"] and it["notes"][0] == "출발") else "inbound"
+                pl_ = _planner()
+                drv = pl_.one_way_minutes(spec) if key == "outbound" else pl_._return_base(spec)
                 long[key] = {"mode": spec.long_transport, "label": it["place_name"], "depart": it["start_time"],
+                             "drive_min": drv, "drive_custom": bool((spec.long_override or {}).get("out" if key == "outbound" else "back")),
                              "arrive": it["end_time"],
                              "duration_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
                              "estimated": True}
                 if key == "outbound":
                     prev, prev_name = {"lat": center[0], "lng": center[1]}, "도착 지점"
                 continue
+            from_route = prev is not None and (prev.get("notes") or [""])[0] == "가는 길"
             stop = {"order": len(stops) + 1, "place_id": it.get("place_id"), "name": it["place_name"],
                     "type": it["type"], "arrive": it["start_time"], "depart": it["end_time"],
+                    "arrive_label": hours.label(it["start_time"]), "depart_label": hours.label(it["end_time"]),
                     "stay_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
                     "hours_status": it["hours_status"], "reason": it.get("reason") or "",
                     "lat": it.get("lat"), "lng": it.get("lng"), "source": it.get("source")}
@@ -372,18 +411,21 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
             stop["fee_check"] = fee_check(_pl)
             stop["swap_hint"] = alternatives.swap_hint(_pl, it["type"])
             stops.append(stop)
-            if prev is not None and it["travel_minutes_from_prev"]:
+            if prev is not None and (it["travel_minutes_from_prev"] or from_route):
                 a, b = _coord(prev), _coord(it)
                 dist = travel.distance_km(a, b) or 0.0
+                # 가는 길에 들른 곳 → 여행지 첫 장소: 남은 운전 시간(들른 곳을 떠난 시각 → 도착 시각)
+                dur = (hours.parse_hm(it["start_time"]) - hours.parse_hm(prev["end_time"])) if from_route else it["travel_minutes_from_prev"]
                 legs.append({"from": prev.get("place_id") or prev_name, "from_name": prev_name, "to": it.get("place_id"),
-                             "to_name": it["place_name"], "mode": mode_ko, "distance_km": dist,
-                             "duration_min": it["travel_minutes_from_prev"], "estimated": True,
+                             "to_name": it["place_name"], "mode": spec.long_transport if from_route else mode_ko, "distance_km": dist,
+                             "duration_min": max(0, dur), "estimated": True, "long": from_route,
                              "path": [list(a), list(b)] if a and b else []})
             prev, prev_name = it, it["place_name"]
             if it["type"] == "stay":
                 stay_prev = it
-        dkm = round(sum(x["distance_km"] for x in legs), 1)
-        dmin = sum(x["duration_min"] for x in legs)
+        # 장거리(가는 길·오는 길) 구간은 동선에는 보이되 현지 이동 합계·유류비에서는 뺀다(장거리 비용은 따로 계산)
+        dkm = round(sum(x["distance_km"] for x in legs if not x.get("long")), 1)
+        dmin = sum(x["duration_min"] for x in legs if not x.get("long"))
         tot_km += dkm
         tot_min += dmin
         sg = Counter((pl.get(s["place_id"] or "") or {}).get("sigungu") for s in stops if s["type"] == "place")
@@ -395,7 +437,7 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
     cap_min = {"보통": 60, "여유": 40}.get(spec.intensity)
     for day in days:
         for lg in day["legs"]:
-            if cap_min and lg["duration_min"] > cap_min:
+            if cap_min and lg["duration_min"] > cap_min and not lg.get("long"):
                 warnings.append(f"{day['day']}일차 {lg['from_name']} → {lg['to_name']} 이동이 약 {lg['duration_min']}분으로 "
                                 f"'{spec.intensity}' 강도 권장({cap_min}분)보다 길어요")
     if spec.local_transport == "대중교통" and spec.region in RURAL:

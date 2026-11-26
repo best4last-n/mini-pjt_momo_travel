@@ -133,7 +133,7 @@ def estimate(spec, plan: dict) -> dict:
                                                                                           "eff": 12, "price": FUEL_PRICE, "unit": "L", "given": True})
         add("유류비", f"현지 이동 약 {local_km:,.0f}km" + (" (렌터카)" if spec.local_transport == "렌터카" else ""), amount, basis)
     if spec.local_transport == "대중교통":
-        legs = sum(len(d.get("legs") or []) for d in plan.get("itinerary", []))
+        legs = sum(len([x for x in d.get("legs") or [] if not x.get("long")]) for d in plan.get("itinerary", []))
         add("현지 교통", f"버스 등 {legs}구간 × {people}명", legs * TRANSIT_PER_LEG * people,
             f"구간당 1인 {TRANSIT_PER_LEG:,}원 (택시 이용 시 추가)")
     # 식비·입장료·숙박
@@ -144,7 +144,9 @@ def estimate(spec, plan: dict) -> dict:
         for s in d.get("stops", []):
             if s["type"] == "meal":
                 kind = "lunch" if hours.parse_hm(s["arrive"]) < 16 * 60 else "dinner"
-                add("식비", f"{d['day']}일차 {'점심' if kind == 'lunch' else '저녁'} · {s['name']}", MEAL[kind] * people,
+                t_ = hours.parse_hm(s["arrive"])
+                label = "아침" if (t_ < 10 * 60 + 30 or "조식" in s["name"] or "아침" in s["name"]) else "점심" if kind == "lunch" else "저녁"
+                add("식비", f"{d['day']}일차 {label} · {s['name']}", MEAL[kind] * people,
                     f"1인 {MEAL[kind]:,}원 × {people}명 (평균 단가 추정)")
             elif s["type"] == "place" and s.get("place_id"):
                 p = pl.get(s["place_id"]) or {}

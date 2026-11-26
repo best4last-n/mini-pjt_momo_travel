@@ -146,10 +146,95 @@ def resolve_date(p: ParsedRequest, question: str) -> tuple[date | None, str | No
     return sat, None, notes
 
 
-def resolve_waypoints(names: list[str], region: str) -> tuple[list[str], list[dict], list[str]]:
+MAX_WAYPOINTS = 200        # 100곳 넘게 적어도 받는다(일정에 들어갈 만큼만 넣고 나머지는 후보 — planner.must_ids)
+
+
+def _local_title(n: str, region: str) -> dict | None:
+    """색인 뒤에 수집된 장소(extra_places)까지 제목으로 맞춰 보기 — '사성암' ↔ '사성암(구례)'."""
+    from .placesearch import name_key
+    k = name_key(n)
+    if len(k) < 2:
+        return None
+    for pid, p in data.places(region).items():
+        t = re.sub(r"\(.*?\)|\[.*?\]", "", p.get("title") or "")
+        if name_key(t) == k:
+            return {"doc_id": pid}
+    return None
+
+
+def _resolve_many(names: list[str], region: str, choices: list | None) -> tuple[list[str], list[dict], list[str]]:
+    """꼭 갈 곳 여러 곳을 동시에(12개씩) 찾는다 — 곳당 1~3초라 100곳을 하나씩 찾으면 수 분. 결과 순서는 적은 순서 그대로.
+    안내가 장소마다 한 줄씩 100줄이 되지 않게, 10곳 넘으면 '찾음 N · 직접 지정 N · 지점 고르기 N · 못 찾음 N'으로 묶는다."""
+    import contextvars
+    from concurrent.futures import ThreadPoolExecutor
+    from .cancel import check as _cancel_check
+    _cancel_check()
+
+    def one(n):
+        ch: list | None = [] if choices is not None else None
+        r = resolve_waypoints([n], region, ch)
+        return r, ch
+    with ThreadPoolExecutor(max_workers=12) as ex:     # 중지 신호(contextvar)가 각 작업에도 전달되게 문맥 복사
+        futs = [ex.submit(contextvars.copy_context().run, one, n) for n in names]
+        results = [f.result() for f in futs]
+    ids, users, notes = [], [], []
+    found = picked = 0
+    missing, branchy = [], []
+    for n, ((i, u, nt), ch) in zip(names, results):
+        ids += [x for x in i if x not in ids]
+        users += [x for x in u if x["place_id"] not in {y["place_id"] for y in users}]
+        found += len(i)
+        picked += len(u)
+        if ch:
+            choices.extend(ch)
+            branchy.append(n)
+        elif not i and not u:
+            missing.append(n)
+        if len(names) <= 10:
+            notes += nt
+    if len(names) > 10:
+        notes.append(f"꼭 갈 곳 {len(names)}곳 확인: 관광공사 자료 {found}곳 · 지도에서 찾아 직접 지정 {picked}곳"
+                     + (f" · 지점 고르기 {len(branchy)}곳({', '.join(branchy[:5])}{' 외' if len(branchy) > 5 else ''})" if branchy else "")
+                     + (f" · 못 찾음 {len(missing)}곳({', '.join(missing[:8])}{' 외' if len(missing) > 8 else ''}) — 정확한 이름이나 '직접 추가'로 넣어 주세요"
+                        if missing else ""))
+    return ids, users, notes
+
+
+
+def clean_waypoints(raw) -> tuple[list[str], list[str]]:
+    """시작 카드 '꼭 가고 싶은 곳' 정리(잘림 오류 2026-11-26): 쉼표·줄바꿈으로 나누고 '꼭 갈 곳' 머리말 제거,
+    개인정보 가리기, 한 곳 60자, 중복 제거. MAX_WAYPOINTS를 넘는 곳은 버리지 않고 (받은 목록, 못 받은 목록)으로 돌려줘 안내한다."""
+    items = raw if isinstance(raw, list) else [raw] if raw else []
+    out: list[str] = []
+    for it in items:
+        for w in re.split(r"[,，、\n;]+", str(it or "")):
+            w = re.sub(r"^\s*꼭\s*갈\s*곳\s*", "", w).strip()
+            if w:
+                w = guardrails.mask_pii(w[:60])[0]
+                if w not in out:
+                    out.append(w)
+    return out[:MAX_WAYPOINTS], out[MAX_WAYPOINTS:]
+
+
+def resolve_waypoints(names: list[str], region: str, choices: list | None = None) -> tuple[list[str], list[dict], list[str]]:
+    """사용자가 이름으로 말한 장소 찾기. choices를 넘기면 지점이 여러 곳인 상호(프랜차이즈·정지영처럼)는 넣지 않고
+    지점 선택지를 choices에 담는다(관광지·이름이 하나뿐인 곳은 그대로)."""
+    if len(names) > 1:          # 여러 곳(100곳 넘게도)은 동시에 찾고, 안내는 묶어서
+        return _resolve_many(names, region, choices)
+    from .cancel import check as _cancel_check
     ids, users, notes = [], [], []
     for n in names:
-        d = retrieve.find_by_name(n, region)
+        _cancel_check()          # 장소가 많으면 찾기가 길어져서, 한 곳마다 중지 확인
+        d = retrieve.find_by_name(n, region) or _local_title(n, region)
+        if choices is not None and (not d or (data.places(region).get(d["doc_id"]) or {}).get("kind") == "restaurant"):
+            from . import placesearch
+            br = placesearch.branches(n, region)
+            if br:
+                choices.append({"query": n, "question": f"{_josa(chr(39) + n + chr(39), '은는')} 근처에 지점이 {len(br)}곳 있어요. 어느 지점으로 갈까요?",
+                                "options": [{**{k: v for k, v in o.items() if k != "candidate"},
+                                             "edit": {"op": "add", "candidate": o["candidate"]}} for o in br]})
+                notes.append(f"{_josa(chr(39) + n + chr(39), '은는')} 근처에 지점이 {len(br)}곳 있어요 — 어느 지점으로 갈지 골라 주시면 일정에 넣을게요")
+                continue
         if d:
             ids.append(d["doc_id"])
             continue
@@ -205,6 +290,14 @@ def resolve_waypoints(names: list[str], region: str) -> tuple[list[str], list[di
                      + (f"이름이 비슷한 곳: {', '.join(similar)}. " if similar else "")
                      + "정확한 이름이나 주소를 알려 주시거나, 장소 찾기의 '직접 추가'로 넣어 주세요.")
     return ids, users, notes
+
+
+def _with_choices(out: State, choices: list) -> State:
+    """지점 선택지(place_choices)를 응답에 싣는다 — 화면은 버튼으로, 고르면 edit op add(candidate)."""
+    if choices:
+        out = dict(out)
+        out["extra"] = {**(out.get("extra") or {}), "place_choices": choices}
+    return out
 
 
 # ---------------- 노드 ----------------
@@ -341,8 +434,9 @@ def plan_node(state: State) -> State:
                             origin_label=(oloc or {}).get("label") or (_dep_label(p.departure) if dep else None),
                             origin_coords=[oloc["lat"], oloc["lng"]] if oloc else None, assumptions=assumed,
                             budget=budget, budget_per_person=per, budget_label=p.budget_text if budget else None)
+    choices: list = []
     if p.waypoints:
-        ids, users, wnotes = resolve_waypoints(p.waypoints, region)
+        ids, users, wnotes = resolve_waypoints(p.waypoints, region, choices)
         spec.waypoint_ids, spec.user_waypoints = ids, users
         notes += wnotes
     # 당일치기 현지 시간 경고 (3-4e)
@@ -353,7 +447,7 @@ def plan_node(state: State) -> State:
                     "머물 시간이 1시간도 안 돼요. 더 이른 출발이나 1박 어때요?", "trace": _t(state, "plan", "시간 창", f"{w}")}
         if w[1] - w[0] < 180:
             notes.append("당일치기로는 빠듯해요. 1박 어때요?")
-    return _run_plan(state, spec, q, notes, base=None)
+    return _with_choices(_run_plan(state, spec, q, notes, base=None), choices)
 
 
 def _run_plan(state: State, spec: planner.TripSpec, request: str, notes: list[str], base: list | None,
@@ -378,6 +472,13 @@ def _run_plan(state: State, spec: planner.TripSpec, request: str, notes: list[st
         old = {(it["date"], it.get("place_id") or it["place_name"], it["start_time"]) for it in base}
         changed = {(it["date"], it.get("place_id") or it["place_name"]) for it in items
                    if (it["date"], it.get("place_id") or it["place_name"], it["start_time"]) not in old and it["type"] != "move"}
+    over = planner.waypoint_overflow(spec)
+    if over:
+        nm = [(data.places(spec.region).get(x) or {}).get("title")
+              or next((w["title"] for w in spec.user_waypoints if w["place_id"] == x), x) for x in over]
+        notes.append(f"꼭 갈 곳이 많아 {spec.nights}박 {spec.nights + 1}일에 다 들어가지 않아요 — 적어 주신 순서대로 "
+                     f"{len(planner.must_ids(spec))}곳을 넣고 {len(over)}곳({', '.join(nm[:6])}{' 외' if len(nm) > 6 else ''})은 후보로 남겼어요. "
+                     "여행 강도를 '강행군'으로 바꾸거나 기간을 늘리면 더 넣을 수 있어요")
     viol = res["violations"]
     if viol:
         notes.append("규칙 검사에서 아직 고치지 못한 부분이 있어 확정 전에 조정이 필요해요: "
@@ -441,8 +542,9 @@ def modify_node(state: State) -> State:
     instr = p.modify_instruction or state["question"]
     if p.preferences:
         spec.preferences = list(dict.fromkeys([*spec.preferences, *p.preferences]))
+    choices: list = []
     if p.waypoints:
-        ids, users, wnotes = resolve_waypoints(p.waypoints, spec.region)
+        ids, users, wnotes = resolve_waypoints(p.waypoints, spec.region, choices)
         spec.waypoint_ids = list(dict.fromkeys([*spec.waypoint_ids, *ids]))
         spec.user_waypoints = [*spec.user_waypoints, *users]
         notes += wnotes
@@ -474,7 +576,7 @@ def modify_node(state: State) -> State:
                               and (hours.parse_hm(it["start_time"]) < 12 * 60 or _role(it) == "lunch")]
     indoor = "실내" in state["question"] or any("실내" in x for x in p.preferences)
     request = f"{state.get('last_request', '')}\n[수정 요청] {instr}"
-    return _run_plan(state, spec, request, notes, base=base, locked=locked, prefix=prefix, indoor=indoor)
+    return _with_choices(_run_plan(state, spec, request, notes, base=base, locked=locked, prefix=prefix, indoor=indoor), choices)
 
 
 def _infer_companion(text: str | None) -> str:
@@ -540,19 +642,25 @@ def _day_picks(spec: planner.TripSpec, items: list) -> list[list]:
     return days
 
 
-def _fill_meals(spec: planner.TripSpec, days: list[list]) -> list[list]:
-    """식사가 필요한 날에 식사 항목이 없으면 '주변에서 식사' 자리표시자를 넣는다."""
+def _fill_meals(spec: planner.TripSpec, days: list[list], log: list | None = None) -> list[list]:
+    """식사 보완: 빈 식사 자리표시자 → 점심을 정오 자리로 → 연달아 겹친 식사 정리(사용자가 넣은 곳은 유지).
+    정리로 빠진 자리가 생기면 한 번 더 채운다."""
     mw = planner.meal_windows(spec)
-    for di, row in enumerate(days):
-        for role, win in (("lunch", planner.LUNCH), ("dinner", planner.DINNER)):
-            if planner.meal_required(mw[di], win) and not any(x.role == role for x in row):
-                ph = PickItem(place_id=planner.MEAL_ID, role=role, stay_minutes=60, reason="")
-                if role == "lunch":
-                    idx = min(len([x for x in row if x.role != "stay"]), max(1, len(row) // 2))
+
+    def add_placeholders(days):
+        for di, row in enumerate(days):
+            for role, win in (("lunch", planner.LUNCH), ("dinner", planner.DINNER)):
+                if planner.meal_required(mw[di], win) and not any(x.role == role for x in row):
+                    ph = PickItem(place_id=planner.MEAL_ID, role=role, stay_minutes=60, reason="")
+                    if role == "lunch":
+                        idx = min(len([x for x in row if x.role != "stay"]), max(1, len(row) // 2))
+                    else:
+                        idx = next((i for i, x in enumerate(row) if x.role == "stay"), len(row))
                     row.insert(idx, ph)
-                else:
-                    idx = next((i for i, x in enumerate(row) if x.role == "stay"), len(row))
-                    row.insert(idx, ph)
+        return days
+
+    for _ in range(2):
+        days = planner.dedupe_meals(spec, planner.place_lunch(spec, add_placeholders(days)), log)
     return days
 
 
@@ -711,7 +819,9 @@ def _reschedule(state: State, spec: planner.TripSpec, days: list[list], changes:
                 repair: bool = False) -> State:
     """화면 편집·조건 변경을 LLM 없이 반영: 배치 → 식사 보완 → 규칙 검사(→ 필요 시 보정) → plan 재구성."""
     allowed = set(state.get("allowed") or []) | {x.place_id for row in days for x in row} | {planner.MEAL_ID}
-    days = _fill_meals(spec, days)
+    dropped: list[str] = []
+    days = _fill_meals(spec, days, dropped)
+    changes[1:1] = [x for x in dict.fromkeys(dropped) if x not in changes]     # 첫 줄(요청한 변경) 바로 뒤 — 3줄 안에 보이게
     pick = planner.PlanPick(days=[DayPick(day=i + 1, items=row) for i, row in enumerate(days)])
     items = planner.schedule(spec, pick, {})
     viol = planner.validate(spec, items, allowed)
@@ -765,7 +875,16 @@ def edit_node(state: State) -> State:
     days = _day_picks(spec, state["itinerary"])
     op, pid = e.get("op"), e.get("place_id")
     pl = data.places(spec.region)
-    name = (pl.get(pid) or {}).get("title") or pid
+
+    def title_of(x) -> str:
+        """수집 장소·직접 고른 곳(user:…) 모두 이름으로 — id가 문장에 그대로 나오지 않게."""
+        if not x:
+            return ""
+        return ((data.places(spec.region).get(x) or {}).get("title")
+                or next((w.get("title") for w in spec.user_waypoints if w.get("place_id") == x), None)
+                or ("이 장소" if str(x).startswith(("user:", "osm:", "vw:")) else str(x)))
+
+    name = title_of(pid)
     nd = len(days)
     changes: list[str] = []
 
@@ -787,6 +906,7 @@ def edit_node(state: State) -> State:
             return {"status": "승인 대기", "answer": "그 장소는 일정에 없어요.", "trace": _t(state, "edit", e, "없음")}
         days[di].pop(i)
         spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {di + 1})
+        spec.waypoint_ids = [w for w in spec.waypoint_ids if w != pid]       # 다시 짜도 되살리지 않음
         changes.append(f"{di + 1}일차에서 {_josa(name, '을를')} 뺐어요. 빈 시간에는 후보 중 한 곳을 넣어 보셔도 좋아요")
     elif op in ("move", "reorder"):
         di, i = locate(pid)
@@ -846,7 +966,13 @@ def edit_node(state: State) -> State:
                 pid = up["place_id"]
             pl = data.places(spec.region)
         if not pid and e.get("name"):
-            ids, users, notes = resolve_waypoints([e["name"]], spec.region)
+            br: list = []
+            ids, users, notes = resolve_waypoints([e["name"]], spec.region, br)
+            if br:            # 지점이 여러 곳 → 어느 지점인지 되묻기(고르면 같은 add 편집에 candidate로 다시 옴)
+                for o in br[0]["options"]:
+                    o["edit"] = {**o["edit"], **{k: e[k] for k in ("day", "after", "before", "insert") if e.get(k)}}
+                return {"status": "되묻기", "answer": br[0]["question"], "changes": notes[:1],
+                        "extra": {"place_choices": br}, "trace": _t(state, "edit", e, f"지점 {len(br[0]['options'])}곳")}
             if users:
                 spec.user_waypoints = [*spec.user_waypoints, *users]
                 pid = users[0]["place_id"]
@@ -860,7 +986,7 @@ def edit_node(state: State) -> State:
             return {"status": "승인 대기", "answer": "그 장소를 찾지 못했어요.", "trace": _t(state, "edit", e, "없는 id")}
         if locate(pid)[0] is not None:
             return {"status": "승인 대기", "answer": "이미 일정에 있는 곳이에요.", "trace": _t(state, "edit", e, "중복")}
-        name = (pl.get(pid) or {}).get("title") or next((w["title"] for w in spec.user_waypoints if w["place_id"] == pid), pid)
+        name = title_of(pid)
         if op == "replace":
             old = days[tdi][ti]
             oname = (pl.get(old.place_id) or {}).get("title") or next(
@@ -870,17 +996,22 @@ def edit_node(state: State) -> State:
             spec.waypoint_ids = [w for w in spec.waypoint_ids if w != old.place_id]
             spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {tdi + 1})
             to = tdi
-        elif e.get("after") and locate(e["after"])[0] is not None:     # 관광지 카드의 '근처 먹거리' → 그 바로 다음
-            to, ai = locate(e["after"])
-            kind = (pl.get(pid) or {}).get("kind")
-            days[to].insert(ai + 1, PickItem(place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
-                                             reason=f"{(pl.get(e['after']) or {}).get('title', '')} 근처에서 고르신 곳"))
+        elif (e.get("after") and locate(e["after"])[0] is not None) or (e.get("before") and locate(e["before"])[0] is not None):
+            # 일정 중간에 끼워 넣기(2026-11-26): '근처 먹거리'·'+ 여기에 넣기' → 그 바로 다음(after) 또는 바로 앞(before)
+            before = not (e.get("after") and locate(e["after"])[0] is not None)
+            to, ai = locate(e["before"] if before else e["after"])
+            kind = (pl.get(pid) or next((w for w in spec.user_waypoints if w["place_id"] == pid), {})).get("kind")
+            days[to].insert(ai if before else ai + 1, PickItem(
+                place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
+                reason="일정 사이에 직접 끼워 넣으신 곳" if e.get("insert") else f"{title_of(e['after'])} 근처에서 고르신 곳"))
             spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {to + 1})
         else:
             if e.get("day"):
                 to = max(1, min(nd, int(e["day"]))) - 1
-            else:   # 관광지가 가장 적은 날
-                to = min(range(nd), key=lambda k: sum(1 for x in days[k] if x.role == "place"))
+            else:   # 관광지가 가장 적은 날 — 그 장소가 쉬는 날은 빼고(사용자 테스트: 휴무 월요일에 넣어 확정 불가)
+                pinfo = pl.get(pid)
+                open_days = [k for k in range(nd) if not pinfo or hours.parse_open(pinfo, spec.days[k]).status != "휴무"] or list(range(nd))
+                to = min(open_days, key=lambda k: sum(1 for x in days[k] if x.role == "place"))
             kind = (pl.get(pid) or {}).get("kind")
             insert(to, PickItem(place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
                                 reason=next((r for p_, r in (state.get("ranked") or []) if p_ == pid), "") or "직접 추가하신 곳"))
@@ -894,8 +1025,10 @@ def edit_node(state: State) -> State:
                 changes.append(f"{np_.get('title', '이곳')}은(는) 여행 지역에서 약 {far_km:,.0f}km 떨어져 있어 오가는 이동이 길어요(추정)")
         if op == "replace":
             changes.append(f"{to + 1}일차 {oname} 자리에 {_josa(name, '을를')} 넣었어요(순서·머무는 시간은 그대로)")
-        elif e.get("after"):
-            changes.append(f"{to + 1}일차 {(pl.get(e['after']) or {}).get('title', '')} 바로 다음에 {_josa(name, '을를')} 넣었어요")
+        elif e.get("after") and locate(e["after"])[0] is not None and e["after"] != pid:
+            changes.append(f"{to + 1}일차 {title_of(e['after'])} 바로 다음에 {_josa(name, '을를')} 넣었어요")
+        elif e.get("before"):
+            changes.append(f"{to + 1}일차 {title_of(e['before'])} 바로 앞에 {_josa(name, '을를')} 넣었어요")
         else:
             if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
                 days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
@@ -904,6 +1037,50 @@ def edit_node(state: State) -> State:
         t = guardrails.mask_pii(re.sub(r"\s+", " ", str(e.get("title") or "")).strip()[:40])[0]
         spec.title = t or None
         changes.append(f"여행 제목을 '{t}'(으)로 바꿨어요" if t else "여행 제목을 기본 제목으로 되돌렸어요")
+    elif op == "long_time":      # {leg: out|back, minutes|null} 장거리 운전 시간 직접 정하기(null이면 자동 추정)
+        leg = "back" if e.get("leg") == "back" else "out"
+        lo = dict(spec.long_override or {})
+        where = "오는 길(귀가)" if leg == "back" else "가는 길(출발)"
+        if e.get("minutes") in (None, "", "auto"):
+            lo.pop(leg, None)
+            changes.append(f"{where} 운전 시간을 자동 추정으로 되돌렸어요(도로 경로·시간대 혼잡 기준)")
+        else:
+            try:
+                mins = max(20, min(900, int(e.get("minutes"))))
+            except (TypeError, ValueError):
+                return {"status": "승인 대기", "answer": "운전 시간을 분 단위 숫자로 알려 주세요.", "trace": _t(state, "edit", e, "형식")}
+            lo[leg] = mins
+            changes.append(f"{where} 운전 시간을 {mins // 60}시간 {mins % 60}분으로 정했어요(들르는 곳·식사 시간은 따로 더해요)")
+        spec.long_override = lo
+    elif op == "time":           # {place_id, time: "HH:MM"|null, minutes?} 시작 시각 직접 정하기(null이면 앞 일정에 바로 붙이기)
+        di, i = locate(pid)
+        if di is None:
+            return {"status": "승인 대기", "answer": "그 장소는 일정에 없어요.", "trace": _t(state, "edit", e, "없음")}
+        key = f"{di + 1}:{pid}"
+        fs = dict(spec.fixed_starts or {})
+        old = days[di][i]
+        nm = old.reason if old.place_id.startswith(planner.FREE_PREFIX) else name
+        tv = e.get("time")
+        if tv in (None, "", "auto"):
+            fs.pop(key, None)
+            changes.append(f"{di + 1}일차 {nm} 시작 시각을 자동으로 — 앞 일정이 끝나면 바로 이어져요")
+        else:
+            m_ = re.match(r"^\s*(\d{1,2}):(\d{2})\s*$", str(tv))
+            if not m_ or not (5 * 60 <= int(m_.group(1)) * 60 + int(m_.group(2)) <= 26 * 60):
+                return {"status": "승인 대기", "answer": "시작 시각은 05:00~익일 02:00 사이 'HH:MM'으로 알려 주세요.", "trace": _t(state, "edit", e, "형식")}
+            mm = int(m_.group(1)) * 60 + int(m_.group(2))
+            fs[key] = mm
+            changes.append(f"{di + 1}일차 {nm} 시작을 {hours.fmt(mm)}로 정했어요(앞 일정이 그보다 늦게 끝나면 끝난 뒤로, 뒤 일정은 이어서 다시 계산)")
+        spec.fixed_starts = fs
+        if e.get("minutes") not in (None, "") and old.role != "stay":
+            try:
+                mins = max(15, min(360, int(e.get("minutes"))))
+                if mins != old.stay_minutes:
+                    days[di][i] = PickItem(place_id=old.place_id, role=old.role, stay_minutes=mins, reason=old.reason)
+                    changes.append(f"{di + 1}일차 {nm} 머무는 시간을 {mins}분으로 바꿨어요")
+            except (TypeError, ValueError):
+                pass
+        spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {di + 1})     # 직접 시간을 정한 날은 순서도 그대로
     elif op == "stay":           # {place_id, minutes} 머무는 시간 직접 정하기(15~360분)
         di, i = locate(pid)
         if di is None:
@@ -935,7 +1112,7 @@ def edit_node(state: State) -> State:
             if e.get("after") and locate(e["after"])[0] is not None:
                 to, ai = locate(e["after"])
                 days[to].insert(ai + 1, blk)
-                where = f"{(pl.get(e['after']) or {}).get('title') or '그 장소'} 다음에"
+                where = f"{title_of(e['after']) or '그 장소'} 다음에"
             else:
                 to = max(1, min(nd, int(e.get("day") or 1))) - 1
                 idx = next((k for k, x in enumerate(days[to]) if x.role == "stay"), len(days[to]))
@@ -956,6 +1133,90 @@ def edit_node(state: State) -> State:
             else:
                 spec.breakfast_skip_days = [x for x in spec.breakfast_skip_days if x != dn]
                 changes.append(f"{dn}일차 아침 식사를 다시 넣었어요")
+    elif op == "night":          # {day, mode: stay|차박|밤샘|야간 이동|숙박 필요 없음} 다음 날로 이어지는 밤의 숙박
+        try:
+            dn = int(e.get("day"))
+        except (TypeError, ValueError):
+            return {"status": "승인 대기", "answer": "몇 일차 밤인지 알려 주세요.", "trace": _t(state, "edit", e, "형식")}
+        if not 1 <= dn <= spec.nights:
+            return {"status": "승인 대기", "answer": "그날은 다음 날로 이어지는 밤이 아니에요(마지막 날은 숙박이 없어요).",
+                    "trace": _t(state, "edit", e, "범위")}
+        mode = str(e.get("mode") or "stay")
+        row = days[dn - 1]
+        if mode in planner.NO_STAY_MODES:
+            spec.no_stay = {**(spec.no_stay or {}), str(dn): mode}
+            had = [x for x in row if x.role == "stay"]
+            days[dn - 1] = [x for x in row if x.role != "stay"]
+            changes.append(f"{dn}일차 밤은 숙소 없이 '{mode}'(으)로 보낼게요"
+                           + (f" — {title_of(had[0].place_id)}을(를) 뺐어요" if had else "")
+                           + ". 다음 날 아침 숙소 식사·체크아웃 안내도 빠져요. 졸음운전과 안전한 쉴 곳을 꼭 챙겨 주세요")
+        else:
+            spec.no_stay = {k: v for k, v in (spec.no_stay or {}).items() if k != str(dn)}
+            if not any(x.role == "stay" for x in row):
+                # 앞·뒤 밤 숙소가 있으면 그 숙소(연박), 없으면 그날 마지막 장소에서 가장 가까운 숙소
+                sid_ = next((x.place_id for k in (dn - 2, dn) if 0 <= k < nd for x in days[k] if x.role == "stay"), None)
+                if not sid_:      # 그날 마지막 장소에서 가장 가까운 숙소(수집 데이터)
+                    from .travel import km as _km
+                    last = next((planner._pcoord(spec, x.place_id) for x in reversed(row)
+                                 if x.place_id != planner.MEAL_ID and not x.place_id.startswith(planner.FREE_PREFIX)
+                                 and planner._pcoord(spec, x.place_id)), None) or data.region_center(spec.region)
+                    lodg = [(pid_, p) for pid_, p in pl.items() if p.get("kind") == "lodging" and p.get("lat")]
+                    if not lodg:
+                        return {"status": "승인 대기", "answer": "가까운 숙소 자료가 없어요. '장소 찾기'로 숙소를 직접 넣어 주세요.",
+                                "trace": _t(state, "edit", e, "숙소 없음")}
+                    sid_ = min(lodg, key=lambda kv: _km(last, (kv[1]["lat"], kv[1]["lng"])))[0]
+                row.append(PickItem(place_id=sid_, role="stay", stay_minutes=0, reason="다음 날까지 이어지는 일정이라 숙소를 넣었어요"))
+                changes.append(f"{dn}일차 밤에 {_josa(title_of(sid_), '을를')} 숙소로 넣었어요(다른 숙소로 바꿀 수 있어요)")
+            else:
+                changes.append(f"{dn}일차 밤은 숙소에서 묵어요")
+    elif op == "route_stop":     # {leg: out|back, action: add|remove, candidate|stop} 출발 지점 다음·복귀 지점 앞에 들를 곳(전국 검색 결과)
+        leg = "back" if e.get("leg") == "back" else "out"
+        lst_name = "return_stops" if leg == "back" else "depart_stops"
+        cur = list(getattr(spec, lst_name) or [])
+        where = "오는 길" if leg == "back" else "가는 길"
+        if e.get("action") in ("stay", "move"):          # 머무는 시간 바꾸기 · 순서 앞뒤로(동선에 포함된 들를 곳)
+            k = str((e.get("stop") or {}).get("key") or e.get("key") or "")
+            ix = next((i for i, s in enumerate(cur) if s.get("key") == k), None)
+            if ix is None:
+                return {"status": "승인 대기", "answer": f"{where}에 넣은 곳 중에서 찾지 못했어요.", "trace": _t(state, "edit", e, "없음")}
+            if e.get("action") == "stay":
+                try:
+                    mins = max(10, min(360, int(e.get("minutes"))))
+                except (TypeError, ValueError):
+                    return {"status": "승인 대기", "answer": "머무는 시간을 분 단위 숫자로 알려 주세요.", "trace": _t(state, "edit", e, "형식")}
+                cur[ix] = {**cur[ix], "stay_min": mins}
+                changes.append(f"{where} {cur[ix]['name']} 머무는 시간을 {mins}분으로 바꿨어요(뒤 일정은 이어서 다시 계산)")
+            else:
+                j_ = ix + (1 if int(e.get("dir") or 1) > 0 else -1)
+                if not 0 <= j_ < len(cur):
+                    return {"status": "승인 대기", "answer": "더 옮길 수 없어요.", "trace": _t(state, "edit", e, "끝")}
+                cur[ix], cur[j_] = cur[j_], cur[ix]
+                changes.append(f"{where} 들르는 순서를 바꿨어요: " + " → ".join(s["name"] for s in cur))
+            setattr(spec, lst_name, cur)
+        elif e.get("action") == "remove":
+            k = str((e.get("stop") or {}).get("key") or (e.get("stop") or {}).get("name") or e.get("key") or "")
+            gone = [s for s in cur if k in (s.get("key"), s.get("name"))]
+            if not gone:
+                return {"status": "승인 대기", "answer": f"{where}에 넣은 곳 중에서 찾지 못했어요.", "trace": _t(state, "edit", e, "없음")}
+            setattr(spec, lst_name, [s for s in cur if s not in gone])
+            changes.append(f"{where} 들를 곳에서 {_josa(gone[0]['name'], '을를')} 뺐어요")
+        else:
+            c = e.get("candidate") if isinstance(e.get("candidate"), dict) else e.get("stop") if isinstance(e.get("stop"), dict) else {}
+            if not planner.route_ends(spec).get(leg):
+                return {"status": "승인 대기", "answer": ("출발지를 먼저 정해 주세요. 출발 지점이 있어야 그다음에 들를 곳을 넣을 수 있어요."
+                                                     if leg == "out" else "복귀 지점(출발지 또는 여행 후 도착지)을 먼저 정해 주세요."),
+                        "trace": _t(state, "edit", e, "양 끝 없음")}
+            stop = planner.route_stop_from(spec, leg, c)
+            if not stop:
+                return {"status": "승인 대기", "answer": "들를 곳의 위치를 읽지 못했어요. 장소 찾기에서 다시 골라 주세요.", "trace": _t(state, "edit", e, "형식 오류")}
+            stop["name"] = guardrails.mask_pii(stop["name"])[0]
+            if len(cur) >= 5 and not any(s.get("key") == stop["key"] for s in cur):
+                return {"status": "승인 대기", "answer": f"{where}에 들를 곳은 5곳까지 넣을 수 있어요.", "trace": _t(state, "edit", e, "상한")}
+            cur = [s for s in cur if s.get("key") != stop["key"]] + [stop]
+            cur.sort(key=lambda s: s.get("km_from_start") or 0)
+            setattr(spec, lst_name, cur)
+            meal = " · 이 시간대 끼니를 이곳에서 먹어요" if stop["kind"] == "식당" else ""
+            changes.append(f"{where}에 {_josa(stop['name'], '을를')} 넣었어요(우회 약 {stop['detour_min']}분 + 머무는 {stop['stay_min']}분, 추정){meal}")
     elif op == "return_stop":    # {action: add|remove, stop: {...}} 귀가길에 잠깐 들를 곳
         st = e.get("stop") if isinstance(e.get("stop"), dict) else {}
         key_ = str(st.get("key") or st.get("name") or "")[:80]
@@ -969,17 +1230,27 @@ def edit_node(state: State) -> State:
                         "km_from_start": st.get("km_from_start"), "kind": st.get("kind"), "source": st.get("source") or "한국관광공사"}
             except (KeyError, TypeError, ValueError):
                 return {"status": "승인 대기", "answer": "들를 곳 정보를 읽지 못했어요.", "trace": _t(state, "edit", e, "형식 오류")}
-            if len(spec.return_stops) >= 3:
-                return {"status": "승인 대기", "answer": "귀가길에 들를 곳은 3곳까지만 넣을 수 있어요.", "trace": _t(state, "edit", e, "상한")}
+            if len(spec.return_stops) >= 5:
+                return {"status": "승인 대기", "answer": "귀가길에 들를 곳은 5곳까지만 넣을 수 있어요.", "trace": _t(state, "edit", e, "상한")}
             spec.return_stops = [s for s in spec.return_stops if s.get("key") != stop["key"]] + [stop]
             spec.return_stops.sort(key=lambda s: s.get("km_from_start") or 0)
             changes.append(f"돌아가는 길에 {_josa(stop['name'], '을를')} 들르도록 넣었어요(우회 약 {stop['detour_min']}분 + 머무는 {stop['stay_min']}분)")
     elif op == "order":          # 끌어서 바꾼 전체 순서(날짜 사이 이동 포함)
         by_id = {x.place_id: x for row in days for x in row if x.place_id != planner.MEAL_ID}
         want = {int(r.get("day") or 0): [str(x) for x in r.get("place_ids") or []] for r in e.get("days") or []}
-        if not want or any(i not in by_id for ids in want.values() for i in ids):
+        drop = [str(x) for x in e.get("remove") or []]          # 동선 편집에서 삭제한 장소
+        if (not want and not drop) or any(i not in by_id for ids in want.values() for i in ids) or any(i not in by_id for i in drop):
             return {"status": "승인 대기", "answer": "순서를 바꿀 장소를 찾지 못했어요. 화면을 새로 고친 뒤 다시 해 주세요.",
                     "trace": _t(state, "edit", e, "모르는 id")}
+        want = {dn: [i for i in ids if i not in drop] for dn, ids in want.items()}
+        if drop:
+            for di in range(nd):
+                if any(x.place_id in drop for x in days[di]):
+                    days[di] = [x for x in days[di] if x.place_id not in drop]
+                    spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {di + 1})
+            spec.waypoint_ids = [w for w in spec.waypoint_ids if w not in drop]      # 다시 짜도 되살리지 않음
+            names = [title_of(i) for i in drop]
+            changes.append(f"{', '.join(names[:3])}{f' 외 {len(names) - 3}곳' if len(names) > 3 else ''}을(를) 일정에서 뺐어요")
         listed = {i for ids in want.values() for i in ids}
         moved = 0
         for di in range(nd):        # 목록에 없는 날에서는 다른 날로 옮겨 간 장소만 뺀다
@@ -991,10 +1262,11 @@ def edit_node(state: State) -> State:
             if [x.place_id for x in days[dn - 1] if x.place_id != planner.MEAL_ID] != ids:
                 moved += 1
                 spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {dn})
-            ph = [x for x in days[dn - 1] if x.place_id == planner.MEAL_ID]
-            days[dn - 1] = [by_id[i] for i in ids] + ph
-        changes.append(f"{moved}개 날의 순서를 직접 정하신 대로 바꿨어요(직접 정한 순서를 최우선으로 지켜요)" if moved
-                       else "순서는 그대로예요")
+            # 식사 자리표시자는 여기서 붙이지 않음(예전엔 숙소 뒤에 붙어 쌓였음) — _fill_meals가 필요한 자리에 다시 넣음
+            days[dn - 1] = [by_id[i] for i in ids]
+        if moved or not drop:
+            changes.append(f"{moved}개 날의 순서를 직접 정하신 대로 바꿨어요(직접 정한 순서를 최우선으로 지켜요)" if moved
+                           else "순서는 그대로예요")
     elif op == "optimize":       # 동선 최적화(식사·숙소 자리는 고정, 그 사이 관광지 순서만)
         whole = e.get("scope") == "all"
         targets = list(range(1, nd + 1)) if whole or not e.get("day") else [int(e["day"])]
@@ -1102,8 +1374,13 @@ def start_node(state: State) -> State:
         assumptions=assumed, budget=budget, budget_per_person=per, budget_label=s.get("budget") if budget else None,
         vehicle=s.get("vehicle") or None, end_location=eloc["sido"] if eloc else None,
         end_label=eloc["label"] if eloc else None, arrive_time=_hm(s.get("arrive_time")), preset=s.get("preset"), given=given)
-    if s.get("waypoints"):
-        ids, users, wnotes = resolve_waypoints([w for w in s["waypoints"] if w], rid)
+    choices: list = []
+    wps, wdrop = clean_waypoints(s.get("waypoints"))
+    if wdrop:
+        notes.append(f"꼭 갈 곳은 {MAX_WAYPOINTS}곳까지 받아요 — 받지 못한 곳: {', '.join(wdrop[:5])}{' 외' if len(wdrop) > 5 else ''}. "
+                     "일정이 나온 뒤 대화나 '장소 찾기'로 더해 주세요")
+    if wps:
+        ids, users, wnotes = resolve_waypoints(wps, rid, choices)
         spec.waypoint_ids, spec.user_waypoints = ids, users
         notes += wnotes
     if assumed:
@@ -1118,7 +1395,7 @@ def start_node(state: State) -> State:
         if w[1] - w[0] < 60:
             return {"status": "정보", "stage": "intake", "answer": f"{dep}에서 {data.region_label(rid)}까지 오가는 시간이 길어서 당일치기로는 "
                     "현지에 머물 시간이 1시간도 안 돼요. 더 이른 출발이나 1박 어때요?", "trace": _t(state, "start", s, "시간 창 부족")}
-    return _run_plan(state, spec, request, notes, base=None)
+    return _with_choices(_run_plan(state, spec, request, notes, base=None), choices)
 
 
 def pack_node(state: State) -> State:
@@ -1241,7 +1518,7 @@ def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: d
         return spec, False, value, None
     if key == "intensity":
         if value not in brochure.CHECK_OPTIONS["intensity"]:
-            return spec, False, value, "여행 강도는 빡빡·보통·여유 중에서 골라 주세요."
+            return spec, False, value, "여행 강도는 강행군·빡빡·보통·여유 중에서 골라 주세요."
         spec.intensity = value
         a.discard("intensity")
         return spec, True, value, None
@@ -1654,7 +1931,7 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
 def backfill_messages(session_id: str) -> int:
     """기록 기능 전에 나눈 대화: 체크포인트 이력(실제 대화 실행분만)에서 요청·답변을 복원해 기록에 넣는다."""
     from datetime import datetime, timedelta, timezone
-    if store.list_messages(session_id, 1):
+    if store.list_messages(session_id, 1) or store.messages_cleared(session_id):   # 사용자가 지운 기록은 되살리지 않음
         return 0
     runs = []
     for s in graph().get_state_history({"configurable": {"thread_id": session_id}}):

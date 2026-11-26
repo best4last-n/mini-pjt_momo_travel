@@ -12,7 +12,7 @@ from dataclasses import dataclass, field
 from datetime import date
 
 from . import data, guardrails, hours, retrieve, travel
-from .config import (BUFFER_MIN, DAY_END, DAY_START, DEFAULT_DEPART, DINNER, HOME_LIMIT, LUNCH, MAX_REGEN)
+from .config import (BUFFER_MIN, DAY_END, DAY_START, DEFAULT_DEPART, DINNER, HOME_LIMIT, LUNCH, MAX_REGEN, STAY_LIMIT)
 from .llm import MOMO_PERSONA, structured
 from .schemas import ItineraryItem, PlanPick
 
@@ -30,7 +30,7 @@ class TripSpec:
     depart_time: int = DEFAULT_DEPART
     transport: str = "자차"                 # (하위 호환) 현지 이동
     companions: str | None = None
-    intensity: str = "보통"                 # 빡빡 / 보통 / 여유 (SERVICE.md 3-6 (2))
+    intensity: str = "보통"                 # 강행군 / 빡빡 / 보통 / 여유 (SERVICE.md 3-6 (2))
     long_transport: str = "자차"            # 자차 / KTX·SRT / 고속·시외버스
     local_transport: str = "자차"           # 자차 / 렌터카 / 대중교통
     companion_type: str = "보통"            # 보통 / 노약자 / 어린이·유아
@@ -50,6 +50,10 @@ class TripSpec:
     breakfast: str = "근처 식당"            # 근처 식당 / 숙소 조식 / 안 먹음 (숙박 다음 날 아침)
     breakfast_skip_days: list[int] = field(default_factory=list)   # 그날만 아침 빼기(1부터)
     return_stops: list[dict] = field(default_factory=list)         # 귀가길에 들를 곳 {name, lat, lng, detour_min, stay_min, …}
+    depart_stops: list[dict] = field(default_factory=list)         # 가는 길에 들를 곳(출발 지점 다음) — return_stops와 같은 모양
+    long_override: dict = field(default_factory=dict)   # {"out"|"back": 분} 사용자가 정한 장거리 운전 시간(들르는 곳·식사 빼고)
+    fixed_starts: dict = field(default_factory=dict)    # {"일차:place_id": 분} 사용자가 정한 시작 시각(앞 일정이 늦게 끝나면 그 뒤로)
+    no_stay: dict = field(default_factory=dict)    # {"N": 차박|밤샘|야간 이동|숙박 필요 없음} 그 밤은 숙소 없이(사용자가 고른 예외)
     preset: str | None = None
     given: list[str] = field(default_factory=list)      # 사용자가 직접 준 선택 항목(depart_time 등)
     pack_checked: list[str] = field(default_factory=list)   # 준비물 체크한 id
@@ -71,6 +75,7 @@ class TripSpec:
 # ---------- 시간 창 ----------
 
 INTENSITY = {   # 관광 시간대(분), 하루 관광지 상한, 구간 권장 상한(분)
+    "강행군": (6 * 60 + 30, 23 * 60, 25, None),   # 새벽형·야행성: 가까운 곳 연달아 하루 20곳 이상도, 숙소는 다음 날 02:00까지
     "빡빡": (8 * 60, 20 * 60, 5, None),
     "보통": (9 * 60, 18 * 60 + 30, 4, 60),
     "여유": (10 * 60, 17 * 60 + 30, 3, 40),
@@ -81,9 +86,16 @@ def local_mode(spec: TripSpec) -> str:
     return "대중교통" if spec.local_transport == "대중교통" else "자차"
 
 
+def _less_rests(dr: dict, stops: list) -> int:
+    """들르는 곳이 있으면 그곳이 휴게소 쉬기를 대신(쉬기 15분 × min(쉬기 횟수, 들르는 곳 수) 빼기)."""
+    return int(dr["total_min"]) - 15 * min(int(dr.get("rests") or 0), len(stops or []))
+
+
 def one_way_minutes(spec: TripSpec) -> int | None:
     if not spec.departure or spec.departure not in data.SIDO_COORDS:
         return None
+    if (spec.long_override or {}).get("out"):            # 사용자가 정한 운전 시간
+        return int(spec.long_override["out"])
     a = tuple(spec.origin_coords) if spec.origin_coords else data.SIDO_COORDS[spec.departure]
     if spec.long_transport in ("KTX·SRT", "비행기"):
         from . import hubs
@@ -96,7 +108,7 @@ def one_way_minutes(spec: TripSpec) -> int | None:
         from . import roads
         dr = roads.drive(a, data.region_center(spec.region), spec.start, spec.depart_time, True)
         if dr:
-            return dr["total_min"]
+            return _less_rests(dr, spec.depart_stops)
     return travel.intercity_minutes(a, data.region_center(spec.region), spec.long_transport)
 
 
@@ -114,12 +126,14 @@ def _return_base(spec: TripSpec) -> int | None:
     if not coords and (not dest or dest not in data.SIDO_COORDS):
         return None
     b = tuple(coords) if coords else data.SIDO_COORDS[dest]
+    if (spec.long_override or {}).get("back"):
+        return int(spec.long_override["back"])
     if spec.long_transport == "자차":
         from . import roads
         last = spec.days[-1]
         dr = roads.drive(data.region_center(spec.region), b, last, 16 * 60, False)
         if dr:
-            return dr["total_min"]
+            return _less_rests(dr, spec.return_stops)
     return travel.intercity_minutes(data.region_center(spec.region), b, spec.long_transport)
 
 
@@ -128,6 +142,118 @@ def home_limit(spec: TripSpec) -> int:
 
 
 def windows(spec: TripSpec) -> list[tuple[int, int]]:
+    """현지 관광 시간 창. 가는 길 들를 곳·가는 길 식사만큼 첫날 시작이 늦고, 오는 길 식사만큼 마지막 날 끝이 당겨진다."""
+    base = _base_windows(spec)
+    if not base:
+        return base
+    rm = road_meals(spec)
+    extra_out = route_extra(spec.depart_stops) + sum(m["minutes"] for m in rm["out"])
+    extra_back = sum(m["minutes"] for m in rm["back"])
+    if extra_out and one_way_minutes(spec) is not None:
+        base[0] = (_ceil5(base[0][0] + extra_out), base[0][1])
+    if extra_back:
+        base[-1] = (base[-1][0], base[-1][1] - extra_back)
+    return base
+
+
+ROAD_MEAL_MIN = {"아침": 30, "점심": 50, "저녁": 50}      # 휴게소·경유지 식당(이동 중이라 짧게)
+ROAD_BREAKFAST = (7 * 60, 9 * 60)
+
+
+def route_extra(stops: list[dict]) -> int:
+    return sum(int(s.get("detour_min") or 0) + int(s.get("stay_min") or 40) for s in stops or [])
+
+
+def _is_food_stop(s: dict) -> bool:
+    return s.get("kind") in ("식당", "restaurant")
+
+
+def road_meals(spec: TripSpec) -> dict:
+    """이동 중 끼니(2026-11-26 '출발일 아침·점심을 못 먹게 되어 있음'): 장거리 이동이 끼니 시간에 걸리고
+    여행지에서는 그 끼니를 먹을 수 없으면 '가는 길/오는 길 식사'(휴게소·경유지 식당)를 넣는다.
+      가는 길 아침: 07:30 전에 출발하고 여행지 도착이 09:00 이후(아침 안 먹음 설정이면 빼기)
+      가는 길 점심: 12:30 전에 출발하고 여행지에서 점심을 못 먹는 시각(13:30 넘어 도착)에 도착
+      오는 길 점심·저녁: 마지막 날 여행지를 떠나는 시각 이후에 끼니 시간이 걸리면
+    사용자가 가는 길/오는 길에 넣은 식당이 있으면 그 식당이 그 끼니를 대신한다(빈 식사 자리를 하나씩 뺀다)."""
+    out, back = [], []
+    base = _base_windows(spec)
+    if not base:
+        return {"out": out, "back": back}
+    ow = one_way_minutes(spec)
+    if ow is not None:
+        t0 = spec.depart_time
+        t1 = t0 + ow + route_extra(spec.depart_stops)
+        if (spec.breakfast != "안 먹음" and 1 not in spec.breakfast_skip_days
+                and t0 < ROAD_BREAKFAST[0] + 30 and t1 >= ROAD_BREAKFAST[1]):
+            out.append({"meal": "아침", "target": max(t0 + 60, ROAD_BREAKFAST[0])})
+        mw0 = (base[0][0], max(base[0][1], DINNER[1]))
+        if not meal_required(mw0, LUNCH) and t0 <= LUNCH[0] + 30 and t1 > LUNCH[0] + 30:
+            out.append({"meal": "점심", "target": max(t0 + 60, LUNCH[0])})
+    rb = _return_base(spec)
+    if rb is not None:
+        rw = rb + route_extra(spec.return_stops)
+        e = base[-1][1]
+        last = base[-1]
+        if not meal_required(last, LUNCH) and e <= LUNCH[0] + 30 and e + rw > LUNCH[0] + 30:
+            back.append({"meal": "점심", "target": max(e + 60, LUNCH[0])})
+        if not meal_required(last, DINNER) and e <= DINNER[0] + 60 and e + rw > DINNER[0] + 30:
+            back.append({"meal": "저녁", "target": max(e + 60, DINNER[0])})
+    for lst, stops in ((out, spec.depart_stops), (back, spec.return_stops)):
+        for _ in [s for s in stops or [] if _is_food_stop(s)][:len(lst)]:
+            lst.pop()          # 사용자가 고른 식당이 끼니를 대신(늦은 끼니부터)
+        for m in lst:
+            m["minutes"] = ROAD_MEAL_MIN[m["meal"]]
+    return {"out": out, "back": back}
+
+
+def route_ends(spec: TripSpec) -> dict:
+    """가는 길(출발 지점 → 여행 지역)·오는 길(여행 지역 → 최종 복귀 지점) 양 끝 좌표. 모르면 None."""
+    center = data.region_center(spec.region)
+    o, e = origin_point(spec), end_point(spec)
+    return {"out": ((o["lat"], o["lng"]), center) if o and o.get("lat") is not None else None,
+            "back": (center, (e["lat"], e["lng"])) if e and e.get("lat") is not None else None}
+
+
+def route_stop_from(spec: TripSpec, leg: str, c: dict) -> dict | None:
+    """검색 후보 → 가는 길/오는 길 들를 곳. 우회 = (A→P + P→B − A→B) 직선 × 1.25 ÷ 70km/h(추정) + 5분."""
+    ends = route_ends(spec).get(leg)
+    try:
+        p = (float(c["lat"]), float(c["lng"]))
+    except (KeyError, TypeError, ValueError):
+        return None
+    if not ends:
+        return None
+    a, b = ends
+    extra_km = max(0.0, travel.km(a, p) + travel.km(p, b) - travel.km(a, b))
+    detour = int(math.ceil(extra_km * 1.25 / 70 * 60 / 5) * 5) + 5
+    nm = str(c.get("name") or c.get("title") or "들를 곳")[:40]
+    cat = c.get("category") or c.get("kind")
+    kind = "식당" if cat in ("restaurant", "식당") and not re.search(r"(카페|커피|coffee|cafe|베이커리|디저트)", nm, re.I) else \
+        "카페" if re.search(r"(카페|커피|coffee|cafe|베이커리|디저트)", nm, re.I) else "관광지"
+    return {"key": str(c.get("key") or c.get("place_id") or f"user:{nm}")[:80], "name": nm, "lat": p[0], "lng": p[1],
+            "detour_min": min(180, detour), "stay_min": {"식당": 50, "카페": 30}.get(kind, 45), "kind": kind,
+            "km_from_start": round(travel.km(a, p)), "address": (c.get("address") or "")[:40],
+            "place_id": c.get("place_id"), "source": c.get("source") or "장소 찾기"}
+
+
+def route_km(spec: TripSpec, p: tuple) -> dict:
+    """후보가 가는 길·오는 길 경로(직선)에서 얼마나 떨어졌는지(km)."""
+    out = {}
+    for leg, ends in route_ends(spec).items():
+        if ends:
+            out[leg] = round(_seg_km(p, *ends), 1)
+    return out
+
+
+def _seg_km(p: tuple, a: tuple, b: tuple) -> float:
+    k = math.cos(math.radians((a[0] + b[0]) / 2))
+    ax, ay, bx, by, px, py = a[1] * k, a[0], b[1] * k, b[0], p[1] * k, p[0]
+    dx, dy = bx - ax, by - ay
+    t = 0.0 if dx == dy == 0 else max(0.0, min(1.0, ((px - ax) * dx + (py - ay) * dy) / (dx * dx + dy * dy)))
+    return travel.km(p, (ay + t * dy, (ax + t * dx) / k))
+
+
+def _base_windows(spec: TripSpec) -> list[tuple[int, int]]:
     ow = one_way_minutes(spec)
     rw = return_minutes(spec)
     out = []
@@ -159,15 +285,25 @@ def _ceil5(m: int) -> int:
 
 def max_places(win: tuple[int, int], n_meals: int, many: bool = False, intensity: str = "보통") -> int:
     """시간 창에 들어갈 관광지 수 어림(체류 75분 + 이동·여유 25분), 강도별 상한."""
-    cap = 7 if many else INTENSITY.get(intensity, INTENSITY["보통"])[2]
+    cap = INTENSITY.get(intensity, INTENSITY["보통"])[2]
+    cap = max(cap, 7) if many else cap
     free = win[1] - win[0] - n_meals * 80
-    return max(1, min(cap, free // (100 if not many else 80)))
+    per = 40 if intensity == "강행군" else 80 if many else 100    # 강행군: 짧게 보고(25분) 가까운 곳으로 바로(15분)
+    return max(1, min(cap, free // per))
 
 
 def meal_required(win: tuple[int, int], meal: tuple[int, int]) -> bool:
     """점심은 시간 창과 30분 이상 겹치면, 저녁은 60분 식사가 온전히 들어갈 때만 필수(귀가 길 저녁은 안내로)."""
     need = 60 if meal == DINNER else 30
     return min(win[1], meal[1]) - max(win[0], meal[0]) >= need
+
+
+NO_STAY_MODES = ("차박", "밤샘", "야간 이동", "숙박 필요 없음")
+
+
+def night_needs_stay(spec: TripSpec, di: int) -> bool:
+    """di(0부터)일차 밤: 다음 날까지 여행이 이어지면 숙박이 기본. 사용자가 차박·밤샘·야간 이동을 고른 밤은 예외."""
+    return di < spec.nights and str(di + 1) not in (spec.no_stay or {})
 
 
 # ---------- 후보 ----------
@@ -188,6 +324,8 @@ def candidates(spec: TripSpec, query: str) -> dict[str, dict]:
     q = " ".join([query, spec.companions or "", *spec.preferences]).strip()
     picked: dict[str, dict] = {}
     n_att = 18 + 7 * max(0, spec.nights - 1)
+    if spec.intensity == "강행군":      # 하루 20곳 이상 고를 수 있게 후보를 넉넉히
+        n_att = max(n_att, 30 * (spec.nights + 1))
     n_food = 12 + 4 * max(0, spec.nights - 1)
     for kinds, k in ((["attraction", "festival"], n_att), (["restaurant"], n_food), (["lodging"], 5 if spec.nights else 0)):
         if k:
@@ -246,6 +384,7 @@ PICK_SYSTEM = MOMO_PERSONA + """
 - 하루 관광지 3~5곳(많이 원해도 최대 7곳), 가까운 곳끼리 묶어 이동을 줄인다(좌표 참고).
 - 하루 시간 창 안에서 점심(role=lunch, 12~14시)·저녁(role=dinner, 18~20시)이 필요하다고 주어지면 음식점을 넣는다.
 - 점심·저녁은 식사가 되는 음식점으로 고른다(카페·베이커리·디저트 전문점은 식사 자리에 넣지 않는다).
+- 식사(점심·저녁)는 하루에 각각 한 번씩만 넣는다. 식당 두 곳을 연달아 넣지 않는다(식사 뒤 카페·디저트는 괜찮다). 사용자가 꼭 가겠다고 한 식당은 그 식사 자리에 쓴다.
 - N박이면 1~N일차 마지막에 숙박(role=stay)을 하루 1곳씩(같은 숙소 연박 가능, 다음 날 동선 쪽 숙소면 더 좋음). 마지막 날은 숙박 없음.
 - 해당 일차에 '휴무'인 곳은 그날 넣지 않는다. '운영시간 확인 필요'는 하루 최대 1곳, 식사·마지막 자리에 두지 않는다.
 - 운영시간이 짧은 곳(예: 17시 마감)은 그날 앞쪽에 둔다. 체류시간은 관광지 60~120분, 식사 60분.
@@ -270,10 +409,17 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
            f"현지 이동: {spec.local_transport} · 취향: {', '.join(spec.preferences) or '없음'}",
            f"여행: {data.region_label(spec.region)} {spec.nights}박 {spec.nights + 1}일",
            *day_lines]
-    if spec.many_places:
+    if spec.intensity == "강행군":
+        msg.append("여행 강도 강행군(새벽형·야행성): 가까운 곳끼리 연달아 묶어 하루 최대한 많이(20곳 이상도 가능) 넣는다. "
+                   "관광지 머무는 시간은 20~40분으로 짧게, 이동 10~15분 거리끼리 잇는다. 숙소 도착은 다음 날 02:00까지 괜찮다.")
+    elif spec.many_places:
         msg.append("사용자가 아주 많은 곳을 원함: 하루 최대 7곳까지, 이동이 짧은 곳 위주.")
     if spec.waypoint_ids:
-        msg.append(f"사용자가 꼭 넣어 달라고 한 장소 id: {', '.join(spec.waypoint_ids)} (반드시 포함)")
+        must = [w for w in must_ids(spec) if w in spec.waypoint_ids]
+        msg.append(f"사용자가 꼭 넣어 달라고 한 장소 id: {', '.join(must)} (반드시 포함)")
+        extra = [w for w in waypoint_overflow(spec) if w in spec.waypoint_ids]
+        if extra:
+            msg.append(f"사용자가 더 적은 곳(일정에 다 못 들어감, 시간이 남을 때만): {', '.join(extra[:60])}")
     if base:
         msg.append("현재 일정(수정 요청과 무관한 항목은 그대로 같은 순서로 유지):\n" + "\n".join(
             f"- {it['date']} {it['start_time']} {it['place_name']} (id={it.get('place_id')}, role={it['type']})"
@@ -327,10 +473,26 @@ def _pcoord(spec: TripSpec, pid: str):
     return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
 
 
+def must_ids(spec: TripSpec) -> list[str]:
+    """꼭 갈 곳 중 이번 일정에 '반드시' 넣을 곳(사용자가 적은 순서대로, 일정 용량까지). 나머지는 후보로 남긴다.
+    용량 = 날마다 들어갈 관광지 수 어림(max_places)의 합 — 100곳 넘게 적어도 시간 창을 넘겨 확정 불가가 되지 않게."""
+    want = list(dict.fromkeys([*spec.waypoint_ids, *[w["place_id"] for w in spec.user_waypoints]]))
+    wins, mwins = windows(spec), meal_windows(spec)
+    cap = sum(max_places(w, 1 if meal_required(mw, LUNCH) else 0, spec.many_places, spec.intensity)
+              for w, mw in zip(wins, mwins))
+    return want[:max(1, cap)]
+
+
+def waypoint_overflow(spec: TripSpec) -> list[str]:
+    want = list(dict.fromkeys([*spec.waypoint_ids, *[w["place_id"] for w in spec.user_waypoints]]))
+    must = set(must_ids(spec))
+    return [w for w in want if w not in must]
+
+
 def ensure_waypoints(spec: TripSpec, picked: PlanPick) -> PlanPick:
     """사용자가 꼭 가겠다고 한 장소가 빠졌으면 코드가 넣는다: 관광지가 가장 적은 날의 저녁·숙박 앞(그다음 동선 최적화)."""
     from .schemas import DayPick, PickItem
-    want = [*spec.waypoint_ids, *[w["place_id"] for w in spec.user_waypoints]]
+    want = must_ids(spec)
     have = {x.place_id for d in picked.days for x in d.items}
     missing = [w for w in want if w not in have]
     if not missing:
@@ -542,13 +704,17 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
         day = next((x for x in plan.days if x.day == di + 1), None)
         picks = day.items if day else []
         if ow is not None and di == 0:
-            items.append(_move(d, f"{short_label(spec.origin_label) or spec.departure} → {data.region_label(spec.region)}", spec.depart_time,
-                               spec.depart_time + ow, "출발"))
+            rm = road_meals(spec)
+            extra = route_extra(spec.depart_stops) + sum(m["minutes"] for m in rm["out"])
+            via = " → ".join(s["name"] for s in spec.depart_stops)
+            items.append(_move(d, f"{short_label(spec.origin_label) or spec.departure} → " + (f"{via}(들렀다가) → " if via else "")
+                               + data.region_label(spec.region), spec.depart_time, spec.depart_time + ow + extra, "출발"))
+            items += _route_items(spec, d, "out", spec.depart_time, ow, spec.depart_stops, rm["out"])
         cursor, prev = w[0], None
         origin = last_stay if di > 0 and last_stay else (hub if di == 0 and ow is not None else None)
         if di > 0 and last_stay and spec.breakfast != "안 먹음" and (di + 1) not in spec.breakfast_skip_days:
             hotel = spec.breakfast == "숙소 조식"
-            bs = max(7 * 60, w[0] - (45 if hotel else 75))       # 숙소 조식은 이동이 없어 30분 늦게 시작해도 됨
+            bs = max((6 if spec.intensity == "강행군" else 7) * 60, w[0] - (45 if hotel else 75))       # 숙소 조식은 이동이 없어 30분 늦게 시작해도 됨
             be = bs + (35 if hotel else 45)
             bp = {"contentid": None, "title": f"숙소 조식 · {last_stay.get('title', '')}" if hotel else "숙소 근처 아침 식사",
                   "kind": "restaurant", "source": "식사 안내", "lat": last_stay.get("lat"), "lng": last_stay.get("lng")}
@@ -583,6 +749,10 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
                 info = hours.parse_open(p, d)
             if prev is None and origin is not None and not placeholder:     # 숙소·도착 지점에서 첫 장소까지
                 tmin, tsrc = travel.local_minutes(origin.get("contentid"), p.get("contentid"), _coords(origin), _coords(p), lm)
+                home = origin_point(spec) if origin is hub else None
+                if home and home.get("lat") is not None and _coords(p) and None not in _coords(p) and \
+                        travel.km((home["lat"], home["lng"]), _coords(p)) <= travel.km((home["lat"], home["lng"]), center):
+                    tmin = max(10, tmin // 3)        # 오는 길 쪽 장소: 중심까지 갔다 되돌아오지 않음(2026-11-26 도착 시각이 너무 늦음)
             elif prev is None:
                 tmin, tsrc = 0, "estimate"
             elif placeholder or prev.get("source") == "식사 안내":
@@ -590,10 +760,15 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             else:
                 tmin, tsrc = travel.local_minutes(prev.get("contentid"), p.get("contentid"), _coords(prev), _coords(p), lm)
             start = cursor + (tmin + BUFFER_MIN if prev is not None else tmin)
-            if pk.role == "lunch":
-                start = max(start, LUNCH[0])
-            elif pk.role == "dinner":
-                start = max(start, DINNER[0])
+            meal0 = LUNCH[0] if pk.role == "lunch" else DINNER[0] if pk.role == "dinner" else None
+            if meal0 is not None and start < meal0:
+                # 사용자가 순서를 정한 날은 시간을 연달아 붙인다: 식사 시간대까지 30분 넘게 기다리지 않음
+                # (2026-11-26 섬진강 대나무숲길 14:05 → 라플라타 18:00, 4시간 빈 시간이 생기고 뒤 일정이 밀림)
+                if (di + 1) not in spec.user_ordered_days or meal0 - start <= 30:
+                    start = meal0
+            fixed = (spec.fixed_starts or {}).get(f"{di + 1}:{pk.place_id}")
+            if fixed is not None and int(fixed) > start:      # 사용자가 정한 시작 시각(그보다 일찍은 도착 못 하면 도착 시각)
+                start = int(fixed)
             if info.status == "확인됨" and p.get("kind") != "lodging":
                 start = max(start, info.open)
             if p.get("kind") == "lodging":
@@ -611,16 +786,70 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             cursor, prev = end, p
             if typ == "stay":
                 last_stay = p
+        if di < spec.nights and not any(pk.role == "stay" for pk in picks):
+            last_stay = None          # 숙소 없이 보낸 밤(차박·밤샘·야간 이동) 다음 날은 숙소 아침·숙소 출발 없음
         rw = return_minutes(spec)
         if rw is not None and di == len(spec.days) - 1:
             back = max(cursor, w[0])
             dest = short_label(spec.end_label or spec.end_location or spec.origin_label) or spec.departure
             via = " → ".join(s["name"] for s in spec.return_stops)
+            rm = road_meals(spec)
+            meals_b = []        # 실제로 여행지를 떠나는 시각(back) 기준으로 다시 판단: 일찍 떠나 저녁 전에 집에 닿으면 빼기
+            for m in rm["back"]:
+                meal = LUNCH if m["meal"] == "점심" else DINNER
+                if back <= meal[0] + (30 if meal == LUNCH else 60) and back + rw > meal[0] + 30:
+                    meals_b.append({**m, "target": max(back + 60, meal[0])})
+            rm = {**rm, "back": meals_b}
+            extra = sum(m["minutes"] for m in rm["back"])
+            items += _route_items(spec, d, "back", back, _return_base(spec) or rw, spec.return_stops, rm["back"])
             items.append(_move(d, f"{data.region_label(spec.region)} → " + (f"{via}(들렀다가) → " if via else "") + dest,
-                               back, back + rw, "귀가"))
+                               back, back + rw + extra, "귀가"))
     for i, it in enumerate(items, 1):
         it["seq"] = i
     return items
+
+
+ROUTE_LEG = {"out": "가는 길", "back": "오는 길"}
+
+
+def _route_items(spec: TripSpec, d: date, leg: str, t0: int, drive: int, stops: list[dict], meals: list[dict]) -> list[dict]:
+    """장거리 이동 중에 들르는 곳·먹는 끼니를 시각이 있는 항목으로(type=move, notes[0]='가는 길'/'오는 길').
+    move라서 규칙 검사·현지 동선·다시 짜기에서는 빠지고, 브로셔·일정표에는 출발 지점 다음/복귀 지점 앞 카드로 보인다."""
+    ends = route_ends(spec).get(leg)
+    a = ends[0] if ends else None
+    ev, last = [], 0
+    for s in stops or []:          # 사용자가 정한 순서 그대로(↑↓로 바꿀 수 있음) — 거리 순 정렬은 넣을 때만
+        off = travel.intercity_minutes(a, (s["lat"], s["lng"]), spec.long_transport) if a and s.get("lat") is not None else drive // 2
+        off = max(last + 10, max(20, min(off, max(20, drive - 20))))
+        last = off
+        ev.append((off, "stop", s))
+    for m in meals:
+        ev.append((max(30, min(m["target"] - t0, max(30, drive - 20))), "meal", m))
+    ev.sort(key=lambda x: x[0])          # 안정 정렬: 들르는 곳 순서는 유지, 끼니는 시각 자리에
+    out, spent, cur_end = [], 0, t0
+    for off, typ, x in ev:
+        if typ == "stop":
+            s = t0 + off + spent + int(x.get("detour_min") or 0) // 2
+            dur = int(x.get("stay_min") or 40)
+            spent += int(x.get("detour_min") or 0) + dur
+            name, kind, lat, lng = x["name"], ("meal" if _is_food_stop(x) else "place"), x.get("lat"), x.get("lng")
+            reason = f"{ROUTE_LEG[leg]}에 들러요 · 우회 약 {x.get('detour_min') or 0}분(추정)"
+            key, src = x.get("key"), x.get("source") or "장소 찾기"
+        else:
+            s = _ceil5(t0 + off + spent)
+            dur = x["minutes"]
+            spent += dur
+            name = f"{ROUTE_LEG[leg]} {x['meal']} · 휴게소·경유지 식당"
+            kind, lat, lng, key, src = "meal", None, None, None, "식사 안내"
+            reason = (f"{'출발' if leg == 'out' else '귀가'} 이동이 {x['meal']} 시간에 걸려요. 휴게소나 경유지 식당에서 먹어요"
+                      " — '+ 들를 곳'으로 식당을 고르면 그곳으로 바뀌어요")
+        it = _move(d, name, s, s + dur, ROUTE_LEG[leg])
+        it.update(place_name=name, route_kind=kind, route_key=key, lat=lat, lng=lng, reason=reason, source=src,
+                  route_meal=x["meal"] if typ == "meal" else None, travel_minutes_from_prev=max(0, s - cur_end),
+                  route_stay=int(x.get("stay_min") or 40) if typ == "stop" else None)
+        cur_end = s + dur
+        out.append(it)
+    return out
 
 
 def _move(d: date, name: str, s: int, e: int, leg: str) -> dict:
@@ -703,19 +932,23 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
                 continue
             if it["type"] != "stay" and (s < win[0] or e > win[1]):
                 v.append(_v("시간 창 밖", it, f"현지 가능 시간 {hours.fmt(win[0])}~{hours.fmt(win[1])}"))
-            if it["type"] == "stay" and s > HOME_LIMIT:
-                v.append(_v("시간 창 밖", it, "숙소 도착이 22:00 이후"))
+            if it["type"] == "stay" and s > STAY_LIMIT:       # 22:00~다음 날 02:00 늦은 체크인은 문제 없음
+                v.append(_v("시간 창 밖", it, "숙소 도착이 다음 날 02:00 이후"))
             prev = it
         if check_cnt > 1:
             v.append({"type": "확인 필요 초과", "seq": None, "place_name": "", "date": ds,
                       "detail": f"{ds} 운영시간 확인 필요 장소 {check_cnt}곳(하루 최대 1곳)"})
+        for a, b in meal_clashes(spec, day):       # 식사 연달아 두 번 이상(카페 제외, 둘 다 사용자가 넣은 곳이면 허용)
+            v.append(_v("식사 중복", b, f"숙소 체크인({a['start_time']}) 뒤에 식사" if a["type"] == "stay" else
+                        f"{a['place_name']}({a['start_time']})와 같은 끼니·연달아 또 식사({b['start_time']})"))
         meals = [hours.parse_hm(it["start_time"]) for it in day if it["type"] == "meal"]
         for label, (a, b) in (("점심", LUNCH), ("저녁", DINNER)):
             if meal_required(mw, (a, b)) and not any(a - 30 <= m < b for m in meals):
                 v.append({"type": "식사 누락", "seq": None, "place_name": "", "date": ds,
                           "detail": f"{ds} {label}({hours.fmt(a)}~{hours.fmt(b)}) 식사 항목 없음"})
-        if di < spec.nights and (not day or day[-1]["type"] != "stay"):
-            v.append({"type": "숙박 누락", "seq": None, "place_name": "", "date": ds, "detail": f"{di + 1}일차 마지막에 숙박 없음"})
+        if night_needs_stay(spec, di) and (not day or day[-1]["type"] != "stay"):     # 다음 날까지 이어지는 밤
+            v.append({"type": "숙박 누락", "seq": None, "place_name": "", "date": ds,
+                      "detail": f"{di + 1}일차 밤 숙소 없음 — 숙소를 넣거나 '숙박 필요 없음(차박·밤샘·야간 이동)'을 골라 주세요"})
     return v
 
 
@@ -747,7 +980,7 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
                  for it in day if it["type"] != "stay"]
         stay = [PickItem(place_id=it["place_id"], role="stay", stay_minutes=0, reason=it["reason"])
                 for it in day if it["type"] == "stay"][:1]
-        if di < spec.nights and not stay:
+        if night_needs_stay(spec, di) and not stay:
             lodg = next((p for p in (cands or {}).values() if p.get("kind") == "lodging"), None)
             if lodg:
                 stay = [PickItem(place_id=lodg["contentid"], role="stay", stay_minutes=0, reason="동선이 가까운 숙소예요")]
@@ -762,6 +995,7 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
                 else:
                     picks.append(PickItem(place_id=MEAL_ID, role="dinner", stay_minutes=60, reason=""))
         days.append(picks + stay)
+    days = dedupe_meals(spec, place_lunch(spec, days))
     out: list[dict] = []
     for _ in range(8):     # 항목에 걸린 시간 위반만 풀어 냄: 위반한 관광지를 빼고, 식사·숙소가 밀렸으면 그 앞 관광지를 하나 뺌
         out = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=x) for i, x in enumerate(days)]), {})
@@ -772,7 +1006,7 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
         bad = next(it for it in out if it["seq"] == v[0]["seq"])
         di = [d.isoformat() for d in spec.days].index(bad["date"])
         row = days[di]
-        keep = set(spec.waypoint_ids) | {w["place_id"] for w in spec.user_waypoints}   # 사용자가 지정한 곳은 보호
+        keep = set(must_ids(spec))   # 사용자가 지정한 곳은 보호(일정 용량 안의 꼭 갈 곳)
         hit = next((i for i, pk in enumerate(row) if pk.role == "place" and pk.place_id == bad.get("place_id")
                     and pk.place_id not in keep), None)
         if hit is None and bad.get("place_id") in keep:   # 지정 장소가 밀렸으면 그날 다른 관광지를 뺌
@@ -785,6 +1019,116 @@ def repair(spec: TripSpec, items: list[dict], viol: list[dict], allowed: set[str
             break
         row.pop(hit)
     return out
+
+
+CAFE_RE = re.compile(r"(카페|까페|커피|cafe|coffee|베이커리|bakery|제과|찻집|다원|디저트|티하우스|브런치)", re.I)
+MEAL_GAP_MIN = 120      # 앞 식사가 끝나고 이 시간 안에 또 식사(카페 제외)면 '식사 중복'
+
+
+def user_meant(spec: TripSpec, pid: str | None) -> bool:
+    """사용자가 일부러 넣은 곳: 꼭 갈 곳·대화/화면에서 추가·바꾸기로 고른 곳(waypoint_ids), 직접 고른 곳(user_waypoints)."""
+    return bool(pid) and (pid in spec.waypoint_ids or any(w.get("place_id") == pid for w in spec.user_waypoints))
+
+
+def _real_meal(spec: TripSpec, it: dict) -> bool:
+    """아침 식사·카페·디저트를 뺀 '식사' 항목."""
+    if it["type"] != "meal" or "조식" in (it.get("notes") or []):
+        return False
+    pid = it.get("place_id")
+    p = (data.places(spec.region).get(pid) if pid else None) or next(
+        (w for w in spec.user_waypoints if w.get("place_id") == pid), {}) if pid else {}
+    return not CAFE_RE.search(f"{it.get('place_name') or ''} {(p or {}).get('vworld_category') or ''}")
+
+
+def _slot(it: dict) -> str:
+    return "lunch" if hours.parse_hm(it["start_time"]) < 16 * 60 else "dinner"
+
+
+def meal_clashes(spec: TripSpec, day_items: list[dict]) -> list[tuple[dict, dict]]:
+    """같은 날 식사(아침·카페 제외) 중복 쌍: ① 앞 식사 종료 후 MEAL_GAP_MIN 안에 또 식사 ② 같은 끼니(점심=16시 전, 저녁=16시부터)
+    두 번 ③ 숙소 체크인 뒤 식사. 둘 다 사용자가 넣은 곳이면 허용(③은 자리표시자만)."""
+    meals = sorted((it for it in day_items if _real_meal(spec, it)), key=lambda x: hours.parse_hm(x["start_time"]))
+    out = []
+    for i, b in enumerate(meals):
+        for a in meals[:i]:
+            if user_meant(spec, a.get("place_id")) and user_meant(spec, b.get("place_id")):
+                continue
+            if hours.parse_hm(b["start_time"]) - hours.parse_hm(a["end_time"]) < MEAL_GAP_MIN or _slot(a) == _slot(b):
+                out.append((a, b))
+                break
+    stay = next((it for it in day_items if it["type"] == "stay"), None)
+    if stay:
+        late = [it for it in day_items if it.get("place_id") is None and it["type"] == "meal"
+                and day_items.index(it) > day_items.index(stay)]
+        out += [(stay, it) for it in late if not any(it is y for _, y in out)]
+    return out
+
+
+def dedupe_meals(spec: TripSpec, days: list[list], log: list | None = None) -> list[list]:
+    """식사 중복 정리(사용자 테스트 2026-11-26: 전체 동선 최적화 뒤 1일차 저녁 18:00·19:20·20:40 세 번).
+    연달아 잡힌 식사 중 사용자가 넣지 않은 쪽을 뺀다 — '주변에서 식사' 자리표시자 → 모모가 고른 식당 순. 카페는 그대로."""
+    from .schemas import DayPick
+    days = [list(r) for r in days]
+    for _ in range(6):
+        items = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(days)]), {})
+        changed = False
+        for di, d in enumerate(spec.days):
+            ds = d.isoformat()
+            day = [it for it in items if it["date"] == ds and it["type"] != "move" and "조식" not in (it.get("notes") or [])]
+            row = days[di]
+            if len(day) != len(row):
+                continue
+            for a, b in meal_clashes(spec, day):
+                drop = b if a["type"] == "stay" else min(
+                    (a, b), key=lambda it: (user_meant(spec, it.get("place_id")), it.get("place_id") is not None))
+                k = day.index(drop)
+                if user_meant(spec, row[k].place_id):
+                    continue
+                row.pop(k)
+                if log is not None and a["type"] != "stay":     # 숙소 뒤 자리표시자는 조용히 정리
+                    keep = b if drop is a else a
+                    log.append(f"{di + 1}일차 {keep['place_name']}와(과) 식사가 겹쳐 "
+                               f"{'주변 식사 자리' if drop.get('place_id') is None else drop['place_name']}을(를) 뺐어요(카페는 그대로)")
+                changed = True
+                break
+        if not changed:
+            break
+    return days
+
+
+def place_lunch(spec: TripSpec, days: list[list]) -> list[list]:
+    """점심 자리 바로잡기(사용자 테스트 2026-11-26): 점심 역할 식당이 있어도 관광지 뒤로 밀려 15시 넘어 배치되면
+    '점심 식사 항목 없음'이 풀리지 않아 확정할 수 없었다. 실제 배치 시각을 보고, 점심이 빠진 날은
+    정오를 차지하는 장소 앞으로 점심(없으면 '주변에서 점심 식사')을 옮긴다. 다른 장소 순서는 그대로."""
+    from .schemas import DayPick, PickItem
+    days = [list(r) for r in days]
+    mw = meal_windows(spec)
+    for _ in range(2):
+        items = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(days)]), {})
+        changed = False
+        for di, d in enumerate(spec.days):
+            if not meal_required(mw[di], LUNCH):
+                continue
+            ds = d.isoformat()
+            day = [it for it in items if it["date"] == ds and it["type"] != "move" and "조식" not in (it.get("notes") or [])]
+            if any(it["type"] == "meal" and LUNCH[0] - 30 <= hours.parse_hm(it["start_time"]) < LUNCH[1] for it in day):
+                continue
+            row = days[di]
+            if len(day) != len(row):        # 배치와 고른 목록이 어긋나면 손대지 않음
+                continue
+            target = next((i for i, it in enumerate(day) if it["type"] != "stay"
+                           and hours.parse_hm(it["end_time"]) > LUNCH[0] + 30), None)
+            if target is None:
+                target = next((i for i, pk in enumerate(row) if pk.role in ("dinner", "stay")), len(row))
+            li = next((i for i, pk in enumerate(row) if pk.role == "lunch"), None)
+            if li is not None and li < target:   # 점심이 이미 앞에 있는데도 빠졌으면(시간 창 문제) 그대로
+                continue
+            pk = row.pop(li) if li is not None else PickItem(place_id=MEAL_ID, role="lunch", stay_minutes=60, reason="")
+            row.insert(target, pk)
+            changed = True
+        if not changed:
+            break
+    return days
 
 
 def _role_of(it: dict) -> str:
@@ -812,10 +1156,16 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
     allowed = set(cands)
     trace.append({"step": "retrieve", "input": request[:200], "output": f"후보 {len(cands)}곳: " + ", ".join(p["title"] for p in list(cands.values())[:15])})
     feedback, items, viol, regen, last_ranked = None, [], [], 0, []
+    from .cancel import check as _cancel_check
     for attempt in range(MAX_REGEN + 1):
+        _cancel_check()
         picked = pick(spec, cands, request, feedback, base, indoor=indoor)
         last_ranked = picked.ranked or last_ranked
         picked = ensure_waypoints(spec, picked)
+        if spec.no_stay:          # 사용자가 숙박 필요 없음(차박·밤샘·야간 이동)을 고른 밤에는 숙소를 다시 넣지 않음
+            for dp in picked.days:
+                if str(dp.day) in spec.no_stay:
+                    dp.items = [x for x in dp.items if x.role != "stay"]
         if prefix or indoor:
             from .schemas import DayPick
             new_days = []

@@ -4,25 +4,45 @@
 """
 from __future__ import annotations
 
+import re
 from datetime import date
 
-from . import data
+from . import data, hours
 
 WD = "월화수목금토일"
 TYPE_LABEL = {"meal": "식사", "stay": "숙박", "place": "", "move": "이동"}
 
 
+def _ends(name: str) -> tuple[str, str]:
+    """'판교동 → 순천/구례' · '순천/구례 → 남원(들렀다가) → 판교동' → (출발 쪽, 마지막 도착 쪽)."""
+    parts = [x.strip() for x in str(name).split("→")]
+    return parts[0], re.sub(r"\(들렀다가\)", "", parts[-1]).strip()
+
+
 def itinerary_text(items: list[dict], changed: set | None = None) -> str:
+    """일정표(텍스트). 출발 지점(첫날 맨 앞)과 최종 복귀 지점(마지막 날 맨 뒤)을 항상 따로 적는다 — 모르면 '미정'."""
     lines, cur = [], None
     days = sorted({it["date"] for it in items})
+    legs = [((it.get("notes") or [""])[0]) for it in items if it["type"] == "move"]
     for it in items:
         if it["date"] != cur:
             cur = it["date"]
             d = date.fromisoformat(cur)
             lines.append(f"\n■ {days.index(cur) + 1}일차 · {d.month}월 {d.day}일({WD[d.weekday()]})")
+            if days.index(cur) == 0 and "출발" not in legs:
+                lines.append("- 🏠 출발 지점: 미정 — 여행 조건에서 출발지를 정하면 오가는 시간까지 일정에 넣어요")
         if it["type"] == "move":
             mins = _mins(it)
-            lines.append(f"- {it['start_time']}~{it['end_time']} {it['place_name']} 이동 (약 {mins}분, 직선거리 추정)")
+            leg = (it.get("notes") or [""])[0]
+            if leg in ("가는 길", "오는 길"):
+                lines.append(f"- {hours.label(it['start_time'])}~{hours.label(it['end_time'])} 🛣️ [{leg}] {it['place_name']} — {it.get('reason') or ''}")
+                continue
+            a, b = _ends(it["place_name"])
+            if leg == "출발":
+                lines.append(f"- 🏠 {hours.label(it['start_time'])} 출발 지점: {a}")
+            lines.append(f"- {hours.label(it['start_time'])}~{hours.label(it['end_time'])} {it['place_name']} 이동 (약 {mins}분, 직선거리 추정)")
+            if leg == "귀가":
+                lines.append(f"- 🏁 {hours.label(it['end_time'])} 최종 복귀 지점: {b} 도착")
             continue
         tag = f"[{TYPE_LABEL[it['type']]}] " if TYPE_LABEL[it["type"]] else ""
         mark = " (바뀜)" if changed and (it["date"], it.get("place_id") or it["place_name"]) in changed else ""
@@ -32,8 +52,10 @@ def itinerary_text(items: list[dict], changed: set | None = None) -> str:
             hours_part = " · 운영시간 확인 필요"
         elif it.get("hours_text"):
             hours_part = f" · 운영 {it['hours_text']}"
-        lines.append(f"- {it['start_time']}~{it['end_time']} {move}{tag}{it['place_name']}{mark} — {it['reason']}"
+        lines.append(f"- {hours.label(it['start_time'])}~{hours.label(it['end_time'])} {move}{tag}{it['place_name']}{mark} — {it['reason']}"
                      f" (출처: {it['source']}{hours_part})")
+    if items and "귀가" not in legs:
+        lines.append("- 🏁 최종 복귀 지점: 미정 — 출발지(또는 여행 후 도착지)를 정하면 돌아가는 시간까지 넣어요")
     return "\n".join(lines).strip()
 
 
