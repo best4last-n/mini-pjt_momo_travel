@@ -508,6 +508,48 @@ def _fill_meals(spec: planner.TripSpec, days: list[list]) -> list[list]:
     return days
 
 
+def route_proposal(spec: planner.TripSpec, days: list[list]) -> dict:
+    """날짜별 동선 최적화 제안(적용 전 미리 보기): 지금 순서 vs 제안 순서, 이동 분·km."""
+    from .travel import km as _km
+    center = data.region_center(spec.region)
+    pl = data.places(spec.region)
+
+    def nm(pid):
+        return (pl.get(pid) or {}).get("title") or next(
+            (w["title"] for w in spec.user_waypoints if w["place_id"] == pid), "주변 식사")
+
+    def sched(rows):
+        filled = _fill_meals(spec, [list(r) for r in rows])
+        return planner.schedule(spec, planner.PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(filled)]), {})
+
+    def dist(row, start):
+        pts = [p for p in [start] + [planner._pcoord(spec, x.place_id) for x in row] if p]
+        return round(sum(_km(a, b) for a, b in zip(pts, pts[1:])), 1)
+
+    new_rows, last_stay, starts = [], None, []
+    for row in days:
+        start = planner._pcoord(spec, last_stay) if last_stay else center
+        starts.append(start)
+        new_rows.append(planner.optimize_day(spec, list(row), start))
+        last_stay = next((x.place_id for x in row if x.role == "stay"), None) or last_stay
+    before, after = _travel_by_day(sched(days)), _travel_by_day(sched(new_rows))
+    out = []
+    for i, d in enumerate(spec.days):
+        ds = d.isoformat()
+        same = [x.place_id for x in days[i]] == [x.place_id for x in new_rows[i]]
+        b = before.get(ds, 0)
+        a = b if same else after.get(ds, 0)
+        out.append({"day": i + 1, "date": ds, "before_min": b, "after_min": a, "saved_min": max(0, b - a),
+                    "before_km": dist(days[i], starts[i]), "after_km": dist(new_rows[i] if not same else days[i], starts[i]),
+                    "before": [{"place_id": x.place_id, "name": nm(x.place_id), "role": x.role}
+                               for x in days[i] if x.place_id != planner.MEAL_ID],
+                    "after": [{"place_id": x.place_id, "name": nm(x.place_id), "role": x.role}
+                              for x in (days[i] if same else new_rows[i]) if x.place_id != planner.MEAL_ID],
+                    "user_ordered": (i + 1) in spec.user_ordered_days, "_row": days[i] if same else new_rows[i]})
+    return {"days": out, "total_saved_min": sum(r["saved_min"] for r in out),
+            "note": "식사·숙소 자리는 그대로 두고, 그 사이 관광지 순서를 이동이 가장 짧게 바꿔요(직선거리 기준 추정)."}
+
+
 def _travel_by_day(items: list) -> dict:
     out: dict = {}
     for it in items:
@@ -679,6 +721,12 @@ def edit_node(state: State) -> State:
             spec.waypoint_ids = [w for w in spec.waypoint_ids if w != old.place_id]
             spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {tdi + 1})
             to = tdi
+        elif e.get("after") and locate(e["after"])[0] is not None:     # 관광지 카드의 '근처 먹거리' → 그 바로 다음
+            to, ai = locate(e["after"])
+            kind = (pl.get(pid) or {}).get("kind")
+            days[to].insert(ai + 1, PickItem(place_id=pid, role="place", stay_minutes=60 if kind == "restaurant" else 90,
+                                             reason=f"{(pl.get(e['after']) or {}).get('title', '')} 근처에서 고르신 곳"))
+            spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {to + 1})
         else:
             if e.get("day"):
                 to = max(1, min(nd, int(e["day"]))) - 1
@@ -697,10 +745,42 @@ def edit_node(state: State) -> State:
                 changes.append(f"{np_.get('title', '이곳')}은(는) 여행 지역에서 약 {far_km:,.0f}km 떨어져 있어 오가는 이동이 길어요(추정)")
         if op == "replace":
             changes.append(f"{to + 1}일차 {oname} 자리에 {_josa(name, '을를')} 넣었어요(순서·머무는 시간은 그대로)")
+        elif e.get("after"):
+            changes.append(f"{to + 1}일차 {(pl.get(e['after']) or {}).get('title', '')} 바로 다음에 {_josa(name, '을를')} 넣었어요")
         else:
             if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
                 days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
             changes.append(f"{to + 1}일차에 {_josa(name, '을를')} 추가했어요")
+    elif op == "order":          # 끌어서 바꾼 전체 순서(날짜 사이 이동 포함)
+        by_id = {x.place_id: x for row in days for x in row if x.place_id != planner.MEAL_ID}
+        want = {int(r.get("day") or 0): [str(x) for x in r.get("place_ids") or []] for r in e.get("days") or []}
+        if not want or any(i not in by_id for ids in want.values() for i in ids):
+            return {"status": "승인 대기", "answer": "순서를 바꿀 장소를 찾지 못했어요. 화면을 새로 고친 뒤 다시 해 주세요.",
+                    "trace": _t(state, "edit", e, "모르는 id")}
+        listed = {i for ids in want.values() for i in ids}
+        moved = 0
+        for di in range(nd):        # 목록에 없는 날에서는 다른 날로 옮겨 간 장소만 뺀다
+            if di + 1 not in want:
+                days[di] = [x for x in days[di] if x.place_id == planner.MEAL_ID or x.place_id not in listed]
+        for dn, ids in want.items():
+            if not 1 <= dn <= nd:
+                continue
+            if [x.place_id for x in days[dn - 1] if x.place_id != planner.MEAL_ID] != ids:
+                moved += 1
+                spec.user_ordered_days = sorted(set(spec.user_ordered_days) | {dn})
+            ph = [x for x in days[dn - 1] if x.place_id == planner.MEAL_ID]
+            days[dn - 1] = [by_id[i] for i in ids] + ph
+        changes.append(f"{moved}개 날의 순서를 직접 정하신 대로 바꿨어요(직접 정한 순서를 최우선으로 지켜요)" if moved
+                       else "순서는 그대로예요")
+    elif op == "optimize":       # 동선 최적화(식사·숙소 자리는 고정, 그 사이 관광지 순서만)
+        targets = [int(e["day"])] if e.get("day") else list(range(1, nd + 1))
+        prop = route_proposal(spec, days)
+        for r in prop["days"]:
+            if r["day"] in targets and r["saved_min"] > 0:
+                days[r["day"] - 1] = r["_row"]
+        spec.user_ordered_days = [d for d in spec.user_ordered_days if d not in targets]
+        saved = sum(r["saved_min"] for r in prop["days"] if r["day"] in targets)
+        changes.append(f"동선을 최적화해 이동을 약 {saved}분 줄였어요" if saved > 0 else "이미 가장 짧은 동선이에요")
     else:
         return {"status": "오류", "answer": "앗, 모르는 편집 요청이에요.", "trace": _t(state, "edit", e, "알 수 없는 op")}
     out = _reschedule(state, spec, days, changes, "edit")

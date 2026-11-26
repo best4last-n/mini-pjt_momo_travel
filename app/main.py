@@ -202,6 +202,19 @@ async def places_alternatives(session_id: str = "", place_id: str = "", q: str =
     return out
 
 
+@app.get("/route/optimize")
+async def route_optimize(session_id: str = ""):
+    """동선 최적화 미리 보기(저장 안 함). 적용은 edit op=optimize(제안대로) 또는 op=order(직접 끌어 정한 순서)."""
+    st = agent.graph().get_state({"configurable": {"thread_id": session_id}}).values if session_id else None
+    if not st or not st.get("spec") or not st.get("itinerary"):
+        return JSONResponse(status_code=400, content={"error": "일정이 있는 상담에서만 동선을 볼 수 있어요.", "days": []})
+    spec = agent.spec_from_dict(st["spec"])
+    out = await run_in_threadpool(agent.route_proposal, spec, agent._day_picks(spec, st["itinerary"]))
+    for r in out["days"]:
+        r.pop("_row", None)
+    return out
+
+
 MAP_LAYERS = {"Base": "png", "Satellite": "jpeg", "Hybrid": "png", "white": "png", "midnight": "png"}
 TILE_DIR = Path(__file__).resolve().parent.parent / "data" / "tile_cache"
 

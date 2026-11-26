@@ -286,6 +286,30 @@ def pick(spec: TripSpec, cands: dict[str, dict], request: str, feedback: str | N
 
 # ---------- 동선 최적화 (SERVICE.md 3-6 (12)) ----------
 
+def short_label(label: str | None) -> str | None:
+    """'판교동 (경기도 성남시)' → '판교동'."""
+    return label.split(" (")[0].strip() if label else label
+
+
+def origin_point(spec: TripSpec) -> dict | None:
+    """출발지(집 등) 점: 이름·좌표(약 1km 반올림, 없으면 시·도 대표 좌표)."""
+    if not (spec.origin_label or spec.departure):
+        return None
+    xy = spec.origin_coords or (data.SIDO_COORDS.get(spec.departure) if spec.departure else None)
+    return {"name": short_label(spec.origin_label) or spec.departure, "label": spec.origin_label or spec.departure,
+            "lat": xy[0] if xy else None, "lng": xy[1] if xy else None, "approx": not spec.origin_coords}
+
+
+def end_point(spec: TripSpec) -> dict | None:
+    """여행 후 도착지(따로 없으면 출발지)."""
+    if spec.end_coords or spec.end_location or spec.end_label:
+        xy = spec.end_coords or data.SIDO_COORDS.get(spec.end_location or "")
+        lab = spec.end_label or spec.end_location
+        return {"name": short_label(lab), "label": lab, "lat": xy[0] if xy else None, "lng": xy[1] if xy else None,
+                "approx": not spec.end_coords}
+    return origin_point(spec)
+
+
 def _pcoord(spec: TripSpec, pid: str):
     p = data.places(spec.region).get(pid) or next((w for w in spec.user_waypoints if w["place_id"] == pid), None)
     return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
@@ -396,7 +420,7 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
         day = next((x for x in plan.days if x.day == di + 1), None)
         picks = day.items if day else []
         if ow is not None and di == 0:
-            items.append(_move(d, f"{spec.departure} → {data.region_label(spec.region)}", spec.depart_time,
+            items.append(_move(d, f"{short_label(spec.origin_label) or spec.departure} → {data.region_label(spec.region)}", spec.depart_time,
                                spec.depart_time + ow, "출발"))
         cursor, prev = w[0], None
         origin = last_stay if di > 0 and last_stay else (hub if di == 0 and ow is not None else None)
@@ -445,7 +469,7 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
         rw = return_minutes(spec)
         if rw is not None and di == len(spec.days) - 1:
             back = max(cursor, w[0])
-            dest = spec.end_label or spec.end_location or spec.departure
+            dest = short_label(spec.end_label or spec.end_location or spec.origin_label) or spec.departure
             items.append(_move(d, f"{data.region_label(spec.region)} → {dest}", back, back + rw, "귀가"))
     for i, it in enumerate(items, 1):
         it["seq"] = i

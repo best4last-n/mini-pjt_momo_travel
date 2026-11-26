@@ -32,6 +32,26 @@ def _coord(p: dict | None):
     return (p.get("lat"), p.get("lng")) if p and p.get("lat") else None
 
 
+def _planner():
+    from . import planner
+    return planner
+
+
+def _with_home(spec, days: list, long: dict) -> list:
+    """1일차 맨 앞에 출발지(예: 판교동), 마지막 날 맨 뒤에 여행 후 도착지를 붙인다(지도·타임라인 표시용)."""
+    from . import planner
+    if not days:
+        return days
+    o, e = planner.origin_point(spec), planner.end_point(spec)
+    ob, ib = long.get("outbound"), long.get("inbound")
+    if o:
+        days[0]["start_point"] = {**o, "kind": "home", "role": "출발", "time": (ob or {}).get("depart") or hours.fmt(spec.depart_time),
+                                  "leg": ob}
+    if e:
+        days[-1]["end_point"] = {**e, "kind": "home", "role": "도착", "time": (ib or {}).get("arrive"), "leg": ib}
+    return days
+
+
 def nearby(p: dict, region: str, kind: str, k: int = 3, max_km: float = 3.0) -> list[dict]:
     c = _coord(p)
     if not c:
@@ -270,6 +290,7 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
             "title": f"{data.region_label(spec.region)} {length}", "regions": [data.region_label(spec.region)],
             "region_id": spec.region, "start_date": spec.start.isoformat(), "nights": spec.nights,
             "days": spec.nights + 1, "origin": spec.origin_label or spec.departure,
+            "origin_point": _planner().origin_point(spec), "end_point": _planner().end_point(spec),
             "transport": {"long_distance": spec.long_transport, "local": spec.local_transport,
                           "note": "모든 이동시간은 직선거리 기반 추정"},
             "intensity": spec.intensity,
@@ -282,7 +303,7 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
                       + (" · 직접 조정하신 날은 그 순서를 그대로 지켜요" if getattr(spec, "user_ordered_days", []) else "")},
         },
         "places": places,
-        "itinerary": days,
+        "itinerary": _with_home(spec, days, long),
         "totals": {"local": {"distance_km": round(tot_km, 1), "travel_min": tot_min}, "long_distance": long},
         "warnings": warnings,
     }
