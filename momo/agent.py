@@ -480,7 +480,7 @@ def _day_picks(spec: planner.TripSpec, items: list) -> list[list]:
         ds = d.isoformat()
         row = []
         for it in items:
-            if it["date"] != ds or it["type"] == "move":
+            if it["date"] != ds or it["type"] == "move" or "조식" in (it.get("notes") or []):
                 continue
             pid = it.get("place_id") or planner.MEAL_ID
             if pid == planner.MEAL_ID and it["type"] != "meal":
@@ -850,6 +850,38 @@ def edit_node(state: State) -> State:
             if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
                 days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
             changes.append(f"{to + 1}일차에 {_josa(name, '을를')} 추가했어요")
+    elif op == "breakfast":      # {mode?: 근처 식당|숙소 조식|안 먹음, day?: N, skip?: bool}
+        if e.get("mode") in ("근처 식당", "숙소 조식", "안 먹음"):
+            spec.breakfast = e["mode"]
+            spec.breakfast_skip_days = []
+            changes.append(f"아침 식사를 '{e['mode']}'(으)로 바꿨어요"
+                           + (" — 숙소에서 바로 먹으니 이동이 없어 30분 늦게 시작해도 돼요" if e["mode"] == "숙소 조식" else ""))
+        elif e.get("day"):
+            dn = int(e["day"])
+            if e.get("skip", True):
+                spec.breakfast_skip_days = sorted(set(spec.breakfast_skip_days) | {dn})
+                changes.append(f"{dn}일차 아침 식사를 뺐어요")
+            else:
+                spec.breakfast_skip_days = [x for x in spec.breakfast_skip_days if x != dn]
+                changes.append(f"{dn}일차 아침 식사를 다시 넣었어요")
+    elif op == "return_stop":    # {action: add|remove, stop: {...}} 귀가길에 잠깐 들를 곳
+        st = e.get("stop") if isinstance(e.get("stop"), dict) else {}
+        key_ = str(st.get("key") or st.get("name") or "")[:80]
+        if e.get("action") == "remove":
+            spec.return_stops = [s for s in spec.return_stops if s.get("key") != key_ and s.get("name") != key_]
+            changes.append(f"귀가길 들를 곳에서 {_josa(str(st.get('name') or key_), '을를')} 뺐어요")
+        else:
+            try:
+                stop = {"key": key_, "name": guardrails.mask_pii(str(st["name"])[:40])[0], "lat": float(st["lat"]), "lng": float(st["lng"]),
+                        "detour_min": max(0, min(120, int(st.get("detour_min") or 0))), "stay_min": max(20, min(120, int(st.get("stay_min") or 40))),
+                        "km_from_start": st.get("km_from_start"), "kind": st.get("kind"), "source": st.get("source") or "한국관광공사"}
+            except (KeyError, TypeError, ValueError):
+                return {"status": "승인 대기", "answer": "들를 곳 정보를 읽지 못했어요.", "trace": _t(state, "edit", e, "형식 오류")}
+            if len(spec.return_stops) >= 3:
+                return {"status": "승인 대기", "answer": "귀가길에 들를 곳은 3곳까지만 넣을 수 있어요.", "trace": _t(state, "edit", e, "상한")}
+            spec.return_stops = [s for s in spec.return_stops if s.get("key") != stop["key"]] + [stop]
+            spec.return_stops.sort(key=lambda s: s.get("km_from_start") or 0)
+            changes.append(f"돌아가는 길에 {_josa(stop['name'], '을를')} 들르도록 넣었어요(우회 약 {stop['detour_min']}분 + 머무는 {stop['stay_min']}분)")
     elif op == "order":          # 끌어서 바꾼 전체 순서(날짜 사이 이동 포함)
         by_id = {x.place_id: x for row in days for x in row if x.place_id != planner.MEAL_ID}
         want = {int(r.get("day") or 0): [str(x) for x in r.get("place_ids") or []] for r in e.get("days") or []}
@@ -1062,7 +1094,7 @@ def cost_node(state: State) -> State:
 SET_LABEL = {"depart_time": "출발 시각", "arrival": "여행 후 도착", "vehicle": "차량",
              "region": "여행 지역", "start_date": "출발일", "length": "여행 길이", "origin": "출발지",
              "long_transport": "장거리 이동", "local_transport": "현지 이동", "intensity": "여행 강도",
-             "companions": "동반자", "budget": "최대 예산", "interests": "관심사"}
+             "companions": "동반자", "budget": "최대 예산", "interests": "관심사", "breakfast": "아침 식사"}
 
 
 def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: dict | None):
@@ -1108,6 +1140,12 @@ def _apply_change(spec: planner.TripSpec, a: set, key: str, value: str, place: d
         if key == "local_transport":
             spec.transport = "대중교통" if value == "대중교통" else "자차"
         a.discard(key)
+        return spec, False, value, None
+    if key == "breakfast":
+        if value not in ("근처 식당", "숙소 조식", "안 먹음"):
+            return spec, False, value, "아침은 근처 식당·숙소 조식·안 먹음 중에서 골라 주세요."
+        spec.breakfast = value
+        spec.breakfast_skip_days = []
         return spec, False, value, None
     if key == "intensity":
         if value not in brochure.CHECK_OPTIONS["intensity"]:

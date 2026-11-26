@@ -77,9 +77,75 @@ def fee_check(p: dict) -> bool:
     return bool(re.search(r"(문의|변동|별도|상이|홈페이지|확인|유료)", fee)) and not re.fullmatch(r"\s*무료\s*", fee)
 
 
+def lodging_times(p: dict) -> dict:
+    """체크인·체크아웃(관광공사 숙박 소개, 없으면 일반적인 15:00/11:00)·조식 단서."""
+    intro = p.get("intro") or {}
+    cin, cout = hours.clean(intro.get("checkintime")) or "", hours.clean(intro.get("checkouttime")) or ""
+    m_in, m_out = re.search(r"\d{1,2}:\d{2}", cin), re.search(r"\d{1,2}:\d{2}", cout)
+    facil = " ".join(str(intro.get(k) or "") for k in ("subfacility", "foodplace"))
+    return {"checkin": m_in.group(0) if m_in else "15:00", "checkout": m_out.group(0) if m_out else "11:00",
+            "checkin_known": bool(m_in), "checkout_known": bool(m_out),
+            "breakfast_hint": bool(re.search(r"(조식|레스토랑|뷔페|식당)", facil))}
+
+
+def _lodging_notices(spec, days: list, places_by_id: dict) -> None:
+    """숙소 체크인·체크아웃·연박 안내를 날짜별로 붙인다."""
+    stays = []
+    for d in days:
+        st = next((s for s in d["stops"] if s["type"] == "stay"), None)
+        stays.append(st)
+    for i, d in enumerate(days):
+        st = stays[i]
+        if st:
+            p = places_by_id.get(st.get("place_id")) or {}
+            t = lodging_times(p)
+            prev_same = i > 0 and stays[i - 1] and stays[i - 1].get("place_id") == st.get("place_id")
+            nights = 1
+            j = i + 1
+            while j < len(stays) and stays[j] and stays[j].get("place_id") == st.get("place_id"):
+                nights, j = nights + 1, j + 1
+            st.update({"checkin": t["checkin"], "checkout": t["checkout"], "checkin_known": t["checkin_known"],
+                       "checkout_known": t["checkout_known"], "breakfast_hint": t["breakfast_hint"],
+                       "consecutive": bool(prev_same), "nights_here": nights if not prev_same else None})
+            if not prev_same:
+                st["stay_note"] = (f"체크인 {t['checkin']}부터" + (f" · {nights}박 연속" if nights > 1 else "")
+                                   + (" · 조식 정보 있음(숙소 확인)" if t["breakfast_hint"] else ""))
+            else:
+                st["stay_note"] = "어제와 같은 숙소(연박) — 체크인 없이 바로 쉬어요"
+        if i > 0 and stays[i - 1]:
+            prev = stays[i - 1]
+            p = places_by_id.get(prev.get("place_id")) or {}
+            t = lodging_times(p)
+            tonight = stays[i] if i < len(stays) else None
+            if tonight and tonight.get("place_id") == prev.get("place_id"):
+                d["lodging_notice"] = {"kind": "연박", "title": "오늘도 같은 숙소예요",
+                                       "message": f"오늘 밤도 {prev['name']}에서 묵어요. 큰 짐은 숙소에 두고 가볍게 나서세요(귀중품만 챙기기)."}
+            elif tonight:
+                d["lodging_notice"] = {"kind": "이동", "title": "오늘은 숙소를 옮겨요", "checkout": t["checkout"],
+                                       "message": f"짐을 모두 챙겨 {t['checkout']}까지 {prev['name']}에서 체크아웃하세요. "
+                                                  f"새 숙소 {tonight['name']} 체크인은 {lodging_times(places_by_id.get(tonight.get('place_id')) or {})['checkin']}부터예요."}
+            else:
+                d["lodging_notice"] = {"kind": "마지막", "title": "마지막 날 · 체크아웃", "checkout": t["checkout"],
+                                       "message": f"짐을 모두 챙겨 {t['checkout']}까지 {prev['name']}에서 체크아웃하세요. "
+                                                  "충전기·세면도구처럼 두고 오기 쉬운 물건을 한 번 더 확인해요!"}
+
+
 def _planner():
     from . import planner
     return planner
+
+
+def _stopovers(spec) -> dict:
+    from . import stopovers
+    try:
+        sugg = stopovers.suggest(spec)
+    except Exception:
+        sugg = []
+    added = {s.get("key") for s in spec.return_stops}
+    for s in sugg:
+        s["added"] = s["key"] in added
+    return {"items": sugg, "added": list(spec.return_stops),
+            "note": "여행 끝이 아쉬우면 돌아가는 길에 잠깐 들러 보세요. 우회 시간은 직선거리 기준 추정이에요."}
 
 
 def _with_home(spec, days: list, long: dict) -> list:
@@ -87,6 +153,7 @@ def _with_home(spec, days: list, long: dict) -> list:
     from . import planner
     if not days:
         return days
+    _lodging_notices(spec, days, {**data.places(spec.region), **{w["place_id"]: w for w in spec.user_waypoints}})
     o, e = planner.origin_point(spec), planner.end_point(spec)
     ob, ib = long.get("outbound"), long.get("inbound")
     if o:
@@ -352,6 +419,10 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
         },
         "places": places,
         "itinerary": _with_home(spec, days, long),
+        "return_stopovers": _stopovers(spec),
+        "meals": {"breakfast": spec.breakfast, "breakfast_skip_days": list(spec.breakfast_skip_days),
+                  "options": ["근처 식당", "숙소 조식", "안 먹음"],
+                  "note": "숙박 다음 날 아침은 기본으로 넣어요. 숙소 조식이면 이동이 없어 30분 늦게 시작해도 돼요. 필요 없으면 빼 주세요."},
         "totals": {"local": {"distance_km": round(tot_km, 1), "travel_min": tot_min}, "long_distance": long},
         "warnings": warnings,
     }

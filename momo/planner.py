@@ -45,6 +45,9 @@ class TripSpec:
     end_label: str | None = None
     arrive_time: int | None = None          # 도착 희망 시각(분), 없으면 22:00 상한
     custom_costs: list[dict] = field(default_factory=list)
+    breakfast: str = "근처 식당"            # 근처 식당 / 숙소 조식 / 안 먹음 (숙박 다음 날 아침)
+    breakfast_skip_days: list[int] = field(default_factory=list)   # 그날만 아침 빼기(1부터)
+    return_stops: list[dict] = field(default_factory=list)         # 귀가길에 들를 곳 {name, lat, lng, detour_min, stay_min, …}
     preset: str | None = None
     given: list[str] = field(default_factory=list)      # 사용자가 직접 준 선택 항목(depart_time 등)
     pack_checked: list[str] = field(default_factory=list)   # 준비물 체크한 id
@@ -96,7 +99,14 @@ def one_way_minutes(spec: TripSpec) -> int | None:
 
 
 def return_minutes(spec: TripSpec) -> int | None:
-    """여행 지역 → 여행 후 도착지(없으면 출발지)."""
+    """여행 지역 → 여행 후 도착지(없으면 출발지) + 귀가길에 들르는 곳(우회·머무는 시간)."""
+    base = _return_base(spec)
+    if base is None:
+        return None
+    return base + sum(int(s.get("detour_min") or 0) + int(s.get("stay_min") or 40) for s in spec.return_stops)
+
+
+def _return_base(spec: TripSpec) -> int | None:
     coords = spec.end_coords or (None if spec.end_location else spec.origin_coords)
     dest = spec.end_location or spec.departure
     if not coords and (not dest or dest not in data.SIDO_COORDS):
@@ -393,7 +403,7 @@ def best_day_order(spec: TripSpec, rows: list[list], di: int, start, end, allowe
         rr = [list(r) for r in rows]
         rr[di] = order
         items = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(rr)]), {})
-        day = [it for it in items if it["date"] == ds and it["type"] != "move"]
+        day = [it for it in items if it["date"] == ds and it["type"] != "move" and "조식" not in (it.get("notes") or [])]
         viol = [v for v in validate(spec, items, allowed) if v.get("date") in (ds, None)]
         trav = sum(it["travel_minutes_from_prev"] or 0 for it in day)
         wait, prev_end = 0, day_open          # 그날 첫 장소 전 기다림도 센다(예: 아침에 점심부터)
@@ -410,11 +420,12 @@ def best_day_order(spec: TripSpec, rows: list[list], di: int, start, end, allowe
         return meal_ok, len(viol), trav + 0.5 * wait
 
     base_ok, base_v, base_score = evaluate(list(row))
-    best, best_score = list(row), base_score
+    best, best_key = list(row), (0 if base_ok else 1, base_v, base_score)
     for c in cands:
         ok, nv, sc = evaluate(c)
-        if (ok or not base_ok) and nv <= base_v and sc < best_score - 0.5:
-            best, best_score = c, sc
+        key = (0 if ok else 1, nv, sc)
+        if key[:2] < best_key[:2] or (key[:2] == best_key[:2] and sc < best_key[2] - 0.5):
+            best, best_key = c, key
     return best
 
 
@@ -459,21 +470,21 @@ def optimize_plan(spec: TripSpec, picked: PlanPick, allowed: set, fixed_days: se
     base_items = schedule(spec, picked, {})
     base_v = len(validate(spec, base_items, allowed))
     center = data.region_center(spec.region)
-    new_days, last_stay = [], None
-    for d in sorted(picked.days, key=lambda x: x.day):
-        if d.day in fixed_days:
-            new_days.append(d)
-        else:
-            start = (_pcoord(spec, last_stay) if last_stay else (center if spec.departure else None))
-            new_days.append(DayPick(day=d.day, items=optimize_day(spec, list(d.items), start)))
+    ordered = sorted(picked.days, key=lambda x: x.day)
+    rows = [list(d.items) for d in ordered]
+    last_stay = None
+    for i, d in enumerate(ordered):
+        start = (_pcoord(spec, last_stay) if last_stay else center)
+        if d.day not in fixed_days:
+            rows[i] = best_day_order(spec, rows, i, start, center if i == len(rows) - 1 else None, allowed | {MEAL_ID})
         stay = next((x.place_id for x in d.items if x.role == "stay"), None)
         last_stay = stay or last_stay
-    cand = PlanPick(days=new_days, ranked=picked.ranked, note=picked.note)
+    cand = PlanPick(days=[DayPick(day=d.day, items=r) for d, r in zip(ordered, rows)], ranked=picked.ranked, note=picked.note)
     items = schedule(spec, cand, {})
     v = len(validate(spec, items, allowed))
     saved = _travel_total(base_items) - _travel_total(items)
-    if v <= base_v and saved > 0:
-        return cand, saved
+    if v < base_v or (v <= base_v and saved > 0):        # 규칙 위반이 줄거나, 같으면서 이동이 줄 때
+        return cand, max(0, saved)
     return picked, 0
 
 
@@ -503,6 +514,17 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
                                spec.depart_time + ow, "출발"))
         cursor, prev = w[0], None
         origin = last_stay if di > 0 and last_stay else (hub if di == 0 and ow is not None else None)
+        if di > 0 and last_stay and spec.breakfast != "안 먹음" and (di + 1) not in spec.breakfast_skip_days:
+            hotel = spec.breakfast == "숙소 조식"
+            bs = max(7 * 60, w[0] - (45 if hotel else 75))       # 숙소 조식은 이동이 없어 30분 늦게 시작해도 됨
+            be = bs + (35 if hotel else 45)
+            bp = {"contentid": None, "title": f"숙소 조식 · {last_stay.get('title', '')}" if hotel else "숙소 근처 아침 식사",
+                  "kind": "restaurant", "source": "식사 안내", "lat": last_stay.get("lat"), "lng": last_stay.get("lng")}
+            bi = _item(bp, d, "meal", bs, be, 0 if hotel else 10, "estimate", mode,
+                       "숙소에서 바로 먹어 이동 시간을 아껴요" if hotel else "숙소 가까운 곳에서 든든하게 시작해요", hours.OpenInfo("확인됨"))
+            bi["notes"] = ["조식"] + (["숙소 조식"] if hotel else [])
+            items.append(bi)
+            cursor = max(cursor - 10, be + (0 if hotel else 10))
         for pk in picks:
             placeholder = pk.place_id == MEAL_ID
             if placeholder:   # '주변에서 식사' (운영시간이 맞는 식당이 없을 때)
@@ -549,7 +571,9 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
         if rw is not None and di == len(spec.days) - 1:
             back = max(cursor, w[0])
             dest = short_label(spec.end_label or spec.end_location or spec.origin_label) or spec.departure
-            items.append(_move(d, f"{data.region_label(spec.region)} → {dest}", back, back + rw, "귀가"))
+            via = " → ".join(s["name"] for s in spec.return_stops)
+            items.append(_move(d, f"{data.region_label(spec.region)} → " + (f"{via}(들렀다가) → " if via else "") + dest,
+                               back, back + rw, "귀가"))
     for i, it in enumerate(items, 1):
         it["seq"] = i
     return items
@@ -629,6 +653,8 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
                 if pe + it["travel_minutes_from_prev"] + BUFFER_MIN > s:
                     v.append(_v("시간 겹침", it, f"앞 일정 종료 {prev['end_time']} + 이동 {it['travel_minutes_from_prev']}분 + 여유 10분 > 시작 {it['start_time']}"))
             win = mw if it["type"] == "meal" else w
+            if "조식" in (it.get("notes") or []):
+                continue
             if it["type"] != "stay" and (s < win[0] or e > win[1]):
                 v.append(_v("시간 창 밖", it, f"현지 가능 시간 {hours.fmt(win[0])}~{hours.fmt(win[1])}"))
             if it["type"] == "stay" and s > HOME_LIMIT:

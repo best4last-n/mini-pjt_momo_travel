@@ -19,10 +19,13 @@ from .config import DATA, today
 
 CAFE_RE = re.compile(r"(카페|까페|커피|cafe|coffee|베이커리|bakery|제과|찻집|다원|디저트|티하우스|브런치)", re.I)
 LODGE_RE = re.compile(r"(호텔|모텔|펜션|리조트|게스트하우스|한옥스테이|민박|스테이|콘도|글램핑|캠핑)")
+NON_LODGE_RE = re.compile(r"(카페|커피|음식|식당|주거|주택|아파트|통신판매|의류|잡화|학교|공장|사무|판매|소매|도매|쇼핑|편의)")
 FOOD_RE = re.compile(r"(음식|식당|한식|중식|일식|양식|분식|주점|고기|국밥|횟집|맛집|레스토랑)")
 TYPE_ID = {"식당": "39", "카페": "39", "숙소": "32", "관광지": "12"}
 VW_QUERY = {"카페": ["카페", "커피"], "식당": ["식당", "음식점"], "숙소": ["펜션", "호텔"], "관광지": ["관광지"]}
 RADIUS_KM = {"숙소": 25, "관광지": 20, "식당": 12, "카페": 12}
+WIDE_KM = {"숙소": 50}           # 후보가 적으면 넓혀 찾는 범위(숙소는 멀어도 묵을 만하다)
+QUERY_KM = {"숙소": 150}         # 이름으로 찾을 때 숙소는 더 멀리까지(먼 곳은 거리 표시)
 COMPANION_WORDS = {
     "어린이": "아이|어린이|키즈|체험|놀이|가족", "아이": "아이|어린이|키즈|체험|놀이|가족", "노약자": "주차|휴식|평지|한정식|엘리베이터|부모",
     "부모": "주차|휴식|평지|한정식|엘리베이터|부모", "배우자": "분위기|전망|뷰|야경|산책|감성",
@@ -136,10 +139,42 @@ def _vw(raw: str, kl: str | None) -> dict | None:
     both = cat + pl["title"]
     if re.search(r"(진출입|건물|주차|사무실|화장실|정류장|입구)", both):
         return None
-    if (kl == "숙소" and not LODGE_RE.search(both) or kl == "카페" and not CAFE_RE.search(both)
+    if (kl == "숙소" and (not LODGE_RE.search(both) or NON_LODGE_RE.search(cat)) or kl == "카페" and not CAFE_RE.search(both)
             or kl == "식당" and (not FOOD_RE.search(cat) or CAFE_RE.search(cat)) or kl == "관광지" and FOOD_RE.search(cat)):
         return None
     return {"src": "브이월드", "p": pl, "key": f"vworld:{i.get('id') or (pl['title'], round(lat, 5))}"}
+
+
+@lru_cache(maxsize=16)
+def _tour_area(region: str, type_id: str) -> tuple:
+    """지역 시군구 전체의 같은 종류(숙소 등) — 위치기반 20km 한계를 넘어 넓게."""
+    from .tourlive import _client
+    cfg = data.regions_config().get(region) or {"sigungu": []}
+    rows = []
+    for sg in cfg["sigungu"]:
+        try:
+            rows += _client().call("areaBasedList2", contentTypeId=type_id, lDongRegnCd=sg["regn"], lDongSignguCd=sg["signgu"],
+                                   arrange="Q", numOfRows=100, pageNo=1)
+        except Exception:
+            continue
+    return tuple(json.dumps(r, ensure_ascii=False) for r in rows)
+
+
+def _gather_wide(spec, target: dict, kl: str) -> list[dict]:
+    near = (target["lat"], target["lng"])
+    out = []
+    for raw in _tour_area(spec.region, TYPE_ID[kl]):
+        h = json.loads(raw)
+        if h.get("mapy"):
+            out.append({"src": "관광공사", "place_id": h["contentid"], "wide": True, "p": {
+                "title": h["title"], "lat": float(h["mapy"]), "lng": float(h["mapx"]), "addr": h.get("addr1"),
+                "image_url": h.get("firstimage2") or h.get("firstimage") or None, "kind": "lodging"}})
+    for word in VW_QUERY[kl] + ["리조트", "한옥", "게스트하우스"]:
+        for raw in placesearch.vworld_search(word, "place", round(near[0], 2), round(near[1], 2), 0.4, size=40):
+            c = _vw(raw, kl)
+            if c:
+                out.append({**c, "wide": True})
+    return out
 
 
 def _gather(spec, target: dict, kl: str, q: str) -> list[dict]:
@@ -163,11 +198,18 @@ def _gather(spec, target: dict, kl: str, q: str) -> list[dict]:
     if q:          # 검색어가 있으면 그 결과만(종류 제한 없이, 원래 장소 근처 우선)
         out = []
         for raw in placesearch.vworld_search(q, "place", round(near[0], 3), round(near[1], 3), 0.2, size=40):
-            c = _vw(raw, None)
+            c = _vw(raw, "숙소" if kl == "숙소" else None)
             if c:
                 out.append({**c, "query_hit": True})
-        res = placesearch.search(q, spec.region, near=near, limit=20)
-        for c in res.get("results") or []:
+        res = placesearch.search(q, spec.region, near=near, limit=20, expand=kl == "숙소")
+        for c in (res.get("results") or []) + ((res.get("far") or []) if kl == "숙소" else []):
+            nm_cat = f"{c['name']} {c.get('vworld_category') or ''}"
+            if re.search(r"(진출입|입구|주차|정류장|사무실|화장실)", nm_cat):
+                continue
+            vcat = c.get("vworld_category") or ""
+            if kl == "숙소" and (NON_LODGE_RE.search(vcat) or not (c.get("category") == "lodging" or LODGE_RE.search(nm_cat)
+                                                              or (c.get("similarity") or 0) >= 0.85)):
+                continue          # 숙소를 찾는데 식당·가게가 섞이지 않게(이름이 거의 같으면 예외: 예) 쌍산재)
             pl = {"title": c["name"], "lat": c["lat"], "lng": c["lng"], "addr": c.get("address"), "image_url": c.get("image"),
                   "vworld_category": (c.get("vworld_category") or "").split(">")[-1].strip() or None}
             out.append({"src": c["source"], "place_id": c.get("place_id"), "p": pl, "cand": c, "query_hit": True})
@@ -183,7 +225,8 @@ def _gather(spec, target: dict, kl: str, q: str) -> list[dict]:
 def _score(spec, d: date, target: dict, kl: str, c: dict, ranks: dict) -> dict | None:
     p = c["p"]
     dist = travel.km((target["lat"], target["lng"]), (p["lat"], p["lng"]))
-    lim = placesearch.MAX_KM if c.get("query_hit") else RADIUS_KM[kl]     # 직접 찾은 이름은 여행 지역 전체
+    lim = (QUERY_KM.get(kl, placesearch.MAX_KM) if c.get("query_hit")        # 직접 찾은 이름은 여행 지역 전체(숙소는 더 멀리)
+           else WIDE_KM.get(kl, RADIUS_KM[kl]) if c.get("wide") else RADIUS_KM[kl])
     if dist > lim:
         return None
     s_dist = round(30 * max(0.0, 1 - dist / lim))
@@ -221,7 +264,9 @@ def _score(spec, d: date, target: dict, kl: str, c: dict, ranks: dict) -> dict |
                              "source": c["src"], "key": c.get("key") or (c.get("cand") or {}).get("key"),
                              "image": img, "category": "lodging" if kl == "숙소" else "restaurant" if kl in ("식당", "카페") else "attraction",
                              "osm_ref": (c.get("cand") or {}).get("osm_ref")}})
-    return {"score": sum(parts.values()), "parts": parts, "name": p["title"],
+    if dist > RADIUS_KM[kl]:
+        why.insert(0, f"조금 멀어요(약 {dist:.0f}km)")
+    return {"score": sum(parts.values()), "parts": parts, "name": p["title"], "far": dist > placesearch.MAX_KM,
             "category": p.get("vworld_category") or kl, "address": (p.get("addr") or "")[:60], "distance_km": round(dist, 1),
             "lat": p["lat"], "lng": p["lng"], "image": img, "image_source": "한국관광공사" if img and c["src"].startswith("관광공사") else None,
             "hours": htxt, "hours_status": st, "source": c["src"], "popular_rank": rk, "rating": None, "review_count": None,
@@ -253,9 +298,30 @@ def alternatives(spec, itinerary: list[dict], place_id: str, q: str = "", limit:
         if r:
             seen.append((k, (c["p"]["lat"], c["p"]["lng"])))
             rows.append(r)
-    rows.sort(key=lambda r: (-r["score"], r["distance_km"]))
+    if kl in WIDE_KM and not q and len(rows) < 10:          # 근처에 숙소가 적으면 지역 전체·더 넓게
+        for c in _gather_wide(spec, target, kl):
+            if (c.get("place_id") and c["place_id"] in taken) or c["p"].get("title") == target["name"]:
+                continue
+            k = placesearch.name_key(c["p"]["title"])
+            if any(k == k2 and travel.km((c["p"]["lat"], c["p"]["lng"]), xy) < 1 for k2, xy in seen):
+                continue
+            r = _score(spec, d, target, kl, c, ranks)
+            if r:
+                seen.append((k, (c["p"]["lat"], c["p"]["lng"])))
+                rows.append(r)
+        widened = True
+    else:
+        widened = False
+    if q:      # 이름으로 찾았으면 이름이 비슷한 순서가 먼저
+        for r in rows:
+            r["similarity"] = round(placesearch.similarity(q, r["name"]), 2)
+        rows.sort(key=lambda r: (-round(r["similarity"], 1), -r["score"], r["distance_km"]))
+    else:
+        rows.sort(key=lambda r: (-r["score"], r["distance_km"]))
     for i, r in enumerate(rows[:limit], 1):
         r["rank"] = i
     return {"target": target, "criteria": CRITERIA, "items": rows[:limit], "total_found": len(rows),
-            "sources": sorted({r["source"] for r in rows}), "note": NOTE, "has_reviews": False,
+            "sources": sorted({r["source"] for r in rows}), "has_reviews": False, "widened": widened,
+            "note": NOTE + (f" 근처에 숙소가 적어 {WIDE_KM[kl]}km 안까지 넓혀 찾았어요." if widened else "")
+            + (" 숙소는 이름으로 찾으면 전국까지 찾고, 먼 곳은 거리를 함께 보여 드려요." if kl == "숙소" else ""),
             "popular_source": "관광공사 연관 관광지(T맵 검색량)" if ranks else None}

@@ -30,8 +30,9 @@ def test_optimizer_keeps_meal_anchor_and_reduces_distance():
            PickItem(place_id=pid("국립경주박물관"), stay_minutes=60, reason="")]
     plan = PlanPick(days=[DayPick(day=1, items=row)])
     new, saved = planner.optimize_plan(spec, plan, set(pl), set())
-    roles = [x.role for x in new.days[0].items]
-    assert roles.index("lunch") == 1 and saved > 0
+    items = planner.schedule(spec, new, {})                     # 식사도 순서를 바꿀 수 있되 점심 시각은 지킨다
+    lunch = next(it for it in items if it["type"] == "meal")
+    assert "11:30" <= lunch["start_time"] <= "14:00" and saved > 0
     # 사용자 순서를 정한 날은 바꾸지 않음
     same, saved2 = planner.optimize_plan(spec, plan, set(pl), {1})
     assert [x.place_id for x in same.days[0].items] == [x.place_id for x in row] and saved2 == 0

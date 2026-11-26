@@ -141,5 +141,7 @@ def test_optimizer_groups_nearby_places_across_meal_and_days():
     assert any({"순천만습", "순천만국", "용산전망"} <= g for g in groups)     # 순천만 권역이 한 날에
     items = planner.schedule(spec, planner.PlanPick(days=[DayPick(day=i + 1, items=r["_row"])
                                                           for i, r in enumerate(whole["days"])]), {})
-    lunches = [it["start_time"] for it in items if it["type"] == "meal"]
+    lunches = [it["start_time"] for it in items if it["type"] == "meal" and "조식" not in (it.get("notes") or [])]
+    breakfasts = [it for it in items if "조식" in (it.get("notes") or [])]
+    assert len(breakfasts) == 1 and breakfasts[0]["date"] == spec.days[1].isoformat()   # 숙박 다음 날 아침
     assert all("11:30" <= t <= "14:00" for t in lunches)                      # 점심 시각 지킴
