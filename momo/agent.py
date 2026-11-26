@@ -564,7 +564,7 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
     center = data.region_center(spec.region)
     nd = len(days)
     cap_base = planner.INTENSITY.get(spec.intensity, planner.INTENSITY["보통"])[2]
-    orig = [sum(1 for x in row if x.role == "place") for row in days]
+    orig = [sum(1 for x in row if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))) for row in days]
     caps = [min(max(cap_base, o), o + 1) for o in orig]        # 하루 늘어도 1곳까지(강도 상한 안에서)
     floors = [max(1 if o else 0, o - 1) for o in orig]          # 하루 줄어도 1곳까지, 빈 날 없음
     pl = data.places(spec.region)
@@ -590,19 +590,19 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
     rows = [list(r) for r in days]
     st = starts(rows)
     cost = [day_km(rows[i], st[i], i)[0] for i in range(nd)]
-    origin_day = {x.place_id: i for i, r in enumerate(rows) for x in r if x.role == "place"}
+    origin_day = {x.place_id: i for i, r in enumerate(rows) for x in r if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))}
     for _ in range(4):
         improved = False
         for i in range(nd):
             for j in range(nd):
                 if i == j:
                     continue
-                for a in [x for x in rows[i] if x.role == "place"]:
+                for a in [x for x in rows[i] if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))]:
                     if not open_on(a.place_id, j):
                         continue
                     # (1) 옮기기
-                    if (sum(1 for x in rows[j] if x.role == "place") < caps[j]
-                            and sum(1 for x in rows[i] if x.role == "place") > floors[i]):
+                    if (sum(1 for x in rows[j] if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))) < caps[j]
+                            and sum(1 for x in rows[i] if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))) > floors[i]):
                         ri = [x for x in rows[i] if x is not a]
                         rj = list(rows[j])
                         rj.insert(insert_pos(rj), a)
@@ -611,7 +611,7 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
                             rows[i], rows[j], cost[i], cost[j], improved = ri, rj, ci, cj, True
                             continue
                     # (2) 맞바꾸기
-                    for b in [x for x in rows[j] if x.role == "place"]:
+                    for b in [x for x in rows[j] if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX))]:
                         if not open_on(b.place_id, i):
                             continue
                         ri = [b if x is a else x for x in rows[i]]
@@ -628,7 +628,7 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
     moved = []
     for i, r in enumerate(rows):
         for x in r:
-            if x.role == "place" and origin_day.get(x.place_id, i) != i:
+            if (x.role == "place" and not x.place_id.startswith(planner.FREE_PREFIX)) and origin_day.get(x.place_id, i) != i:
                 moved.append({"place_id": x.place_id, "from_day": origin_day[x.place_id] + 1, "to_day": i + 1})
     return rows, moved
 
@@ -678,9 +678,11 @@ def route_proposal(spec: planner.TripSpec, days: list[list], scope: str = "day")
         a = b if same else after.get(ds, 0)
         out.append({"day": i + 1, "date": ds, "before_min": b, "after_min": a, "saved_min": max(0, b - a),
                     "before_km": dist(days[i], starts[i]), "after_km": dist(new_rows[i] if not same else days[i], starts[i]),
-                    "before": [{"place_id": x.place_id, "name": nm(x.place_id), "role": x.role}
+                    "before": [{"place_id": x.place_id, "name": x.reason if x.place_id.startswith(planner.FREE_PREFIX) else nm(x.place_id), "role": x.role,
+                                "free": x.place_id.startswith(planner.FREE_PREFIX)}
                                for x in days[i] if x.place_id != planner.MEAL_ID],
-                    "after": [{"place_id": x.place_id, "name": nm(x.place_id), "role": x.role}
+                    "after": [{"place_id": x.place_id, "name": x.reason if x.place_id.startswith(planner.FREE_PREFIX) else nm(x.place_id), "role": x.role,
+                                "free": x.place_id.startswith(planner.FREE_PREFIX)}
                               for x in (days[i] if same else new_rows[i]) if x.place_id != planner.MEAL_ID],
                     "user_ordered": (i + 1) in spec.user_ordered_days, "_row": days[i] if same else new_rows[i]})
     nmv = {m["place_id"]: m for m in moved}
@@ -898,6 +900,48 @@ def edit_node(state: State) -> State:
             if not e.get("keep_order") and str(to + 1) not in map(str, spec.user_ordered_days):
                 days[to] = planner.optimize_day(spec, days[to])   # 넣은 날은 동선 기준으로 자리 잡기
             changes.append(f"{to + 1}일차에 {_josa(name, '을를')} 추가했어요")
+    elif op == "title":          # {title} 여행 제목(같은 곳을 여러 번 가도 구분되게). 빈 값이면 기본 제목으로
+        t = guardrails.mask_pii(re.sub(r"\s+", " ", str(e.get("title") or "")).strip()[:40])[0]
+        spec.title = t or None
+        changes.append(f"여행 제목을 '{t}'(으)로 바꿨어요" if t else "여행 제목을 기본 제목으로 되돌렸어요")
+    elif op == "stay":           # {place_id, minutes} 머무는 시간 직접 정하기(15~360분)
+        di, i = locate(pid)
+        if di is None:
+            return {"status": "승인 대기", "answer": "그 장소는 일정에 없어요.", "trace": _t(state, "edit", e, "없음")}
+        try:
+            mins = max(15, min(360, int(e.get("minutes"))))
+        except (TypeError, ValueError):
+            return {"status": "승인 대기", "answer": "머무는 시간을 분 단위 숫자로 알려 주세요.", "trace": _t(state, "edit", e, "형식")}
+        old = days[di][i]
+        if old.role == "stay":
+            return {"status": "승인 대기", "answer": "숙소는 머무는 시간 대신 체크인·체크아웃 시각을 따라요.", "trace": _t(state, "edit", e, "숙소")}
+        days[di][i] = PickItem(place_id=old.place_id, role=old.role, stay_minutes=mins, reason=old.reason)
+        nm = old.reason if old.place_id.startswith(planner.FREE_PREFIX) else name
+        changes.append(f"{di + 1}일차 {nm} 머무는 시간을 {mins}분으로 바꿨어요(뒤 일정 시각은 다시 계산했어요)")
+    elif op == "free":           # {action: add|remove, day?, after?: place_id, minutes, label} 개인 시간(휴식·자유 시간)
+        if e.get("action") == "remove":
+            di, i = locate(pid)
+            if di is None or not pid.startswith(planner.FREE_PREFIX):
+                return {"status": "승인 대기", "answer": "그 개인 시간은 일정에 없어요.", "trace": _t(state, "edit", e, "없음")}
+            label = days[di].pop(i).reason
+            changes.append(f"{di + 1}일차 '{label}'을(를) 뺐어요")
+        else:
+            try:
+                mins = max(15, min(360, int(e.get("minutes") or 60)))
+            except (TypeError, ValueError):
+                mins = 60
+            label = guardrails.mask_pii(str(e.get("label") or "개인 시간").strip()[:30])[0] or "개인 시간"
+            blk = PickItem(place_id=f"{planner.FREE_PREFIX}{uuid.uuid4().hex[:8]}", role="place", stay_minutes=mins, reason=label)
+            if e.get("after") and locate(e["after"])[0] is not None:
+                to, ai = locate(e["after"])
+                days[to].insert(ai + 1, blk)
+                where = f"{(pl.get(e['after']) or {}).get('title') or '그 장소'} 다음에"
+            else:
+                to = max(1, min(nd, int(e.get("day") or 1))) - 1
+                idx = next((k for k, x in enumerate(days[to]) if x.role == "stay"), len(days[to]))
+                days[to].insert(idx, blk)
+                where = "끝(숙소 전)에"
+            changes.append(f"{to + 1}일차 {where} '{label}' {mins}분을 넣었어요(그 시간만큼 뒤 일정이 밀려요)")
     elif op == "breakfast":      # {mode?: 근처 식당|숙소 조식|안 먹음, day?: N, skip?: bool}
         if e.get("mode") in ("근처 식당", "숙소 조식", "안 먹음"):
             spec.breakfast = e["mode"]
@@ -1471,7 +1515,7 @@ def approve_node(state: State) -> State:
                 "extra": {"draft_version": state.get("draft_version"), "violations": viol},
                 "trace": _t(state, "approve", "approve", f"위반 {len(viol)}건 → 승인 거부")}
     spec = state["spec"]
-    payload = {"title": f"{data.region_label(spec['region'])} {'당일치기' if spec['nights'] == 0 else str(spec['nights']) + '박 ' + str(spec['nights'] + 1) + '일'} · 모모 여행 일정",
+    payload = {"title": spec.get("title") or f"{data.region_label(spec['region'])} {'당일치기' if spec['nights'] == 0 else str(spec['nights']) + '박 ' + str(spec['nights'] + 1) + '일'} · 모모 여행 일정",
                "region": spec["region"], "region_label": data.region_label(spec["region"]),
                "departure_sido": spec.get("departure"), "nights": spec["nights"], "start": spec["start"],
                "itinerary": items, "draft_version": state["draft_version"], "plan": state.get("plan")}

@@ -17,6 +17,7 @@ from .llm import MOMO_PERSONA, structured
 from .schemas import ItineraryItem, PlanPick
 
 MEAL_ID = "MEAL"
+FREE_PREFIX = "FREE:"         # 개인 시간(휴식·자유 시간) 블록: place_id = "FREE:<id>", 이름은 reason
 KIND_KO = {"attraction": "관광지", "restaurant": "음식점", "lodging": "숙박", "festival": "축제"}
 
 
@@ -45,6 +46,7 @@ class TripSpec:
     end_label: str | None = None
     arrive_time: int | None = None          # 도착 희망 시각(분), 없으면 22:00 상한
     custom_costs: list[dict] = field(default_factory=list)
+    title: str | None = None                # 사용자가 정한 여행 제목(예: 2026 가을 순천·남해·구례 여행)
     breakfast: str = "근처 식당"            # 근처 식당 / 숙소 조식 / 안 먹음 (숙박 다음 날 아침)
     breakfast_skip_days: list[int] = field(default_factory=list)   # 그날만 아침 빼기(1부터)
     return_stops: list[dict] = field(default_factory=list)         # 귀가길에 들를 곳 {name, lat, lng, detour_min, stay_min, …}
@@ -355,7 +357,35 @@ def _route_km(spec: TripSpec, order: list, start, end) -> float:
     return sum(travel.km(a, b) for a, b in zip(pts, pts[1:]))
 
 
+def _split_free(row: list) -> tuple[list, dict]:
+    """개인 시간 블록을 떼어 두고 {앞 장소 id: [블록…]}로 기억(맨 앞이면 None)."""
+    rest, glue, prev = [], {}, None
+    for x in row:
+        if x.place_id.startswith(FREE_PREFIX):
+            glue.setdefault(prev, []).append(x)
+        else:
+            rest.append(x)
+            prev = x.place_id
+    return rest, glue
+
+
+def _join_free(row: list, glue: dict) -> list:
+    out = list(glue.get(None, []))
+    for x in row:
+        out.append(x)
+        out += glue.get(x.place_id, [])
+    return out
+
+
 def tsp_quick(spec: TripSpec, row: list, start, end) -> tuple[list, float]:
+    rest, glue = _split_free(row)
+    if glue:
+        o, k = _tsp_quick(spec, rest, start, end)
+        return _join_free(o, glue), k
+    return _tsp_quick(spec, row, start, end)
+
+
+def _tsp_quick(spec: TripSpec, row: list, start, end) -> tuple[list, float]:
     """숙소는 맨 끝 고정, 나머지(관광지·식사)는 칸막이 없이 순서를 바꿔 직선거리 최소화.
     8곳 이하는 완전 탐색, 그보다 많으면 2-opt. → (순서, km)"""
     import itertools
@@ -384,17 +414,18 @@ def best_day_order(spec: TripSpec, rows: list[list], di: int, start, end, allowe
     조건: 점심 14:00·저녁 20:30 전에 시작, 그날 규칙 위반이 늘지 않음. 점수 = 이동 분 + 0.5 × 기다리는 분."""
     import itertools
     from .schemas import DayPick
-    row = rows[di]
+    row, glue = _split_free(rows[di])
     stay = [x for x in row if x.role == "stay"]
     mov = [x for x in row if x.role != "stay"]
     if len(mov) <= 1:
-        return row
+        return rows[di]
     tail = _pcoord(spec, stay[0].place_id) if stay else end
     if len(mov) <= 8:
         cands = sorted(itertools.permutations(mov), key=lambda o: _route_km(spec, o, start, tail))[:40]
-        cands = [list(c) + stay for c in cands]
+        cands = [_join_free(list(c) + stay, glue) for c in cands]
     else:
-        cands = [tsp_quick(spec, row, start, end)[0]]
+        cands = [_join_free(tsp_quick(spec, row, start, end)[0], glue)]
+    row = _join_free(row, glue)
     cands.append(list(row))
     ds = spec.days[di].isoformat()
     day_open = windows(spec)[di][0]
@@ -403,12 +434,13 @@ def best_day_order(spec: TripSpec, rows: list[list], di: int, start, end, allowe
         rr = [list(r) for r in rows]
         rr[di] = order
         items = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(rr)]), {})
-        day = [it for it in items if it["date"] == ds and it["type"] != "move" and "조식" not in (it.get("notes") or [])]
+        day = [it for it in items if it["date"] == ds and it["type"] != "move" and "조식" not in (it.get("notes") or [])
+               and "개인 시간" not in (it.get("notes") or [])]
         viol = [v for v in validate(spec, items, allowed) if v.get("date") in (ds, None)]
         trav = sum(it["travel_minutes_from_prev"] or 0 for it in day)
         wait, prev_end = 0, day_open          # 그날 첫 장소 전 기다림도 센다(예: 아침에 점심부터)
         meal_ok = True
-        for it, pk in zip(day, [x for x in order]):
+        for it, pk in zip(day, [x for x in order if not x.place_id.startswith(FREE_PREFIX)]):
             s = hours.parse_hm(it["start_time"])
             if prev_end is not None:
                 wait += max(0, s - prev_end - (it["travel_minutes_from_prev"] or 0) - BUFFER_MIN)
@@ -527,6 +559,18 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             cursor = max(cursor - 10, be + (0 if hotel else 10))
         for pk in picks:
             placeholder = pk.place_id == MEAL_ID
+            if pk.place_id.startswith(FREE_PREFIX):      # 개인 시간: 바로 앞 장소에서 그대로(이동 없음)
+                fs = cursor + (BUFFER_MIN if prev is not None else 0)
+                fe = fs + max(15, min(pk.stay_minutes, 360))
+                fp = {"contentid": pk.place_id, "title": pk.reason or "개인 시간", "kind": "free",
+                      "lat": prev.get("lat") if prev else None, "lng": prev.get("lng") if prev else None}
+                fi = _item(fp, d, "place", fs, fe, 0, "estimate", mode, pk.reason or "개인 시간", hours.OpenInfo("확인됨"))
+                fi.update(source="개인 시간", notes=["개인 시간"], hours_text=None)
+                items.append(fi)
+                cursor = fe
+                if prev is None and origin is not None:
+                    prev = {**origin}
+                continue
             if placeholder:   # '주변에서 식사' (운영시간이 맞는 식당이 없을 때)
                 label = "점심" if pk.role == "lunch" else "저녁"
                 p = {"contentid": None, "title": f"주변에서 {label} 식사", "kind": "restaurant", "source": "식사 안내",
@@ -555,7 +599,7 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             if p.get("kind") == "lodging":
                 start = max(start, info.open)
             start = _ceil5(start)
-            stay = 0 if pk.role == "stay" else max(30, min(pk.stay_minutes, 180))
+            stay = 0 if pk.role == "stay" else max(15, min(pk.stay_minutes, 360))     # 사용자가 늘리거나 줄일 수 있게
             for a, b in info.breaks:          # 휴게·준비시간과 겹치면 끝난 뒤로
                 if start < b and start + stay > a:
                     start = _ceil5(b)
@@ -629,6 +673,8 @@ def validate(spec: TripSpec, items: list[dict], allowed_ids: set[str]) -> list[d
         for idx, it in enumerate(day):
             s, e = hours.parse_hm(it["start_time"]), hours.parse_hm(it["end_time"])
             name, pid = it["place_name"], it.get("place_id")
+            if pid and pid.startswith(FREE_PREFIX):
+                continue
             if pid and pid not in allowed_ids and pid not in user_ids:
                 v.append(_v("없는 장소", it, "검색 결과(후보)에 없는 장소"))
             p = pl.get(pid) if pid else None

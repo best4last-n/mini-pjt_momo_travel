@@ -362,6 +362,11 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
                     "lat": it.get("lat"), "lng": it.get("lng"), "source": it.get("source")}
             _pl = data.places(spec.region).get(it.get("place_id")) or next(
                 (w for w in spec.user_waypoints if w["place_id"] == it.get("place_id")), {"title": it["place_name"]})
+            if (it.get("place_id") or "").startswith("FREE:"):
+                stop.update(free=True, swap_hint=False, swap_kind=None, homepage=None, fee_check=False)
+                stops.append(stop)
+                prev, prev_name = (prev or it), (prev_name or it["place_name"])
+                continue
             stop["swap_kind"] = alternatives.kind_label(_pl, it["type"])
             stop["homepage"] = (links_of(_pl) or [{}])[0].get("url")
             stop["fee_check"] = fee_check(_pl)
@@ -402,7 +407,8 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
     length = "당일치기" if spec.nights == 0 else f"{spec.nights}박 {spec.nights + 1}일"
     out = {
         "trip": {
-            "title": f"{data.region_label(spec.region)} {length}", "regions": [data.region_label(spec.region)],
+            "title": spec.title or f"{data.region_label(spec.region)} {length}", "title_custom": bool(spec.title),
+            "default_title": f"{data.region_label(spec.region)} {length}", "regions": [data.region_label(spec.region)],
             "region_id": spec.region, "start_date": spec.start.isoformat(), "nights": spec.nights,
             "days": spec.nights + 1, "origin": spec.origin_label or spec.departure,
             "origin_point": _planner().origin_point(spec), "end_point": _planner().end_point(spec),

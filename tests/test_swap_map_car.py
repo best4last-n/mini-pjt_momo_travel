@@ -165,3 +165,28 @@ def test_replan_guard_and_diff(seeded, monkeypatch):
     assert t["plan_diff"]["removed"] and t["plan"]["diff"]["summary"] == e["plan_diff"]["summary"]
     msgs = store.list_messages("sw")
     assert [m["role"] for m in msgs][-2:] == ["user", "momo"] and msgs[-1]["plan_no"] >= 1
+
+
+def test_stay_minutes_free_time_and_title(seeded):
+    first = _id("경주 첨성대")
+    r = agent.handle_query("머무는 시간", "sw", "edit", edit={"op": "stay", "place_id": first, "minutes": 150})
+    it = next(x for x in r["itinerary"] if x.get("place_id") == first)
+    assert planner.hours.parse_hm(it["end_time"]) - planner.hours.parse_hm(it["start_time"]) == 150
+    r = agent.handle_query("휴식", "sw", "edit", edit={"op": "free", "action": "add", "after": first, "minutes": 45, "label": "카페에서 쉬기"})
+    names = [x["place_name"] for x in r["itinerary"] if x["type"] != "move"]
+    k = names.index("카페에서 쉬기")
+    assert names[k - 1].startswith("경주 첨성대") and not r.get("violations")
+    blk = next(x for x in r["itinerary"] if x["place_name"] == "카페에서 쉬기")
+    assert blk["source"] == "개인 시간" and blk["travel_minutes_from_prev"] == 0
+    stop = next(s for d in r["plan"]["itinerary"] for s in d["stops"] if s["name"] == "카페에서 쉬기")
+    assert stop["free"] is True
+    # 최적화해도 개인 시간은 첨성대 바로 뒤에 붙어 다님
+    p = agent.route_proposal(agent.spec_from_dict(agent.graph().get_state({"configurable": {"thread_id": "sw"}}).values["spec"]),
+                             agent._day_picks(agent.spec_from_dict(agent.graph().get_state({"configurable": {"thread_id": "sw"}}).values["spec"]),
+                                              r["itinerary"]), "day")
+    after = [x["name"] for x in p["days"][0]["after"]]
+    assert after[after.index("카페에서 쉬기") - 1].startswith("경주 첨성대")
+    r = agent.handle_query("빼기", "sw", "edit", edit={"op": "free", "action": "remove", "place_id": blk["place_id"]})
+    assert "카페에서 쉬기" not in [x["place_name"] for x in r["itinerary"]]
+    r = agent.handle_query("제목", "sw", "edit", edit={"op": "title", "title": "2026 가을 경주 가족 여행"})
+    assert r["plan"]["trip"]["title"] == "2026 가을 경주 가족 여행" and r["plan"]["trip"]["title_custom"] is True
