@@ -339,6 +339,85 @@ def ensure_waypoints(spec: TripSpec, picked: PlanPick) -> PlanPick:
     return PlanPick(days=[DayPick(day=k, items=v) for k, v in sorted(days.items())], ranked=picked.ranked, note=picked.note)
 
 
+def _route_km(spec: TripSpec, order: list, start, end) -> float:
+    """직선거리 합(주변 식사 자리표시처럼 좌표 없는 항목은 그 자리에 머무는 것으로)."""
+    pts = [p for p in [start] + [_pcoord(spec, x.place_id) if x.place_id != MEAL_ID else None for x in order] + [end] if p]
+    return sum(travel.km(a, b) for a, b in zip(pts, pts[1:]))
+
+
+def tsp_quick(spec: TripSpec, row: list, start, end) -> tuple[list, float]:
+    """숙소는 맨 끝 고정, 나머지(관광지·식사)는 칸막이 없이 순서를 바꿔 직선거리 최소화.
+    8곳 이하는 완전 탐색, 그보다 많으면 2-opt. → (순서, km)"""
+    import itertools
+    stay = [x for x in row if x.role == "stay"]
+    mov = [x for x in row if x.role != "stay"]
+    tail = _pcoord(spec, stay[0].place_id) if stay else end
+    if len(mov) <= 1:
+        return mov + stay, _route_km(spec, mov, start, tail)
+    if len(mov) <= 8:
+        best = min(itertools.permutations(mov), key=lambda o: _route_km(spec, o, start, tail))
+        return list(best) + stay, _route_km(spec, best, start, tail)
+    cur = list(mov)
+    improved = True
+    while improved:
+        improved = False
+        for i in range(len(cur) - 1):
+            for j in range(i + 1, len(cur)):
+                cand = cur[:i] + cur[i:j + 1][::-1] + cur[j + 1:]
+                if _route_km(spec, cand, start, tail) < _route_km(spec, cur, start, tail) - 0.05:
+                    cur, improved = cand, True
+    return cur + stay, _route_km(spec, cur, start, tail)
+
+
+def best_day_order(spec: TripSpec, rows: list[list], di: int, start, end, allowed: set) -> list:
+    """그날 순서 최적화(칸막이 없음): 거리 기준 후보 순서들을 실제 시각 계산으로 검증해 고른다.
+    조건: 점심 14:00·저녁 20:30 전에 시작, 그날 규칙 위반이 늘지 않음. 점수 = 이동 분 + 0.5 × 기다리는 분."""
+    import itertools
+    from .schemas import DayPick
+    row = rows[di]
+    stay = [x for x in row if x.role == "stay"]
+    mov = [x for x in row if x.role != "stay"]
+    if len(mov) <= 1:
+        return row
+    tail = _pcoord(spec, stay[0].place_id) if stay else end
+    if len(mov) <= 8:
+        cands = sorted(itertools.permutations(mov), key=lambda o: _route_km(spec, o, start, tail))[:40]
+        cands = [list(c) + stay for c in cands]
+    else:
+        cands = [tsp_quick(spec, row, start, end)[0]]
+    cands.append(list(row))
+    ds = spec.days[di].isoformat()
+    day_open = windows(spec)[di][0]
+
+    def evaluate(order):
+        rr = [list(r) for r in rows]
+        rr[di] = order
+        items = schedule(spec, PlanPick(days=[DayPick(day=i + 1, items=r) for i, r in enumerate(rr)]), {})
+        day = [it for it in items if it["date"] == ds and it["type"] != "move"]
+        viol = [v for v in validate(spec, items, allowed) if v.get("date") in (ds, None)]
+        trav = sum(it["travel_minutes_from_prev"] or 0 for it in day)
+        wait, prev_end = 0, day_open          # 그날 첫 장소 전 기다림도 센다(예: 아침에 점심부터)
+        meal_ok = True
+        for it, pk in zip(day, [x for x in order]):
+            s = hours.parse_hm(it["start_time"])
+            if prev_end is not None:
+                wait += max(0, s - prev_end - (it["travel_minutes_from_prev"] or 0) - BUFFER_MIN)
+            prev_end = hours.parse_hm(it["end_time"])
+            if pk.role == "lunch" and s > LUNCH[1]:
+                meal_ok = False
+            if pk.role == "dinner" and s > DINNER[1] + 30:
+                meal_ok = False
+        return meal_ok, len(viol), trav + 0.5 * wait
+
+    base_ok, base_v, base_score = evaluate(list(row))
+    best, best_score = list(row), base_score
+    for c in cands:
+        ok, nv, sc = evaluate(c)
+        if (ok or not base_ok) and nv <= base_v and sc < best_score - 0.5:
+            best, best_score = c, sc
+    return best
+
+
 def optimize_day(spec: TripSpec, row: list, start=None) -> list:
     """식사·숙소는 제자리(시간 고정점), 그 사이 관광지 묶음만 순서를 바꿔 직선거리 합을 최소화(7곳 이하 완전 탐색)."""
     import itertools

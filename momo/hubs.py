@@ -163,8 +163,17 @@ def guide(spec, one_way_drive: int | None) -> dict | None:
         dest = data.region_label(spec.region)
         if dr:
             g["summary"] = (f"{oname} → {dest} 자차 약 {dr['distance_km']:,.0f}km · 예상 {dr['total_min']}분"
-                            f"(막힘 없을 때 {dr['free_min']}분 × {dr['reason']} {dr['factor']}배"
-                            + (f" + 휴게 {dr['rests']}회" if dr["rests"] else "") + ")")
+                            f"(막힘 없을 때 {dr['free_min']}분 → {dr['reason']} {dr['factor']}배"
+                            + (f" + 휴게 {dr['rests']}회" if dr["rests"] else "")
+                            + (f" + 돌발 {dr['event_delay_min']}분" if dr.get("event_delay_min") else "") + ")")
+            g["road_segments"] = dr.get("segments") or []      # 도로별: 거리·막힘 없을 때·예상 분·속도·출처(실시간/예측/평균)
+            g["road_events"] = dr.get("events") or []          # 돌발상황(사고·공사·기상)
+            g["road_cautions"] = dr.get("cautions") or []      # 주의운전 구간(졸음쉼터·갓길차로·정체·작업 등)
+            g["traffic_sources"] = dr.get("its_used") or []
+            ret = roads.drive(data.region_center(spec.region), origin, spec.days[-1], 16 * 60, False)
+            if ret:
+                g["return_drive"] = {"total_min": ret["total_min"], "reason": ret["reason"], "free_min": ret["free_min"],
+                                     "segments": ret.get("segments") or [], "traffic_sources": ret.get("its_used") or []}
             g["total_min"] = dr["total_min"]
             g["legs"] = [{"type": "drive", "from": oname, "to": dest, "minutes": dr["total_min"],
                           "distance_km": dr["distance_km"], "note": dr["source"]}]
@@ -179,8 +188,13 @@ def guide(spec, one_way_drive: int | None) -> dict | None:
         g["tips"] = ["휴게소에서 2시간마다 쉬어 가세요", "출발 전 타이어 공기압·워셔액을 확인해 주세요",
                      "실제 소요는 출발 직전 내비게이션 실시간 경로로 확인해 주세요"]
         g["fuel"] = fuel_tips(spec, origin)
-        g["traffic_note"] = ("국가교통정보센터 실시간 소통·CCTV는 ITS_API_KEY 설정 후 '경로 CCTV'에서 볼 수 있어요"
-                             if not roads.its_key() else "경로 주변 CCTV를 '경로 CCTV'에서 볼 수 있어요")
+        if not roads.its_key():
+            g["traffic_note"] = "국가교통정보센터 실시간 소통·예측·CCTV는 ITS_API_KEY 설정 후 반영돼요"
+        else:
+            used = (dr or {}).get("its_used") or []
+            g["traffic_note"] = ((f"국가교통정보센터 {'·'.join(used)} 속도로 도로별 소요를 계산했어요. " if used else
+                                  "출발일이 오늘·내일이 아니라 국가교통정보센터 예측이 아직 없어 요일·시간대 평균으로 계산했어요(출발 하루 전부터 예측 반영). ")
+                                 + "경로 CCTV·돌발·주의운전 구간을 함께 확인하세요")
     return g
 
 

@@ -81,6 +81,7 @@ def test_car_guide_uses_road_not_rail(monkeypatch):
     monkeypatch.setattr(roads, "osrm", lambda a, b: {"distance_km": 290.0, "duration_min": 215,
                                                      "path": [[37.39, 127.11], [35.2, 127.46]]})
     monkeypatch.setattr(roads, "today", lambda: date(2000, 1, 1))
+    monkeypatch.setattr(roads, "its_key", lambda: None)              # 외부 ITS 호출 없이
     spec = planner.TripSpec(region="suncheon_gurye", start=SAT, nights=1, long_transport="자차",
                             departure="경기", origin_coords=[37.39, 127.11])
     g = hubs.guide(spec, 240)
@@ -118,3 +119,27 @@ def test_whole_trip_optimize_moves_across_days_respecting_rules():
     assert {x.place_id for x in rows[0]} in ({a1, a2}, set(far))                  # 가까운 곳끼리 같은 날
     p = agent.route_proposal(spec, days, "all")
     assert p["scope"] == "all" and p["total_after_km"] <= p["total_before_km"]
+
+
+def test_optimizer_groups_nearby_places_across_meal_and_days():
+    """순천만습지·국가정원처럼 가까운 곳이 점심 칸막이·날짜로 갈려 있어도 묶는다(사용자 지적 재현)."""
+    spec = planner.TripSpec(region="suncheon_gurye", start=SAT, nights=1, intensity="보통")
+    pl = data.places("suncheon_gurye")
+
+    def pid(t):
+        return next(k for k, p in pl.items() if p["title"].startswith(t))
+    lodge = next(k for k, p in pl.items() if p["kind"] == "lodging")
+    P = lambda t, **kw: PickItem(place_id=pid(t), stay_minutes=kw.get("m", 60), role=kw.get("role", "place"), reason="")
+    days = [[P("순천만습지"), P("지리산수라간", role="lunch"), P("화엄사"), P("용산전망대"),
+             PickItem(place_id=lodge, role="stay", stay_minutes=0, reason="")],
+            [P("사성암"), P("남녘들밥상", role="lunch"), P("순천만국가정원"), P("섬진강 대나무숲길")]]
+    day = agent.route_proposal(spec, days, "day")
+    assert day["total_after_min"] < day["total_before_min"] * 0.7          # 일별도 칸막이 없이 크게 줄어야
+    whole = agent.route_proposal(spec, days, "all")
+    assert whole["total_after_min"] < day["total_after_min"]                # 전체 일정이 더 좋아야
+    groups = [{x["name"][:4] for x in d["after"]} for d in whole["days"]]
+    assert any({"순천만습", "순천만국", "용산전망"} <= g for g in groups)     # 순천만 권역이 한 날에
+    items = planner.schedule(spec, planner.PlanPick(days=[DayPick(day=i + 1, items=r["_row"])
+                                                          for i, r in enumerate(whole["days"])]), {})
+    lunches = [it["start_time"] for it in items if it["type"] == "meal"]
+    assert all("11:30" <= t <= "14:00" for t in lunches)                      # 점심 시각 지킴

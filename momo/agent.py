@@ -533,12 +533,8 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
         return out
 
     def day_km(row, start, di):
-        opt = planner.optimize_day(spec, list(row), start)
-        pts = [start] + [planner._pcoord(spec, x.place_id) for x in opt]
-        if di == nd - 1:
-            pts.append(center)          # 마지막 날은 귀가 출발점(지역 중심)까지
-        pts = [p for p in pts if p]
-        return sum(_km(a, b) for a, b in zip(pts, pts[1:])), opt
+        opt, k = planner.tsp_quick(spec, list(row), start, center if di == nd - 1 else None)
+        return k, opt
 
     def insert_pos(row):
         return next((i for i, x in enumerate(row) if x.role == "stay"), len(row))
@@ -578,7 +574,9 @@ def route_whole(spec: planner.TripSpec, days: list[list]) -> tuple[list[list], l
                             break
         if not improved:
             break
-    rows = [day_km(rows[i], st[i], i)[1] for i in range(nd)]
+    allowed = {x.place_id for r in rows for x in r} | {planner.MEAL_ID}
+    for i in range(nd):
+        rows[i] = planner.best_day_order(spec, rows, i, st[i], center if i == nd - 1 else None, allowed)
     moved = []
     for i, r in enumerate(rows):
         for x in r:
@@ -605,12 +603,13 @@ def route_proposal(spec: planner.TripSpec, days: list[list], scope: str = "day")
         pts = [p for p in [start] + [planner._pcoord(spec, x.place_id) for x in row] if p]
         return round(sum(_km(a, b) for a, b in zip(pts, pts[1:])), 1)
 
-    new_rows, last_stay, starts = [], None, []
+    allowed_all = {x.place_id for r in days for x in r} | {planner.MEAL_ID}
+    new_rows, last_stay, starts = [list(r) for r in days], None, []
     for row in days:
-        start = planner._pcoord(spec, last_stay) if last_stay else center
-        starts.append(start)
-        new_rows.append(planner.optimize_day(spec, list(row), start))
+        starts.append(planner._pcoord(spec, last_stay) if last_stay else center)
         last_stay = next((x.place_id for x in row if x.role == "stay"), None) or last_stay
+    for i in range(len(days)):
+        new_rows[i] = planner.best_day_order(spec, new_rows, i, starts[i], center if i == len(days) - 1 else None, allowed_all)
     moved = []
     if scope == "all":
         new_rows, moved = route_whole(spec, days)
@@ -618,8 +617,10 @@ def route_proposal(spec: planner.TripSpec, days: list[list], scope: str = "day")
         vb = len(planner.validate(spec, sched(days), allowed))
         va = len(planner.validate(spec, sched(new_rows), allowed))
         tb, ta = sum(_travel_by_day(sched(days)).values()), sum(_travel_by_day(sched(new_rows)).values())
-        if va > vb or ta >= tb:         # 규칙 위반이 늘거나 실제 이동이 줄지 않으면 날짜별 최적화로
-            new_rows, moved = [planner.optimize_day(spec, list(r), s) for r, s in zip(days, starts)], []
+        if va > vb or ta >= tb:         # 규칙 위반이 늘거나 실제 이동이 줄지 않으면 일별 최적화로
+            new_rows, moved = [list(r) for r in days], []
+            for i in range(len(days)):
+                new_rows[i] = planner.best_day_order(spec, new_rows, i, starts[i], center if i == len(days) - 1 else None, allowed_all)
     before, after = _travel_by_day(sched(days)), _travel_by_day(sched(new_rows))
     out = []
     for i, d in enumerate(spec.days):
