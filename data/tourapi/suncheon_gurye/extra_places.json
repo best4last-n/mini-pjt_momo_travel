@@ -1,5 +1,568 @@
 [
  {
+  "contentid": "126366",
+  "title": "천은사(구례)",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주통합특별시 구례군 광의면 노고단로 209",
+  "lat": 35.2730927689,
+  "lng": 127.4763084399,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/76/4098976_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "천은사는 구례읍 북쪽 9㎞ 지점, 지리산 일주 도로 입구에 위치하고 있으며, 신라 흥덕왕 3년 (828년)에 덕운조사와 인도의 승려 ‘스루’가 터를 닦고 지은 절로서 화천양사라 하여 화엄사와 함께 지리산 3대 사찰로 손꼽힌다. 임진왜란 때 불타 없어진 것을 조선 광해군 2년(1610년)에 혜정 선사가 다시 지었으나 숙종 2년(1676년)에 불에 타버려 그 이듬해 절을 지었다가 영조 49년(1773)에 화재를 당해, 영조 51년 (1775년)에 혜암 선사가 다시 지어 오늘에 이르렀다.\n\n천은사의 본래 이름은 828년 인도 승려와 덕운 조사가 창건할 당시 경내에 이슬처럼 맑은 차가운 샘이 있어 감로사라 했는데, 이 물을 마시면 흐렸던 정신이 맑아진다 하여 많은 스님들이 몰려들어 한때는 천명이 넘는 스님이 지내기도 했으며 고려 충렬왕 때는  남방 제일 사찰로 승격되기도 했다. 그러나 임진왜란으로 불탄 뒤 중건할 때 샘가에 큰 구렁이가 자주 나타나기에 잡아 죽였더니 샘이 솟아나지 않았다고 한다. 그래서 샘이 숨었다 하여 조선 숙종 4년(1677년)부터 천은사라 이름을 바꾸었는데, 이상하게도 이름을 바꾼 후부터  원인 모를 화재가 잦고 재화가  끊이지 않았다. 주민들도 절의 수기를 지켜주는 구렁이를 죽였기 때문이라며 두려워하였다. 이 소식을 전해 들은 조선 4대 명필의 한 사람인 원교 이광사가 지리산 천은사라는 글씨를 물 흐르는 듯한 서체로 써서 걸었더니 이후로는 화재가  일어나지 않았다고 한다. 지금도 새벽녘 고요한 시간에는 일주문 현판 글씨에서 물 흐르는 소리가 은은하게 들린다고 한다.",
+  "homepage": "천은사 http://www.choneunsa.org구례군 문화관광 https://www.gurye.go.kr/",
+  "intro": {
+   "contentid": "126366",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "천은사 종무소 061-781-4800",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "상시 개방",
+   "parking": "가능",
+   "chkbabycarriage": "불가",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "천은사는 구례읍 북쪽 9㎞ 지점, 지리산 일주 도로 입구에 위치하고 있으며, 신라 흥덕왕 3년 (828년)에 덕운조사와 인도의 승려 ‘스루’가 터를 닦고 지은 절로서 화천양사라 하여 화엄사와 함께 지리산 3대 사찰로 손꼽힌다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/76/4098976_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/75/4098975_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/75/4098975_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/73/4098973_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/4098973_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/72/4098972_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/72/4098972_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "조선 4대 명필 원교 이광사가 쓴 일주문 현판 글씨가 물 흐르는 듯한 서체로 유명하며, 새벽 고요한 시간에는 글씨에서 물소리가 들린다는 전설이 있어요",
+   "신라 흥덕왕 3년(828년) 창건된 지리산 3대 사찰로, 본래 이름은 '감로사'였으나 샘이 솟지 않게 되면서 '천은사(샘이 숨었다)'로 바뀐 독특한 유래를 지녔어요",
+   "지리산 일주 도로 입구에 자리해 지리산 탐방과 함께 둘러보기 좋은 위치이며, 화엄사와 함께 지리산을 대표하는 고찰이에요"
+  ],
+  "guide_tips": "일주문에 들어서면서 원교 이광사의 현판 글씨를 먼저 감상해보세요. 물 흐르는 듯한 서체가 인상적이에요. 새벽 시간대에 방문하면 고요한 분위기 속에서 현판 글씨의 전설을 더 실감나게 느낄 수 있어요. 주차장이 있어 차량 이용이 편리하며, 지리산 일주 도로 입구에 있어 지리산 탐방 전후로 들르기 좋은 위치예요.",
+  "companion_notes": {
+   "elder": "경내 지형과 계단 상황은 현장 확인이 필요해요. 주차장에서 경내까지 거리와 경사도를 미리 확인하시면 좋겠어요.",
+   "child": "유모차 출입이 불가하니 아기띠나 업는 방식을 준비하세요. 경내 환경과 어린이 편의시설은 현장 확인이 필요해요."
+  }
+ },
+ {
+  "contentid": "2358186",
+  "title": "쌍산재",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주통합특별시 구례군 마산면 장수길 3-2",
+  "lat": 35.2156749575,
+  "lng": 127.4980634365,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/53/4101153_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "쌍산재는 지리산권 전남 구례군 소재 고택 한옥으로 그 의미는 휘(諱) 형순(炯淳), 자(字) 내명(乃明), 호(號) 쌍산(雙山)이며  ‘쌍산’은 올곧은 선비의 품격을 의미하며 벼슬을 탐하지 않고 늘 글 보기만을 즐겨 하셨던 쌍산(雙山)의 개인 서재(齋)이다. 가훈으로는 \"집안 화목\"을 가장 중시하였으며 특히 안채의 뒤주는 그 의미가 특별하다.\n과거 춘궁기 시절 봄에는 맥류를 가을에는 미곡을 채워 두고 식량이 부족한 어려운 이웃에게 필요한 만큼 사용하고 그 해에 이자 없이 받아 채워 두고 그다음 해에 또다시 사용하게 했던 나눔의 뒤주가 현재 보존되어 있다. 운영자의 선조는 일제 강점기에 일본식 이름으로 바꾸지 않았으며, 자신을 세상에 크게 드러내지 않고 평생 책과 자연을 벗 삼아 세속에 구속받지 않은 전형적인 유학자이셨다. 이런 조상의 삶의 역사인 한옥을 체험할 수 있는 색다른 쉼터로 후손에게 우리 것에 대한 소중한 교육의 장으로서, 어른들은 어릴 적 추억으로 격동기 시절 우리나라가 겪었던 애증의 시절을 느끼고 체험할 수 있는 공간으로 활용하고 있다.\n또한 tvN 예능 윤스테이 촬영지였으며, 관람은 한낮에 망중한을 전통 정원을 품은 고택 쌍산재 마루에서 차 한 잔과 더불어 한옥의 여유로움을 잠시나마 체험할 수 있다.",
+  "homepage": "https://ssangsanje.com",
+  "intro": {
+   "contentid": "2358186",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "061-782-5179",
+   "opendate": "",
+   "restdate": "매주 화요일",
+   "expguide": "",
+   "expagerange": "중학생부터 관람 가능",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "- 11:00~16:30- 입장 마감 16:00",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "쌍산재는 지리산권 전남 구례군 소재 고택 한옥으로 그 의미는 휘(諱) 형순(炯淳), 자(字) 내명(乃明), 호(號) 쌍산(雙山)이며 ‘쌍산’은 올곧은 선비의 품격을 의미하며 벼슬을 탐하지 않고 늘 글 보기만을 즐겨 하셨던 쌍산(雙山)의 개인 서재(齋)이다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/53/4101153_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/57/4101157_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/57/4101157_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/56/4101156_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/56/4101156_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/55/4101155_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/55/4101155_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "tvN 예능 '윤스테이' 촬영지로 알려진 지리산권 구례 고택",
+   "춘궁기 때 이웃과 나눴던 '나눔의 뒤주'가 안채에 실제 보존되어 있어요",
+   "전통 정원을 품은 마루에서 차 한 잔과 함께 한옥의 여유를 느낄 수 있습니다",
+   "일제강점기에도 창씨개명을 거부한 선비 가문의 역사가 담긴 공간이에요"
+  ],
+  "guide_tips": "관람 시간은 11시부터 16시 30분까지이며 입장 마감은 16시예요. 마루에 앉아 차를 마시며 전통 정원을 감상하는 시간을 넉넉히 두시면 좋습니다. 매주 화요일은 휴무이니 방문 전 확인하세요.",
+  "companion_notes": {
+   "elder": "마루에 앉아 차를 마시며 쉴 수 있어 편안한 관람이 가능하며, 주차 시설이 있어요.",
+   "child": "중학생부터 관람 가능하니 참고하세요. 전통 한옥과 나눔의 뒤주 등 역사 교육 장소로 의미 있습니다."
+  }
+ },
+ {
+  "contentid": "2714103",
+  "title": "섬진강 대나무숲길",
+  "kind": "attraction",
+  "contenttypeid": "28",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주 구례군 구례읍 원방리 1",
+  "lat": 35.1863084197,
+  "lng": 127.4652895126,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/24/4105824_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "섬진강을 따라 조성된 약 2.5km의 산책로로, 대나무 향과 강바람을 느끼며 걷다 보면 코스모스와 야생화가 반기는 생태탐방로로 이어진다. 담양의 대숲과 달리 섬진강과 나란히 걸으며 지리산 능선까지 함께 감상할 수 있는 것이 특징이다. 초입에는 초승달, 안쪽에는 보름달 모양의 포토존이 마련되어 있고, 해가 지고 어둠이 내리면 야간 조명이 켜져 낮과는 다른 분위기를 자아낸다. 몸과 마음이 절로 편안해지는 이 길은 구례를 대표하는 힐링 명소로 꾸준히 사랑받고 있다.",
+  "homepage": "https://www.gurye.go.kr/tour",
+  "intro": {
+   "contentid": "2714103",
+   "contenttypeid": "28",
+   "openperiod": "",
+   "reservation": "",
+   "infocenterleports": "061-780-2390",
+   "scaleleports": "",
+   "accomcountleports": "",
+   "restdateleports": "연중무휴",
+   "usetimeleports": "상시 개방",
+   "usefeeleports": "",
+   "expagerangeleports": "",
+   "parkingleports": "",
+   "parkingfeeleports": "",
+   "chkbabycarriageleports": "",
+   "chkpetleports": "",
+   "chkcreditcardleports": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "섬진강을 따라 조성된 약 2.5km의 산책로로, 대나무 향과 강바람을 느끼며 걷다 보면 코스모스와 야생화가 반기는 생태탐방로로 이어진다. 담양의 대숲과 달리 섬진강과 나란히 걸으며 지리산 능선까지 함께 감상할 수 있는 것이 특징이다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/24/4105824_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/35/4105835_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/35/4105835_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/32/4105832_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/32/4105832_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/27/4105827_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/27/4105827_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "섬진강과 나란히 걸으며 지리산 능선까지 한눈에 담는 약 2.5km 산책로",
+   "담양 대숲과 달리 강바람과 대나무 향을 동시에 느낄 수 있는 구조",
+   "초승달·보름달 모양 포토존과 야간 조명으로 낮과 밤 각각 다른 분위기 연출",
+   "대나무숲 끝자락에 코스모스·야생화가 이어지는 생태탐방로 코스"
+  ],
+  "guide_tips": "초입 초승달 포토존에서 시작해 안쪽 보름달 포토존까지 왕복 약 1시간이면 여유롭게 둘러볼 수 있어요. 해질녘에 방문하면 지리산 능선 실루엣과 야간 조명이 켜지는 순간을 함께 담을 수 있습니다. 강변을 따라 평탄하게 조성되어 있어 천천히 걸으며 대나무 향과 강바람을 즐기시면 좋아요.",
+  "companion_notes": {
+   "elder": "강변 평탄한 산책로라 큰 경사는 없으나, 2.5km 왕복 거리와 주차장 위치는 현장 확인이 필요해요.",
+   "child": "평탄한 길이라 유모차 동행 가능성이 있으나, 노면 상태와 포토존 주변 안전 여부는 현장 확인이 필요합니다."
+  }
+ },
+ {
+  "contentid": "129489",
+  "title": "남해독일마을",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "",
+  "must_include": false,
+  "addr": "경상남도 남해군 독일로 89-7",
+  "lat": 34.8000474598,
+  "lng": 128.0383401826,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/79/3304479_image2_1.jpg",
+  "image_license": "Type3",
+  "overview": "남해 독일마을은 1960~70년대 독일로 파견되었던 광부와 간호사들이 귀국 후 정착하며 형성된 독특한 테마 마을이다. 파독 근로자들의 삶과 문화를 기념하고 이들의 정착을 돕기 위해 조성되었으며, 언덕을 따라 늘어선 독일식 주택들이 마치 유럽에 온 듯한 이국적인 풍경을 자아낸다.\n붉은 지붕과 알록달록한 외벽이 특징인 마을 주택 일부는 여행객을 위한 숙박 시설로 운영되어 현지 가옥을 체험할 수 있는 기회를 제공한다. 또한 마을 내 카페와 음식점에서는 독일식 소시지와 맥주 등을 맛볼 수 있어, 한국 속 작은 독일의 정취를 오감으로 만끽하기에 충분하다.",
+  "homepage": "http://남해독일마을.com",
+  "intro": {
+   "contentid": "129489",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "055-867-8897",
+   "opendate": "",
+   "restdate": "점포별로 상이함",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "점포별로 상이함",
+   "parking": "가능",
+   "chkbabycarriage": "없음",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "남해 독일마을은 1960~70년대 독일로 파견되었던 광부와 간호사들이 귀국 후 정착하며 형성된 독특한 테마 마을이다. 파독 근로자들의 삶과 문화를 기념하고 이들의 정착을 돕기 위해 조성되었으며, 언덕을 따라 늘어선 독일식 주택들이 마치 유럽에 온 듯한 이국적인 풍경을 자아낸다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/79/3304479_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/88/3304488_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/88/3304488_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/74/3304474_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/74/3304474_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/86/3304486_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/86/3304486_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "1960~70년대 독일로 파견된 광부·간호사들이 귀국 후 실제 정착한 마을로, 파독 근로자의 역사가 살아있는 곳",
+   "언덕을 따라 늘어선 붉은 지붕과 알록달록한 외벽의 독일식 주택들이 한국 속 유럽 풍경을 연출",
+   "일부 독일식 가옥이 숙박 시설로 운영되어 현지 주택에서 머물며 이국적 분위기를 체험 가능",
+   "마을 내 카페와 음식점에서 독일식 소시지·맥주 등을 맛보며 독일 문화를 오감으로 경험"
+  ],
+  "guide_tips": "언덕길을 따라 산책하며 독일식 주택 외관을 감상하고, 마을 곳곳의 카페나 음식점에서 독일 음식을 맛보는 코스를 추천해요. 각 점포마다 운영시간이 다르니 방문 전 문의(055-867-8897)하시면 좋습니다. 주차는 가능하니 차량 이용이 편리하고, 언덕 풍경과 알록달록한 주택을 배경으로 사진 찍기 좋은 포인트가 많아요.",
+  "companion_notes": {
+   "elder": "언덕을 따라 조성된 마을이라 경사가 있을 수 있으니, 노약자 동반 시 보폭을 천천히 조절하며 산책하시길 권해요. 주차 후 이동 거리나 경사 정도는 현장 확인이 필요합니다.",
+   "child": "유모차 대여 시설은 별도로 없으니 개인 유모차를 준비하시면 좋아요. 언덕길이 있어 유모차 이동 시 다소 불편할 수 있으니, 아이와 함께 천천히 걸으며 독특한 주택 풍경을 구경하는 여유로운 일정을 추천해요."
+  }
+ },
+ {
+  "contentid": "2738669",
+  "title": "천개의향나무숲",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주통합특별시 구례군 광의면 천변길 12",
+  "lat": 35.2267668147,
+  "lng": 127.4603243706,
+  "tel": "",
+  "image_url": "http://tong.visitkorea.or.kr/cms/resource/58/3552858_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "인위적인 조경에서 벗어나 숲이 주는 자연스러움을 강조한 천 개의 향나무 숲은 평온하고 안락한 느낌을 주는 곳이다. 토종 향나무, 가이스카 향나무, 서양 향나무 등 천 여 그루의 향나무가 길게 뻗어 있는 숲길은 세상의 근심을 잊고 자연과 동화되어 마음이 정화되는 기분을 느끼게 해 준다.  향나무 숲길 뿐만 아니라 100년이 넘은 감나무 세 그루에서 느껴지는 세월의 깊이가 담긴 오색 정원, 게으름을 만끽하고 싶은 늘보 정원, 허브향 가득 한 향기 정원, 큰 돌에 앉아 사사로운 생각들을 머릿속에서 지워 주는 멍석 정원 등 한참을 느리고, 편안하게 다니다 보면 자연이 주는 아름다움 속에서 마음의 안정을 찾게 된다.",
+  "homepage": "<a href=\"https://www.instagram.com/cheon_hyang_\"target=\"_blank\" title=\"새창 : 천개의향나무숲 홈페이지로 이동\">https://www.instagram.com/cheon_hyang_</a>",
+  "intro": {
+   "contentid": "2738669",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "061-783-1004",
+   "opendate": "",
+   "restdate": "매주 화요일",
+   "expguide": "1박 2일 정원체험",
+   "expagerange": "",
+   "accomcount": "100명",
+   "useseason": "",
+   "usetime": "09:00~17:00",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "인위적인 조경에서 벗어나 숲이 주는 자연스러움을 강조한 천 개의 향나무 숲은 평온하고 안락한 느낌을 주는 곳이다. 토종 향나무, 가이스카 향나무, 서양 향나무 등 천 여 그루의 향나무가 길게 뻗어 있는 숲길은 세상의 근심을 잊고 자연과 동화되어 마음이 정화되는 기분을 느끼게 해 준다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "http://tong.visitkorea.or.kr/cms/resource/58/3552858_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "http://tong.visitkorea.or.kr/cms/resource/65/3552865_image2_1.jpg",
+    "thumb": "http://tong.visitkorea.or.kr/cms/resource/65/3552865_image3_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "http://tong.visitkorea.or.kr/cms/resource/59/3552859_image2_1.jpg",
+    "thumb": "http://tong.visitkorea.or.kr/cms/resource/59/3552859_image3_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "http://tong.visitkorea.or.kr/cms/resource/66/3552866_image2_1.jpg",
+    "thumb": "http://tong.visitkorea.or.kr/cms/resource/66/3552866_image3_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "토종·가이스카·서양 향나무 등 천여 그루가 길게 뻗은 숲길을 따라 향나무 향기를 맡으며 산책할 수 있어요",
+   "100년 넘은 감나무 세 그루가 있는 오색 정원, 허브향 가득한 향기 정원, 멍석 정원 등 테마별 정원을 천천히 둘러볼 수 있어요",
+   "1박 2일 정원체험 프로그램이 운영되어 숲에서 여유로운 시간을 보낼 수 있어요"
+  ],
+  "guide_tips": "향나무 숲길부터 시작해 오색 정원, 늘보 정원, 향기 정원, 멍석 정원 순으로 천천히 걷는 게 좋아요. 운영시간은 09:00~17:00이며 매주 화요일은 휴무예요. 서두르지 말고 느리게 걷다 보면 자연스럽게 마음이 편안해지는 곳이에요.",
+  "companion_notes": {
+   "elder": "숲길과 정원을 천천히 걷는 코스라 노약자 동반에 무리 없으나, 구체적인 경사나 계단 정보는 현장 확인이 필요해요.",
+   "child": "향나무 숲길과 여러 테마 정원을 자유롭게 둘러볼 수 있어 아이들과 산책하기 좋으나, 유모차 이용 가능 여부는 현장 확인이 필요해요."
+  }
+ },
+ {
+  "contentid": "2707924",
+  "title": "와온해변",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "순천",
+  "must_include": false,
+  "addr": "전남광주통합특별시 순천시 해룡면 상내리",
+  "lat": 34.8493409467926,
+  "lng": 127.523703800491,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/54/3496254_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "와온해변은 전남광주통합특별시 순천시 해룡면 상내리 와온마을에 위치한 해변이다. 한 스님이 인근 상봉우리에 있는 바위를 보고 소가 누워 있는 형상을 하고 있으며, 산 아래로 따뜻한 물이 흐른다고 말해 이후 부터 와온[臥溫]이라 부른다고 한다. 남서쪽으로는 고흥반도와 순천만, 동쪽으로는 전남광주통합특별시 여수시 율촌면 가장리에 인접한 조용한 해변으로 길이는 약 3㎞다. 낙조풍경이 아름다운 곳으로 와온해변 앞에 있는 솔섬 너머로 해가 넘어가는 모습은 장관을 연출 시킨다. 썰물로 인해 드넓은 개펄이 드러나는데, S자 라인으로 좁고 구불구불한 물길이 생긴다. 또한 흑두루미를 비롯한 겨울 철새의 모습을 볼 수도 있다.",
+  "homepage": "순천여행 https://www.suncheon.go.kr/tour",
+  "intro": {
+   "contentid": "2707924",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "061-749-3114",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "상시 개방",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "와온해변은 전남광주통합특별시 순천시 해룡면 상내리 와온마을에 위치한 해변이다. 한 스님이 인근 상봉우리에 있는 바위를 보고 소가 누워 있는 형상을 하고 있으며, 산 아래로 따뜻한 물이 흐른다고 말해 이후 부터 와온[臥溫]이라 부른다고 한다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/54/3496254_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/51/3496251_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/51/3496251_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/52/3496252_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/52/3496252_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/53/3496253_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/53/3496253_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "솔섬 너머로 해가 넘어가는 낙조 풍경이 장관을 이루는 약 3km 길이의 조용한 해변",
+   "썰물 때 드넓은 개펄 위로 S자 라인의 좁고 구불구불한 물길이 생기는 독특한 풍경",
+   "흑두루미를 비롯한 겨울 철새를 관찰할 수 있는 자연 생태 명소"
+  ],
+  "guide_tips": "낙조 감상을 원하신다면 해 질 무렵 방문을 추천드려요. 썰물 시간대에 맞춰 가시면 개펄 위로 S자 형태의 물길이 만들어지는 특별한 풍경을 사진에 담으실 수 있습니다. 겨울철에는 흑두루미 등 철새 관찰이 가능하니 쌍안경을 준비하시면 좋아요.",
+  "companion_notes": {
+   "elder": "개펄 지형이므로 미끄러울 수 있어 편한 신발과 주의가 필요합니다. 구체적인 산책로 시설은 현장 확인이 필요해요.",
+   "child": "넓은 개펄에서 자연 관찰이 가능하지만, 미끄러운 지형이므로 안전에 유의하셔야 합니다. 유모차 이용 가능 여부는 현장 확인이 필요해요."
+  }
+ },
+ {
+  "contentid": "2616164",
+  "title": "지리산치즈랜드",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "구례",
+  "must_include": false,
+  "addr": "전남광주통합특별시 구례군 산동면 산업로 1590-62",
+  "lat": 35.2778801352,
+  "lng": 127.4217468013,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/44/4054444_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "1979년 젖소 두 마리로 착유를 시작했던 초원목장은 30여 년간의 경험을 바탕 삼아 더 많은 사람에게 낙농산업과 우유를 알리기 위해 2012년 체험 목장 지리산치즈랜드를 건립하였다. 지리산치즈랜드에서는 수제 치즈와 요구르트를 유통하고 있으며, 체험장에서는 모차렐라 치즈 만들기, 송아지 우유 먹이기, 풀 썰매 타기 등의 체험을 할 수 있다. 푸른 초원목장에 130 여두의 젖소를 방목하고 있고, 호수가 인접해 있어 아름다운 풍경을 자아낸다. 지리산치즈랜드의 특별함은 자연이라고 할 수 있다. 풍경, 꽃 그리고 초지가 어우러진 눈부신 푸르름과 향기가 그 특별함이다.",
+  "homepage": "공식 인스타그램 https://www.instagram.com/jcheeseland",
+  "intro": {
+   "contentid": "2616164",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "061-782-2587",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "09:00~18:00",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "1979년 젖소 두 마리로 착유를 시작했던 초원목장은 30여 년간의 경험을 바탕 삼아 더 많은 사람에게 낙농산업과 우유를 알리기 위해 2012년 체험 목장 지리산치즈랜드를 건립하였다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/44/4054444_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/59/4061559_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/59/4061559_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/61/4061561_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/61/4061561_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/56/4061556_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/56/4061556_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "1979년부터 이어온 초원목장의 30여 년 경험을 바탕으로 만든 수제 치즈와 요구르트를 직접 맛볼 수 있어요",
+   "130여 두의 젖소가 푸른 초원에서 방목되는 모습을 가까이서 볼 수 있고, 송아지에게 직접 우유를 먹이는 체험도 가능해요",
+   "모차렐라 치즈를 직접 만들어보는 체험과 풀 썰매 타기 등 아이들이 좋아할 만한 다양한 체험 프로그램이 준비되어 있어요",
+   "호수가 인접해 있어 초지와 어우러진 목가적인 풍경 속에서 여유로운 시간을 보낼 수 있어요"
+  ],
+  "guide_tips": "체험 프로그램은 모차렐라 치즈 만들기부터 시작하시면 좋고, 이후 송아지 우유 먹이기와 풀 썰매 타기 순서로 즐기시면 됩니다. 오전 시간대에 방문하시면 젖소들이 더 활발하게 움직이는 모습을 보실 수 있어요. 목장 전체를 둘러보고 체험까지 즐기시려면 2~3시간 정도 여유 있게 계획하세요.",
+  "companion_notes": {
+   "elder": "초원목장과 호수 주변을 걷는 코스가 있으니 편한 신발을 준비하시고, 체험 프로그램 참여 시 이동 거리와 소요 시간은 현장에서 확인하시는 게 좋습니다.",
+   "child": "모차렐라 치즈 만들기, 송아지 우유 먹이기, 풀 썰매 타기 등 아이들이 직접 참여할 수 있는 체험이 다양하게 준비되어 있어요. 목장 환경이므로 활동하기 편한 옷차림을 권해드립니다."
+  }
+ },
+ {
   "contentid": "317559",
   "title": "사성암(구례)",
   "kind": "attraction",
@@ -69,15 +632,167 @@
    }
   ],
   "highlights": [
-   "높이 20m 바위 사이에 박힌 듯한 약사전과 암벽 계단이 산과 하나 되어 만드는 독특한 건축 경관",
-   "약사전 아래로 섬진강·구례읍·지리산 능선이 한눈에 펼쳐지는 조망",
-   "원효대사가 손톱으로 새겼다는 전설이 전해지는 마애여래입상이 약사전 내 암벽에 직접 새겨져 있음",
-   "원효·도선·진각·의상 4명의 고승이 수도한 곳으로 544년 연기조사가 창건한 천년 고찰"
+   "높이 20m 바위 사이에 박혀 있는 듯한 약사전과 암벽을 따라 이어지는 건물들이 산과 하나 된 독특한 구조",
+   "약사전 아래로 섬진강과 구례읍, 지리산 능선이 한눈에 펼쳐지는 조망",
+   "원효·의상·도선·진각 4명의 고승이 수도했다는 역사를 간직한 천년 고찰",
+   "약사전 내 암벽에 새겨진 마애여래입상(원효대사가 손톱으로 새겼다는 전설)"
   ],
-  "guide_tips": "오산 정상까지 걸어 올라가거나 마을버스(왕복 3,400원, 13세 이하 2,800원)를 이용하실 수 있어요. 정상 주차장은 협소해 주차가 제한적이니 마을버스 이용을 권해드립니다. 약사전에서 내려다보는 섬진강과 지리산 조망이 압권이니 사진 촬영 포인트로 꼭 기억하세요.",
+  "guide_tips": "주차장이 협소해 차량 진입이 제한적이므로, 입구 주차장에서 마을버스(왕복 3,400원)를 이용하시는 게 편리해요. 약사전까지 오르면 섬진강과 지리산 능선이 한눈에 보이니 이곳에서 충분히 조망을 즐기시고, 암벽에 새겨진 마애여래입상도 꼭 확인해 보세요. 운영시간은 09:00~18:00이니 여유 있게 방문하시면 좋습니다.",
   "companion_notes": {
-   "elder": "오산 정상까지 올라가는 길과 암벽 사이 계단 구간이 있어 체력 안배가 필요합니다. 마을버스 이용 시 이동 부담을 줄일 수 있어요.",
-   "child": "바위 사이 계단과 높은 곳에 위치한 건물 구조상 어린이 동반 시 안전에 각별히 주의하셔야 합니다. 유모차 이용은 현장 확인이 필요해요."
+   "elder": "바위와 계단으로 이어지는 구조라 경사와 계단 구간이 있을 수 있으니 현장에서 동선을 확인하시고, 마을버스 이용 시 승하차 편의를 미리 문의해 보세요.",
+   "child": "마을버스는 13세 이하 2,800원이며, 바위 사이 건물 구조가 독특해 아이들이 흥미로워할 수 있어요. 다만 계단과 높은 곳이 많으니 안전에 유의하시고, 유모차 이용 가능 여부는 현장 확인이 필요합니다."
+  }
+ },
+ {
+  "contentid": "2858584",
+  "title": "남녘들밥상",
+  "kind": "restaurant",
+  "contenttypeid": "39",
+  "region": "suncheon_gurye",
+  "sigungu": "순천",
+  "must_include": false,
+  "addr": "전남광주통합특별시 순천시 하풍동길 21 (풍덕동, 오션팰리스)",
+  "lat": 34.9404037998,
+  "lng": 127.5067937306,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/74/2858574_image2_1.jpg",
+  "image_license": "Type3",
+  "overview": "순천 국가 정원 인근에 있는 남녘들 밥상은 순천의 대표 음식인 꼬막, 미나리를 이용한 요리로 구성된 다양한 한정식 메뉴가 준비되어 있다. 내부에 기본 홀도 있고 안쪽으로는 룸이 많아 가족 모임이나 중요한 손님을 모시고 식사를 즐기기에 좋다. 순천 꼬막정식에는 꼬막무침, 양념 꼬막 등 꼬막으로 만든 다양한 음식을 맛볼 수 있다.",
+  "homepage": "",
+  "intro": {
+   "contentid": "2858584",
+   "contenttypeid": "39",
+   "seat": "",
+   "kidsfacility": "0",
+   "firstmenu": "꼬막정식",
+   "treatmenu": "석쇠돼지불고기정식 / 보리굴비정식 / 철판낙지볶음정식 등",
+   "smoking": "",
+   "packing": "",
+   "infocenterfood": "0507-1389-3341",
+   "scalefood": "",
+   "parkingfood": "가능",
+   "opendatefood": "",
+   "opentimefood": "- 11:00~21:00- 준비시간 14:30~17:00- 마지막 주문 20:00",
+   "restdatefood": "매주 수요일",
+   "discountinfofood": "",
+   "chkcreditcardfood": "",
+   "reservationfood": "",
+   "lcnsno": "20110509144"
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "순천 국가 정원 인근에 있는 남녘들 밥상은 순천의 대표 음식인 꼬막, 미나리를 이용한 요리로 구성된 다양한 한정식 메뉴가 준비되어 있다. 내부에 기본 홀도 있고 안쪽으로는 룸이 많아 가족 모임이나 중요한 손님을 모시고 식사를 즐기기에 좋다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/74/2858574_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/72/2858572_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/72/2858572_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/73/2858573_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/2858573_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/75/2858575_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/75/2858575_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type3",
+    "credit": "한국관광공사"
+   }
+  ]
+ },
+ {
+  "contentid": "3076316",
+  "title": "낙안읍성 벚꽃길",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "순천",
+  "must_include": false,
+  "addr": "전남광주통합특별시 순천시 낙안면 충민길 30",
+  "lat": 34.906401074793,
+  "lng": 127.341822652758,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource/70/3497870_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "봄이 되면 순천 시내에서 낙안읍성으로 가는 민속마을 길은 온통 하얗게 벚꽃길이 펼쳐진다. 평균 3월 말 4월 초에 벚꽃은 절정을 이루고 봄바람에 눈처럼 휘날리는 벚꽃길을 감상하며 따라가다 보면 낙안읍성에 도착하게 된다. 낙안 벚꽃길은 상사댐 주변 일대의 예쁜 길로도 유명하다. 상사호를 중심으로 상사호길과 노동길 두 곳으로 총 14㎞에 이른 벚꽃길은 민속마을길로 이어지며 벚꽃이 만개하는 봄이 되면 상춘객들이 도로에 차를 멈추고 사진 촬영을 하는 바람에 주차장이 되는 풍경이 펼쳐지기도 한다. \n벚꽃이 피는 계절이 되면 봄을 맞아 새롭게 초록으로 물드는 산과 어우러져 낙안 벚꽃길은 그야말로 눈이 부신 세상으로 변신한다.\n민속마을길 끝에 낙안읍성민속마을이 있고 민속마을 전에 국립낙안민속자연휴양림을 둘러볼 수 있다.",
+  "homepage": "https://www.suncheon.go.kr/tour",
+  "intro": {
+   "contentid": "3076316",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "순천 낙안읍성관광안내소 061-749-8849",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "상시 개방",
+   "parking": "",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "봄이 되면 순천 시내에서 낙안읍성으로 가는 민속마을 길은 온통 하얗게 벚꽃길이 펼쳐진다. 평균 3월 말 4월 초에 벚꽃은 절정을 이루고 봄바람에 눈처럼 휘날리는 벚꽃길을 감상하며 따라가다 보면 낙안읍성에 도착하게 된다. 낙안 벚꽃길은 상사댐 주변 일대의 예쁜 길로도 유명하다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/70/3497870_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/73/3497873_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/73/3497873_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/74/3497874_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/74/3497874_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource/76/3497876_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource/76/3497876_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "순천 시내에서 낙안읍성까지 이어지는 14km 벚꽃 터널, 상사호를 중심으로 상사호길과 노동길 두 코스로 나뉘어요",
+   "3월 말~4월 초 절정기에는 봄바람에 눈처럼 휘날리는 벚꽃 풍경을 감상하며 드라이브할 수 있어요",
+   "초록으로 물드는 산과 하얀 벚꽃이 어우러진 상사댐 주변 풍경이 특히 아름다워요",
+   "벚꽃길 끝에 낙안읍성민속마을과 국립낙안민속자연휴양림이 있어 함께 둘러보기 좋아요"
+  ],
+  "guide_tips": "14km 벚꽃길을 천천히 드라이브하며 감상하시되, 절정기에는 사진 촬영하는 차량이 많아 교통 흐름이 느려질 수 있어요. 상사호 주변에서 벚꽃과 호수를 함께 담은 사진을 찍으신 후, 민속마을길을 따라 낙안읍성까지 이동하는 순서를 추천해요. 3월 말~4월 초 맑은 날 오전이 가장 화사한 벚꽃을 만날 수 있답니다.",
+  "companion_notes": {
+   "elder": "14km 드라이브 코스라 차량으로 편하게 감상하실 수 있어요. 중간중간 차를 세우고 사진 촬영이 가능하지만, 절정기에는 주차 공간 확보가 어려울 수 있으니 참고하세요.",
+   "child": "차 안에서 벚꽃 터널을 감상할 수 있어 어린 자녀와 함께 부담 없이 즐기기 좋아요. 낙안읍성민속마을까지 이동하면 아이들이 뛰어놀 수 있는 공간도 있답니다."
   }
  }
 ]

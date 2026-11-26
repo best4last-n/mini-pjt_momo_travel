@@ -1,0 +1,1 @@
+{"endpoint": "searchKeyword2", "params": {"keyword": "정지영 로스터즈", "lDongRegnCd": "41", "lDongSignguCd": "111", "numOfRows": 10, "pageNo": 1}, "data": {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"}, "body": {"items": "", "numOfRows": 0, "pageNo": 1, "totalCount": 0}}}}
