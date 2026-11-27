@@ -107,7 +107,7 @@ curl -X POST http://127.0.0.1:8000/query -H "Content-Type: application/json" \
 테스트와 평가:
 
 ```bash
-python -m pytest -q                                  # 회귀 테스트 158건 (LLM 호출 없이)
+python -m pytest -q                                  # 회귀 테스트 160건 (LLM 호출 없이)
 python evaluation/run_eval.py --round 2              # 인-아웃 20건 평가 (Bedrock 호출, 평가 기준일 2026-11-25 고정)
 #   --stage collect|judge|ragas|report|all 로 단계별 실행 가능
 ```
@@ -116,27 +116,29 @@ python evaluation/run_eval.py --round 2              # 인-아웃 20건 평가 (
 
 ## RAGAS 평가 결과
 
-contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별도 지표입니다. 기준치는 프로젝트 자체 기준입니다.
+contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별도 지표입니다. 기준치는 프로젝트 자체 기준입니다. **2차는 최종 실행(제출 코드)을 공식 결과로 씁니다.**
 
-| 지표 | 1차 | 2차 | 자체 기준 |
-|---|---|---|---|
-| context_recall | 0.248 | **0.591** | ≥ 0.70 |
-| context_precision | 0.548 | **0.526** | ≥ 0.70 |
-| faithfulness | 0.318 | **0.678** | ≥ 0.80 |
-| answer_relevancy | 0.443 | **0.462** | ≥ 0.80 |
+| 지표 | 1차 | 2차 사전 점검 (11-26) | **2차 최종** | 자체 기준 |
+|---|---|---|---|---|
+| context_recall | 0.248 | 0.591 | **0.439** | ≥ 0.70 |
+| context_precision | 0.548 | 0.526 | **0.508** | ≥ 0.70 |
+| faithfulness | 0.318 | 0.678 | **0.525** | ≥ 0.80 |
+| answer_relevancy | 0.443 | 0.462 | **0.562** | ≥ 0.80 |
 
-- 1차 → 2차 개선: 일정의 시각·이동시간·날씨·운영시간 판정은 도구가 만든 값인데 contexts에 장소 문서만 있었습니다. 도구 결과를 contexts에 포함해 faithfulness가 +0.36, context_recall이 +0.34 올랐습니다.
-- 기준 미달 해석: 기준 정답(reference)은 공정성을 위해 1차 전에 고정했고 '~라고 안내한다' 같은 기대 동작 서술이 많아 context_recall의 상한이 구조적으로 낮습니다. answer_relevancy는 모모 말투·기본값 안내·출처 문구가 섞여 낮게 나옵니다. 상세는 [evaluation/round2_report.md](evaluation/round2_report.md).
+- 1차 → 2차 개선: 일정의 시각·이동시간·날씨·운영시간 판정은 도구가 만든 값인데 contexts에 장소 문서만 있었습니다. 도구 결과를 contexts에 포함해 faithfulness(+0.21)·context_recall(+0.19)·answer_relevancy(+0.12)가 올랐습니다.
+- 사전 점검보다 낮아진 이유(추정): 사전 점검 뒤 답변에 오가는 길 시간표·기본값 안내·날씨·준비물 팁처럼 contexts 밖 코드 계산 문장이 늘었고, 지역이 7곳으로 늘어 검색 후보가 많아졌습니다.
+- 기준 미달 해석: 기준 정답(reference)은 공정성을 위해 1차 전에 고정했고 '~라고 안내한다' 같은 기대 동작 서술이 많아 context_recall의 상한이 구조적으로 낮습니다. 상세는 [evaluation/round2_report.md](evaluation/round2_report.md).
 
 ## 인-아웃 세트 통과율 (자체 평가)
 
 세트: [evaluation/test_queries.csv](evaluation/test_queries.csv) 20건 (positive 8 · negative 4 · edge 5 · guardrail 3 = 40/20/25/15%).
-통과 = 규칙 위반 0건(하드 게이트) **AND** expected_traits 전부 충족 **AND** forbidden 미검출 (Judge: Claude Sonnet 4.6, temperature 0).
+통과 = 규칙 위반 0건(하드 게이트) **AND** expected_traits 전부 충족 **AND** forbidden 미검출 (Judge: Claude Sonnet 4.6, temperature 0). 채점 장치(CSV SHA-256·Judge·규칙 검사)는 1차 전에 고정했습니다.
 
 - 1차 (Day 9 종료): **12 / 20** 통과 (guardrail 1/3, 규칙 위반 2건) — [round1_report.md](evaluation/round1_report.md)
-- 2차 (Day 10 개선 후): **17 / 20** 통과 (guardrail 3/3, 규칙 위반 0건, positive 8/8 · negative 4/4 · edge 2/5) — [round2_report.md](evaluation/round2_report.md)
-- 개선폭: **+5건** (주요 개선 사항: 실내 요청 시 실내 장소만 강제·오후만 수정, 출발지 시·군·구 표기, 거절 응답에도 출처 문구, 수원 데이터 수집, 도구 결과 contexts 포함)
-- 남은 실패: #15(Judge가 일차 첫 장소 '이동 0분'을 금지 조건으로 판정 → 이후 2일차 첫 구간을 숙소에서 계산하도록 개선), #16 해외 가벼운 모드·#17 LifeGalaxy add-on(추가 기능 미구현, 기획 단계에서 허용한 실패)
+- 2차 (Day 10, 제출 코드 최종 실행): **15 / 20** 통과 (guardrail **3/3**, positive 7/8 · negative 3/4 · edge 2/5) — [round2_report.md](evaluation/round2_report.md)
+- 개선폭: **+3건**, guardrail 1/3 → 3/3 (주요 개선 사항: 실내 요청 시 실내 장소만 강제·오후만 수정, 출발지 시·군·구 표기, 거절 응답에도 출처 문구, 수원 데이터 수집, 도구 결과 contexts 포함, 오가는 길 식사와 귀가 이동이 겹쳐 보이던 문제)
+- 2차 목표 85%(17건)에는 못 미쳤습니다. 11-26 사전 점검은 17/20이었지만, 이후 범위 확대(최대 8박 9일·7개 지역)와 실사용 개선(U26~U57)을 넣은 제출 코드로 다시 잰 결과를 공식 값으로 씁니다. 세 번의 2차 실행은 모두 보존했습니다(사전 점검 17/20 · 1회차 15/20 · 최종 15/20).
+- 남은 실패 5건: #12 범위 확대(3박 4일을 이제 지원 — 정답은 '1박 2일까지만 안내'), #15 '최대한 많이' 요청에서 오전이 비고 아침·점심 자리표시자가 이동 0분으로 이어짐(제출 후 수정), #8 Judge 불일치(이유는 '위반 없음', 판정은 실패 — 채점 장치 고정이라 그대로 보고), #16 해외 가벼운 모드·#17 LifeGalaxy add-on(미구현, 기획 단계에서 허용한 실패)
 
 추가로, 사용자 실사용 테스트에서 나온 문제 56건(U1~U57)을 고치고 회귀 테스트로 고정했습니다 — [evaluation/user_scenarios.csv](evaluation/user_scenarios.csv), `tests/test_user_scenarios.py`, SERVICE.md 3-8. 채점용 20건은 공정성을 위해 바꾸지 않았습니다.
 
@@ -155,10 +157,11 @@ contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별�
 - **화면 편집(넣기·빼기·순서·시간·운전 시간)은 LLM 없이 재계산**합니다. 빠르고 결과가 같고, 되돌리기를 20단계까지 할 수 있습니다.
 - **채점 장치는 1차 전에 고정**했습니다. CSV SHA-256, 커밋 해시, 평가 기준일 2026-11-25를 고정해 1→2차 비교를 공정하게 했습니다.
 - **사용자 실사용 테스트 → 저장된 기록으로 재현 → 회귀 테스트 먼저 → 수정 → 시나리오 한 줄 기록**을 운영 규칙으로 삼았습니다(U1~U57).
+- **평가 후 기능을 늘리면 공식 평가도 다시 잰다** — 사전 점검(17/20) 뒤 범위를 넓히고 기능을 더했더니 다시 잰 1회차가 15/20이었습니다. 20건 응답 전체를 코드로 검사해 같은 원인(귀가 이동과 오는 길 식사의 시간 겹침)이 3건에 있음을 찾아 고쳤고, 점수가 높은 회차를 고르지 않고 제출 코드의 최종 실행을 공식 값으로 했습니다.
 
 **남은 한계 · 향후 개선 방향**
 - RAGAS 4지표가 자체 기준에 못 미칩니다. reference를 근거 문장 중심으로 다시 쓰는 것은 다음 평가 주기에서 할 일입니다(이번엔 공정성 때문에 고정).
-- **2차 평가 뒤 기능을 많이 바꿨습니다(U1~U25).** 회귀 테스트 89건은 통과하지만, 20건 공식 평가는 아직 다시 돌리지 않았습니다.
+- 인-아웃 2차는 15/20으로 목표(17건)에 못 미쳤습니다. 남은 #15(강행군 요청의 오전 공백)는 제출 후 고칩니다. 채점 세트가 처음 범위(당일~1박 2일, 3개 지역) 기준이라 확대된 범위는 회귀 테스트(160건)와 실사용 시나리오로 검증합니다.
 - 이동시간은 추정입니다. 도로 경로는 OSRM과 요일·시간대 혼잡 보정이고, 국가교통정보센터 실시간·예측 정보는 키가 있을 때만 씁니다. 사용자가 운전 시간을 직접 고칠 수 있게 해 두었습니다.
 - 평점·리뷰 수는 없습니다. 카카오·네이버 키가 없고, Google Places는 프로젝트 규칙상 쓰지 않습니다.
 - 지원 지역은 7곳입니다(순천/구례·경주·수원·제주·강릉·동해·삼척·전주·완주·군산·통영·거제). 지역 추가는 설정과 수집만으로 됩니다(지역당 약 30분, TourAPI 하루 1,000건 한도). 처음 하는 전국 장소 검색은 6~12초 걸립니다.
@@ -181,4 +184,4 @@ contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별�
 - `src/guardrails/guardrails.py:43` `mask_pii` · `:92` `detect_injection` · `:106` `check_output` — 가드레일
 - `src/api/main.py:105` — `POST /query` (표준 규약: answer · contexts · trace) · `:178` `/query/async` · `:207` 요청 중지
 - `src/planning/brochure.py` — 계획서 데이터(일정·구간·지도·체크리스트) · `src/budget/costs.py` 예상 경비 · `src/export/export.py` Word·HTML 내보내기
-- `evaluation/run_eval.py` — 자체 평가(규칙 게이트 + Judge + RAGAS) · `tests/` 회귀 테스트 158건
+- `evaluation/run_eval.py` — 자체 평가(규칙 게이트 + Judge + RAGAS) · `tests/` 회귀 테스트 160건
