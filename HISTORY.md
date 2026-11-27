@@ -808,3 +808,8 @@
 - **사용자 요청**: 다음 할 일(#15) 진행 / .env와 .env.example의 키가 다른데 필요한 키가 견본에 다 있는지 점검.
 - **Claude 작업**: #15 원인 — 최종 평가 응답의 일정에 관광지가 0곳(식사 자리표시자·숙소만). trace: 1차 생성은 19개·위반 4건, 재생성 2·3차에서 LLM이 빈 선택을 돌려줬고 코드가 마지막(빈) 시도를 보정해 그대로 '승인 대기'. 수정(`planner.build_plan`): 시도별로 보정해 '보정 뒤 위반 최소 → 관광지 최다' 시도를 쓰고(trace에 '시도 N 사용'), 재생성이 관광지 0곳이면 다음 재생성에는 앞 시도의 위반을 다시 알려 줌. 실패 재현 테스트 먼저 작성(tests/test_regen_keep_best.py — 수정 전 실패 확인) → 수정 후 통과, 전체 161 통과. 같은 질문 실제 LLM 확인: 2차 재생성이 다시 비었지만 시도 1 보정본(관광지 10곳·위반 0건) 사용. 평가 이후 수정이라 round2_report·README·SERVICE 5절에 '평가 이후 수정, 수치 미반영'으로 표시. .env 점검(키 이름만): ITS_API_KEY가 견본에 빠져 있었음 → .env.example을 필수(TourAPI·AWS 3개)/선택(LangSmith·브이월드·ITS·카카오·네이버·MOMO_GEN_MODEL·MOMO_TODAY)으로 다시 씀, README 키 목록 갱신. .env의 키는 모두 견본에 있음.
 - **다음 할 일**: push(사용자 확인 후).
+
+### [2026-11-27 12:45] 기능별 버그 점검 · 리팩토링 버그 2건 수정 · 문서 기록
+- **사용자 요청**: (앞서) .env 키가 모두 쓰이는지 점검·필요 없으면 삭제 / 현재 기준 기능별 버그 점검과 관련 문서에 현재 상태 기록.
+- **Claude 작업**: .env 키 9개 모두 사용 중 — AWS 3개(boto3·langchain_aws가 환경변수로 읽음, ~/.aws 없음), LangSmith 3개(langsmith SDK가 읽음), TOURAPI·VWORLD·ITS(코드에서 직접) → 삭제할 키 없음. 점검 중 버그 발견·수정: ① `tourlive._client`·`_enrich`가 옛 `scripts/` 파일 경로로 수집 모듈을 불러와 관광공사 실시간 조회(장소 찾기·대안·귀가길 들를 곳·사진 보강)가 조용히 실패 → `src.ingest` import, 실제 TourAPI 조회 확인 ② 시작 카드 요청마다 `__import__("momo.options")`로 `No module named 'momo'` → STYLE_PRESETS 직접 import. 실패 재현 테스트 먼저(test_tourlive_loader.py·test_start_flow.py — 수정 전 실패 확인). 실서버 기능별 점검 스크립트(네트워크·LLM 포함) 31/31 정상 + 지출 삭제 별도 확인. 평가 영향: 평가 경로상 #3·#7·#9만 관련, #9 통과 → 수치 유지·기록. 전체 테스트 165 통과. 문서: SERVICE.md 3-10(버그 3건·평가 영향·점검 31항목), 머리말·3-7 수치, README(테스트 수·평가 이후 버그 문단), round2_report(평가 이후 발견 버그), AGENTS.md 4절 규칙 7(문자열 경로로 모듈 불러오기 금지), user_scenarios.csv U58~U60.
+- **다음 할 일**: archify로 앱 구조·업무 흐름 분석(사용자 요청), push(확인 후).

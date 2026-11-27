@@ -32,7 +32,7 @@ from src.shared.config import DEFAULT_DEPART, STATE_DB, today
 from src.shared.travel import km as travel_km
 from src.shared.llm import chat, structured
 from src.counsel.prompts import INFO_SYSTEM, PARSE_SYSTEM
-from src.counsel.options import MAX_NIGHTS
+from src.counsel.options import MAX_NIGHTS, STYLE_PRESETS
 from src.planning.schemas import DayPick, PickItem
 from src.counsel.schemas import ParsedRequest
 
@@ -1793,7 +1793,7 @@ def start_node(state: State) -> State:
     if assumed:
         lab = {"long_transport": "장거리 이동", "local_transport": "현지 이동", "companions": "동반자", "intensity": "여행 강도"}
         notes.append(", ".join(lab[a] for a in assumed) + "은(는) 기본값으로 정했어요. 오른쪽 '여행 조건'에서 바꿀 수 있어요")
-    preset = next((p for p in __import__("momo.options", fromlist=["x"]).STYLE_PRESETS if p["label"] == s.get("preset")), None)
+    preset = next((p for p in STYLE_PRESETS if p["label"] == s.get("preset")), None)
     request = (state.get("question") or "").strip() or f"{data.region_label(rid)} 여행"
     if preset:
         request += f" · 여행 스타일: {preset['label']}({preset['desc']})"

@@ -1,0 +1,1 @@
+{"endpoint": "locationBasedList2", "params": {"mapX": 128.673, "mapY": 36.089, "radius": 6000, "contentTypeId": "39", "arrange": "Q", "numOfRows": 20, "pageNo": 1}, "data": {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"}, "body": {"items": "", "numOfRows": 0, "pageNo": 1, "totalCount": 0}}}}

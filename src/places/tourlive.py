@@ -6,14 +6,13 @@
 """
 from __future__ import annotations
 
-import importlib.util
 import json
 import re
 from functools import lru_cache
 
 from src.shared import data
 from src.planning import hours
-from src.shared.config import DATA, ROOT
+from src.shared.config import DATA
 
 KIND = {"12": "attraction", "14": "attraction", "28": "attraction", "38": "attraction",
         "39": "restaurant", "32": "lodging", "15": "festival"}
@@ -21,10 +20,15 @@ KIND = {"12": "attraction", "14": "attraction", "28": "attraction", "38": "attra
 
 @lru_cache
 def _client():
-    spec = importlib.util.spec_from_file_location("collect_tourapi", ROOT / "scripts" / "collect_tourapi.py")
-    mod = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(mod)
-    return mod
+    """관광공사 API 호출 모듈(수집 파이프라인과 같은 코드). src/ 재구성 뒤 옛 scripts/ 경로로 불러와 실패하던 문제 수정(2026-11-27)."""
+    from src.ingest import collect_tourapi
+    return collect_tourapi
+
+
+def _enrich_module():
+    """사진·특장점 보강 모듈(수집 파이프라인과 같은 코드)."""
+    from src.ingest import enrich_places
+    return enrich_places
 
 
 def _norm(t: str) -> str:
@@ -137,9 +141,7 @@ def lookup(name: str, region: str) -> dict | None:
 def _enrich(p: dict) -> None:
     """수집 장소와 같은 수준으로: 사진 2~4장 + (관광지면) 특장점·관람 팁·동반자 메모. 실패해도 편입은 진행."""
     try:
-        spec = importlib.util.spec_from_file_location("enrich_places", ROOT / "scripts" / "enrich_places.py")
-        mod = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(mod)
+        mod = _enrich_module()
         p["images"] = mod.images(p)
         if p["kind"] in ("attraction", "festival"):
             import boto3
