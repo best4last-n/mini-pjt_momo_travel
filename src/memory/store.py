@@ -12,6 +12,33 @@ from src.shared.config import STATE_DB
 KST = ZoneInfo("Asia/Seoul")
 
 
+CHECKPOINT_KEEP = 2      # 세션마다 남길 LangGraph 체크포인트 수(코드는 최신 상태만 읽음 — get_state; 되돌리기는 undo 표)
+
+
+def prune_checkpoints(thread_id: str | None = None, keep: int = CHECKPOINT_KEEP) -> int:
+    """LangGraph 체크포인트를 세션(thread)별 최근 keep개만 남기고, 지운 체크포인트의 writes도 지운다. 지운 체크포인트 수.
+    대화 단계마다 전체 상태(계획서 포함)가 새로 쌓여 DB가 수백 MB로 커지던 문제(2026-11-27, 483MB) 대응.
+    thread_id를 주면 그 세션만(요청이 끝날 때마다), 없으면 전체(일괄 정리)."""
+    c = sqlite3.connect(STATE_DB)
+    try:
+        if not c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='checkpoints'").fetchone():
+            return 0
+        where, args = ("WHERE thread_id = ?", (thread_id,)) if thread_id else ("", ())
+        cur = c.execute(f"""DELETE FROM checkpoints WHERE rowid IN (
+            SELECT rowid FROM (SELECT rowid, ROW_NUMBER() OVER (PARTITION BY thread_id, checkpoint_ns
+                                                              ORDER BY checkpoint_id DESC) AS rn
+                               FROM checkpoints {where}) WHERE rn > ?)""", (*args, keep))
+        n = cur.rowcount
+        if c.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='writes'").fetchone():
+            c.execute(f"""DELETE FROM writes {where + (' AND' if where else 'WHERE')} NOT EXISTS (
+                SELECT 1 FROM checkpoints k WHERE k.thread_id = writes.thread_id AND k.checkpoint_ns = writes.checkpoint_ns
+                AND k.checkpoint_id = writes.checkpoint_id)""", args)
+        c.commit()
+        return n
+    finally:
+        c.close()
+
+
 def _conn() -> sqlite3.Connection:
     c = sqlite3.connect(STATE_DB)
     c.execute("""CREATE TABLE IF NOT EXISTS plans (

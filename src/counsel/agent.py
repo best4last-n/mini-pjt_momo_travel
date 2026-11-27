@@ -2367,6 +2367,10 @@ def handle_query(question: str, session_id: str | None = None, action: str | Non
         store.upsert_trip(sid, out["plan"], out.get("status") or "", out.get("plan_id") if out.get("status") == "확정" else None)
     if new_session:
         resp["trace"].insert(0, {"step": "session", "input": "", "output": "새 세션 시작"})
+    try:        # 대화 기록(messages)을 남긴 뒤라 예전 체크포인트는 필요 없음 — 세션별 최근 2개만(DB 비대화 방지, 2026-11-27)
+        store.prune_checkpoints(sid)
+    except Exception:
+        pass
     return resp
 
 

@@ -748,3 +748,25 @@
 - **사용자 요청**: 결정 — 2차 평가 다시 실행, 트레이스는 기존 LangSmith 기록 + 응답 trace로 증빙, 제출은 GitHub push와 zip 둘 다.
 - **Claude 작업**: 폴더에 복원된 .git(마지막 커밋 21949b7) 확인. 커밋 전 점검 — .env·sqlite·chroma_db·guide 미추적, 20MB 넘는 파일 없음, .env의 실제 키 값이 작업 트리 어디에도 없음. 11-26 2차 결과를 `evaluation/round2_precheck_report.md`·`evaluation/reports/round2_precheck_20261126/`로 보존(캐시 재사용 방지), run_eval.py의 변경 감지 경로 momo·app → src. 로컬 커밋 `3ac78a9`(push 안 함). 백그라운드: 2차 평가 `run_eval.py --round 2`(LangSmith 추적 끔), 빈 가상환경에 requirements 설치 후 pytest. 문서: README 지역 7곳·433곳, `run.sh`(serve·test·eval·index) 추가·README 안내, SERVICE.md 3-7을 제출 직전 기준으로 재작성.
 - **다음 할 일**: 평가·설치 점검 결과 확인 → round2 리포트 해석·README 점수·SERVICE 5절 → 시연 캡처(평가 끝난 뒤, Bedrock 동시 호출 방지) → LangSmith 기존 기록 캡처(사용자) → GitHub 저장소 생성(사용자) → push(확인 후)·zip.
+
+### [2026-11-27 10:55] 2차 평가 1회차 15/20 → 실패 원인 수정 · 재실행
+- **사용자 요청**: (앞 결정에 따라) 2차 평가 재실행 결과 확인·후속 진행. LangSmith 캡처 위치 문의 → 목록 화면·트레이스 상세 두 장 안내. 이 기록은 사용자 확인 후 남김.
+- **Claude 작업**: ① 빈 가상환경에 requirements만 설치 → pytest 156 통과(재현성 확인). ② 2차 1회차(코드 3ac78a9): 15/20(guardrail 2/3), RAGAS faithfulness 0.591 · answer_relevancy 0.53 · context_precision 0.531 · context_recall 0.447. 사전 점검(17/20) 대비 새 실패 #1·#12·#18, 새 통과 #15, 기존 실패 #16(해외)·#17(add-on). 원인: #1 — 귀가 이동 줄이 오는 길 저녁을 품어 Judge가 '시간 겹침'으로 판정(#5·#20 응답에도 같은 겹침, 코드로 전수 확인 — 가는 길엔 없음). #18 — LLM 조건 파싱이 출발지를 '서울'까지만 뽑음. #12 — 3박 4일 지원(최대 8박)으로 범위가 바뀐 의도된 변경, 테스트 세트는 고정이라 수정하지 않고 리포트에 명시. 수정: planner 귀가 줄을 오는 길 식사 뒤부터(계획서 귀가 카드는 route_leave·route_label·route_drive_min으로 U48 설계 유지), agent `_dep_with_gu`(질문의 같은 시·도 구·군으로 출발지 보완). 테스트 158 통과. 1회차 결과는 `evaluation/round2_run1_report.md`·`reports/round2_run1_20261127/`로 보존, 커밋 f3a71f6, 2차 재실행 시작. 최종 리포트에 사전 점검·1회차·최종을 모두 병기하기로 함.
+- **다음 할 일**: 재실행 결과 → 리포트·README·SERVICE 5절 → git 이력 실명·이메일 정리(noreply 주소 필요) → 시연 캡처 → push·zip.
+
+### [2026-11-27 11:15] README 누락 점검
+- **사용자 요청**: README에 누락된 내용이 없는지 점검. (앞서) LangSmith 캡처 2장을 evaluation/screenshots에 넣음 → 개인정보 없음 확인, README Observability 줄에 연결.
+- **Claude 작업**: 가이드 3-5 템플릿 8개 절은 모두 있음. 바로 고친 것 — ① ReAct를 '쓰지 않았다'고 적은 오류(실제 info_node가 create_agent + 도구 4개로 ReAct) → 패턴 표에 Day 3 ReAct 줄 추가, 적용 패턴 9→10개(1·2·3·4·6·7·8·10·11·12, SERVICE.md 3-4h C안과 일치) ② '최대 3박 4일' → 최대 8박 9일 ③ 테스트 152→158건 ④ 실사용 개선 U1~U25 → U1~U57(56건) ⑤ 한계에 로그인 없음·SQLite 단일 파일·계획 생성 40~90초 추가 ⑥ 핵심 코드 위치 줄 번호 갱신(+info_node).
+- **다음 할 일**: 2차 재실행 결과로 RAGAS 표·통과율(1차·사전 점검·1회차·최종)·남은 실패·한계의 '평가 다시 안 돌림' 문장·회고(1회차 회귀 교훈) 갱신, 시연 화면 절과 평가 산출물 목록 추가.
+
+### [2026-11-27 11:30] md 문서 간 정합성 점검·수정
+- **사용자 요청**: 각 md 문서 간 정합성 점검·수정.
+- **Claude 작업**: README·SERVICE·AGENTS·CLAUDE·evaluation/*.md의 핵심 사실(지역·기간·패턴 수·테스트 수·점수·코드 경로·모델명) 대조. 수정 — SERVICE.md: 머리말에 '현재 상태(제출본)' 요약(7개 지역·433곳, 당일~최대 8박 9일, C안 패턴 10개, src/ 구조, 테스트 158건)과 '뒤 절 결정이 우선, 바뀐 곳은 → 로 현재 값' 원칙 추가, 처음 목표는 '처음 목표(Seed 기준)'로 표기, 3-4 지원 길이·지원 지역에 확대 이력(→ 3박 4일 → 8박 9일, 3곳 → 7곳)과 평가 #12 영향, 3-6 (14) 기간 달력 '최대 4일 → 9일', 옛 경로 4곳(momo/·scripts/) → src 경로, 3-7 테스트 158건, 3-9 경로 문구. README: Seed 링크에 '처음 범위 기준'. evaluation/reference_drafts.md 명령 → `python -m src.ingest.draft_references --apply`. AGENTS·CLAUDE는 일치. HISTORY는 기록 문서라 과거 항목 수정 안 함.
+- **다음 할 일**: 2차 재실행 결과로 README(RAGAS·통과율·남은 실패·한계·회고)·SERVICE 3-7 A.2·5절 결과표·round2_report 해석을 같은 수치로 맞춤.
+
+### [2026-11-27 11:18] 상태 DB 정리(483MB → 35MB) · 자동 정리 · 2차 재실행 완료
+- **사용자 요청**: momo_state.sqlite가 과도하게 크니 정리 — 화면 확인용 복사 세션 삭제, 앞으로 커지지 않게 자동 정리 코드 추가(둘 다 사용자 선택). (앞서) 수집 데이터는 git 포함, 서비스 상태 DB(.sqlite)는 git 제외가 맞는지 확인 요청 → 수집 데이터(data/tourapi·index·route_cache 등)는 이미 포함, 상태 DB는 사용 기록뿐이고 첫 실행 때 자동 생성·483MB(GitHub 100MB 제한)·테스트 대화 기록이라 제외 유지, .gitignore 변경 없음.
+- **Claude 작업**: 원인 — LangGraph가 단계마다 전체 상태를 체크포인트로 쌓아 checkpoints 379MB·writes 82MB(코드는 최신 상태만 읽음, 되돌리기는 undo 표). 서버 중지 → 프로젝트 밖 백업 `..\momo_state_backup_20261127.sqlite`(무결성 ok) → 기록 기능 이전 세션 141개 대화를 체크포인트 이력에서 messages로 먼저 복원(backfill_messages) → 확인용 세션 23개(uicheck-…·u27~29, 계획 10건) 삭제 → 세션별 최근 체크포인트 2개만 → VACUUM·WAL 정리: 35.2MB 한 파일. 세션 7개 최신 상태가 백업과 동일, 확정 계획·공유·ics·지출·리포트·대화 기록 주소 모두 200. 코드: `store.prune_checkpoints()`(세션별 최근 2개, 고아 writes 삭제), handle_query 끝(대화 기록 저장 뒤)에서 그 세션만 정리. tests/test_prune_checkpoints.py 2건, 전체 160 통과.
+- **2차 재실행 결과(커밋 f3a71f6)**: 15/20, guardrail 3/3, 규칙 위반 2건(#15). #1·#18은 수정대로 통과. 새 실패 #8(Judge 이유는 '위반 없음'이라고 쓰고 금지 검출로 판정 — Judge 불일치), #15(아침·점심 '주변 식당' 자리표시자 사이 이동 0분 — 채점 규칙 게이트). RAGAS faithfulness 0.525 · answer_relevancy 0.562 · context_precision 0.508 · context_recall 0.439.
+- **정정**: 바로 앞 두 기록의 시각 '11:15'·'11:30'은 실제보다 늦게 적은 것으로, 실제 작업은 10:55~11:00 사이(이후 시각은 date로 확인해 적음).
+- **다음 할 일**: 2차 결과 처리 방향 결정(사용자) → 리포트·README·SERVICE 5절 수치 맞춤 → git 이력 실명·이메일 정리(noreply 주소 필요) → 시연 캡처 → push·zip.

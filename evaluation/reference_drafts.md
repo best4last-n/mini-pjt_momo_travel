@@ -1,7 +1,7 @@
 # 기준 정답(reference) 초안 — 사용자 검토용
 
 > Bedrock Sonnet 4.5가 수집 데이터 근거로 작성 → Claude가 5건 수정(✏️). 기준일 2026-11-25(수).
-> 검토 후 확정하면 `python scripts/draft_references.py --apply`로 `test_queries.csv` reference 열에 반영하고 1차 평가 직전 고정합니다.
+> 검토 후 확정하면 `python -m src.ingest.draft_references --apply`로 `test_queries.csv` reference 열에 반영하고 1차 평가 직전 고정합니다.
 
 ## #1 (positive) 12월 12일 토요일에 아이 둘이랑 경주 1박 2일 가요. 서울에서 차로 출발해요 ✏️
 

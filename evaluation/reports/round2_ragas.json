@@ -1,0 +1,99 @@
+{
+ "n": 11,
+ "excluded_no_context": [
+  "9",
+  "11",
+  "13",
+  "14",
+  "16",
+  "17",
+  "18",
+  "19",
+  "20"
+ ],
+ "average": {
+  "faithfulness": 0.525,
+  "answer_relevancy": 0.562,
+  "context_precision": 0.508,
+  "context_recall": 0.439
+ },
+ "per_case": [
+  {
+   "id": "1",
+   "faithfulness": 0.5,
+   "answer_relevancy": 0.513,
+   "context_precision": 0.322,
+   "context_recall": 0.667
+  },
+  {
+   "id": "2",
+   "faithfulness": 0.509,
+   "answer_relevancy": 0.62,
+   "context_precision": 0.549,
+   "context_recall": 0.333
+  },
+  {
+   "id": "3",
+   "faithfulness": 0.674,
+   "answer_relevancy": 0.326,
+   "context_precision": 0.278,
+   "context_recall": 0.5
+  },
+  {
+   "id": "4",
+   "faithfulness": 0.333,
+   "answer_relevancy": 0.996,
+   "context_precision": 1.0,
+   "context_recall": 0.667
+  },
+  {
+   "id": "5",
+   "faithfulness": 0.517,
+   "answer_relevancy": 0.166,
+   "context_precision": 0.257,
+   "context_recall": 0.5
+  },
+  {
+   "id": "6",
+   "faithfulness": 0.509,
+   "answer_relevancy": 0.257,
+   "context_precision": 0.562,
+   "context_recall": 0.333
+  },
+  {
+   "id": "7",
+   "faithfulness": 0.625,
+   "answer_relevancy": 0.811,
+   "context_precision": 1.0,
+   "context_recall": 0.333
+  },
+  {
+   "id": "8",
+   "faithfulness": 0.367,
+   "answer_relevancy": 0.484,
+   "context_precision": 0.29,
+   "context_recall": 0.667
+  },
+  {
+   "id": "10",
+   "faithfulness": 0.688,
+   "answer_relevancy": 0.766,
+   "context_precision": 1.0,
+   "context_recall": 0.5
+  },
+  {
+   "id": "12",
+   "faithfulness": null,
+   "answer_relevancy": 0.775,
+   "context_precision": 0.0,
+   "context_recall": 0.0
+  },
+  {
+   "id": "15",
+   "faithfulness": null,
+   "answer_relevancy": 0.467,
+   "context_precision": 0.333,
+   "context_recall": 0.333
+  }
+ ]
+}
