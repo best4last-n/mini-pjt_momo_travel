@@ -823,3 +823,11 @@
 - **사용자 요청**: archify 코드 분석으로 모듈 간 의존 관계와 결합도를 별도 화면으로 분석.
 - **Claude 작업**: `code-analysis prepare . --language py --locale en --ir <앱 구조 다이어그램>` (한국어 화면 미지원 → 영어). 처음 `src`를 루트로 돌렸을 때 `from src.…` import를 못 풀어 의존 0건 → 저장소 루트로 재실행(12초, 파이썬 55개 파일, 발견 120건: 경고 66·참고 54·오류 0). 결과 `.archify/code-analysis-20261127-130114/analysis/repo.analysis.html`(11MB, .gitignore에 추가 — 다시 만들 수 있음). 주요 결과: shared는 다른 도메인을 import하지 않음(AGENTS.md 규칙 3 지켜짐, 12개 중 11개가 의존). 허브 2개 — counsel(들어옴 6·나감 7)·planning(6·7). 도메인 간 상호 의존 6쌍(budget↔counsel·budget↔planning·counsel↔memory·counsel↔planning·ingest↔places·places↔planning). 원인: 아래 도메인(budget·memory·mobility·planning)이 `src/counsel/options.py`(조건 선택지·경비 분류·주차비·효율 상수)를 불러 counsel로 역방향 의존, places가 TourAPI 클라이언트를 `src/ingest`에서 가져옴(앞서 고친 tourlive), placesearch↔alternatives 파일 순환(kind_label). 큰 파일: agent.py 2,521줄·planner.py 1,638줄, 복잡도 최대 edit_node(분기 458, 655줄)·schedule 143·brochure.build 141. 코드 변경 없음.
 - **다음 할 일**: (선택) options.py를 shared로, TourAPI 클라이언트를 places로, kind_label을 places로 옮겨 역방향 의존 정리 · edit_node 분해. push(확인 후).
+
+### [2026-11-27 13:05] 현재 버전 push
+- **사용자 요청**: 현재 버전까지 git push 후 개인 추가 사항 진행 예정.
+- **Claude 작업**: push 전 점검(새 커밋에 키 값 0건, 이력 내 실명 0건) 후 push — origin/main `e009f54`(#15 수정·.env.example·리팩토링 버그 2건·archify 다이어그램·코드 분석 기록 포함). 이 항목은 다음 커밋에 포함됨.
+
+### [2026-11-27 13:10] PC 반납 전 git 누락 점검
+- **사용자 요청**: 이 PC를 내일부터 쓸 수 없으니 git에 빠진 내용이 있는지 점검.
+- **Claude 작업**: 로컬 전용 브랜치·stash·태그 없음, 커밋 안 된 변경은 HISTORY.md뿐(이 항목과 함께 커밋·push). git 제외 대상: `.env`(키 — git에 올리면 안 됨, 별도 보관 필요), `momo_state.sqlite`(39MB·상담 세션·확정 계획·지출 — 개인 사용 기록·용량 때문에 제외, 필요하면 별도 백업), `chroma_db`(벡터 색인 — `python -m src.ingest.build_index`로 재생성), `data/tile_cache`(지도 타일 — 자동 재다운로드), `guide/`(교육 자료 — 공개 저장소 제외, 필요하면 별도 보관), `momo_eta.json`(예상 시간 학습값), `.archify/code-analysis-*`·finalize 영수증(재생성 가능). 프로젝트 밖: 상위 폴더 day1~7_practice(약 5MB, git 아님), sds-ax-training 저장소(커밋 안 된 변경 1건), Claude 메모리(이 PC의 ~/.claude).
