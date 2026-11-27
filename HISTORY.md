@@ -831,3 +831,8 @@
 ### [2026-11-27 13:10] PC 반납 전 git 누락 점검
 - **사용자 요청**: 이 PC를 내일부터 쓸 수 없으니 git에 빠진 내용이 있는지 점검.
 - **Claude 작업**: 로컬 전용 브랜치·stash·태그 없음, 커밋 안 된 변경은 HISTORY.md뿐(이 항목과 함께 커밋·push). git 제외 대상: `.env`(키 — git에 올리면 안 됨, 별도 보관 필요), `momo_state.sqlite`(39MB·상담 세션·확정 계획·지출 — 개인 사용 기록·용량 때문에 제외, 필요하면 별도 백업), `chroma_db`(벡터 색인 — `python -m src.ingest.build_index`로 재생성), `data/tile_cache`(지도 타일 — 자동 재다운로드), `guide/`(교육 자료 — 공개 저장소 제외, 필요하면 별도 보관), `momo_eta.json`(예상 시간 학습값), `.archify/code-analysis-*`·finalize 영수증(재생성 가능). 프로젝트 밖: 상위 폴더 day1~7_practice(약 5MB, git 아님), sds-ax-training 저장소(커밋 안 된 변경 1건), Claude 메모리(이 PC의 ~/.claude).
+
+### [2026-11-27 13:20] 리디자인 분기(travelgalaxy) 진행 방법 상담
+- **사용자 요청**: 웹 디자인 콘셉트와 캐릭터를 새로 리디자인 — galaxygroup\travelgalaxy에 clone해서 별도로 진행하고 싶음(캐릭터 시안은 넣어 둠, 웹 시안은 아직).
+- **Claude 작업**: 시안 확인(travelgalaxy/guide: 'Galaxy Travel Guides' 메인 캡틴 서아 마스터 시트·9인 로스터, 1536×1024 RGB 콘셉트 시트 — 배경 투명 에셋 아님). 모모 코드의 캐릭터·테마 결합도 측정(모모·철새·우체부·엽서 문구 약 108곳, app.js 46곳, 테마 교체 지점 tokens.css [data-brand]). 진행안 제안: 오늘 저장소 분리·push(PC 반납 대비, guide/가 .gitignore 대상이라 시안은 design/으로), 1단계 브랜드 분리(문구·페르소나·에셋을 한곳으로) → 2단계 웹 콘셉트 2~3안 시안 → 3단계 캐릭터 에셋(표정→앱 상태, 가이드 9명→기능 담당) → 4단계 적용·평가 재실행. 코드 변경 없음.
+- **다음 할 일**: 사용자 결정(GitHub 저장소 생성, 이력 유지 여부, 1차 범위) 후 저장소 분리부터.
