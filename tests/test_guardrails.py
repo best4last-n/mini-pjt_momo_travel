@@ -12,9 +12,12 @@ import sqlite3
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from momo import agent, guardrails, planner, store
-from momo.schemas import ParsedRequest
+from src.api.main import app
+from src.counsel import agent
+from src.guardrails import guardrails
+from src.planning import planner
+from src.memory import store
+from src.counsel.schemas import ParsedRequest
 
 c = TestClient(app)
 

@@ -1,8 +1,9 @@
 """규칙 기반 부분(LLM 없이): 운영시간·휴무 해석, 일정 시각 계산, 규칙 검사."""
 from datetime import date
 
-from momo import data, hours, planner
-from momo.schemas import DayPick, PickItem, PlanPick
+from src.shared import data
+from src.planning import hours, planner
+from src.planning.schemas import DayPick, PickItem, PlanPick
 
 SAT, MON = date(2026, 12, 12), date(2026, 12, 14)
 

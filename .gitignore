@@ -13,3 +13,5 @@ guide/
 # 지도 타일·인기 순위 캐시
 data/tile_cache/
 data/popular_cache.json
+momo_eta.json
+.venv_broken/

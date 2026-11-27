@@ -16,14 +16,14 @@
 
 | Day | 패턴 | 어떻게 활용 | 코드 |
 |:-:|---|---|---|
-| 1 | LCEL + Pydantic 구조화 출력 | 조건 파싱(`ParsedRequest`), 장소 고르기(`PlanPick`)를 구조화 출력으로 받고, 실패하면 재시도·문자열 목록 파싱 | `momo/llm.py`, `momo/schemas.py` |
-| 2 | RAG (하이브리드 검색) | BM25(kiwipiepy 형태소) + Chroma 벡터(Titan Embeddings v2)를 순위 융합(RRF)하고 제목 일치 가중. 벡터가 실패하면 BM25만으로 동작 | `momo/retrieve.py:51` |
-| 4 | 도구 여러 개 | 운영정보·축제·날씨(Open-Meteo)·이동시간(OSRM 캐시·도로 경로)·장소 찾기(관광공사·브이월드·OSM)·지점 고르기를 한 질의에서 조합 | `momo/tools.py`, `momo/roads.py`, `momo/placesearch.py` |
-| 5 | 가드레일 | 입력: 개인정보 가리기·프롬프트 인젝션(직접·인코딩·간접) 차단. 출력: 시스템 프롬프트·키 형태 문자열 차단. 외부 데이터는 '데이터'로만 감싸 지시로 따르지 않음 | `momo/guardrails.py`, 그래프 `guard_in`/`guard_out` |
-| 5 | HITL (승인) | 일정은 '승인 대기'로만 나오고, `action=approve` + `session_id`로만 확정·저장(`draft_version`을 함께 보내면 최신본인지 확인해 오래된 요청은 거절). 대화 글로는 확정되지 않음 | `momo/agent.py` `approve_node` |
-| 5 | 미들웨어 | LLM·trace·로그·공유 페이지에 들어가기 전 개인정보 가리기, 구조화 출력 재시도, 요청 중지(취소 신호 → 요청 전 상태로 되돌림) | `momo/guardrails.py`, `momo/cancel.py` |
-| 7 | Plan-Execute · 메모리 | LLM은 장소·순서만 고르고 → 코드가 시각 계산 → 규칙 검사 → 위반 시 최대 2회 재생성 → 남으면 보정. 대화 상태는 LangGraph 체크포인트(SQLite), 상담 기록·되돌리기 목록 보존 | `momo/planner.py:1142`, `momo/store.py` |
-| 7 | Observability · Trace | 모든 응답에 `trace`(단계·입력·출력), LangSmith 추적(환경 변수로 켜기) | `momo/agent.py`, `.env.example` |
+| 1 | LCEL + Pydantic 구조화 출력 | 조건 파싱(`ParsedRequest`), 장소 고르기(`PlanPick`)를 구조화 출력으로 받고, 실패하면 재시도·문자열 목록 파싱 | `src/shared/llm.py`, `src/counsel/schemas.py`, `src/planning/schemas.py` |
+| 2 | RAG (하이브리드 검색) | BM25(kiwipiepy 형태소) + Chroma 벡터(Titan Embeddings v2)를 순위 융합(RRF)하고 제목 일치 가중. 벡터가 실패하면 BM25만으로 동작 | `src/places/retrieve.py:54` |
+| 4 | 도구 여러 개 | 운영정보·축제·날씨(Open-Meteo)·이동시간(OSRM 캐시·도로 경로)·장소 찾기(관광공사·브이월드·OSM)·지점 고르기를 한 질의에서 조합 | `src/places/tools.py`, `src/mobility/roads.py`, `src/places/placesearch.py` |
+| 5 | 가드레일 | 입력: 개인정보 가리기·프롬프트 인젝션(직접·인코딩·간접) 차단. 출력: 시스템 프롬프트·키 형태 문자열 차단. 외부 데이터는 '데이터'로만 감싸 지시로 따르지 않음 | `src/guardrails/guardrails.py`, 그래프 `guard_in`/`guard_out` |
+| 5 | HITL (승인) | 일정은 '승인 대기'로만 나오고, `action=approve` + `session_id`로만 확정·저장(`draft_version`을 함께 보내면 최신본인지 확인해 오래된 요청은 거절). 대화 글로는 확정되지 않음 | `src/counsel/agent.py` `approve_node` |
+| 5 | 미들웨어 | LLM·trace·로그·공유 페이지에 들어가기 전 개인정보 가리기, 구조화 출력 재시도, 요청 중지(취소 신호 → 요청 전 상태로 되돌림) | `src/guardrails/guardrails.py`, `src/shared/cancel.py` |
+| 7 | Plan-Execute · 메모리 | LLM은 장소·순서만 고르고 → 코드가 시각 계산 → 규칙 검사 → 위반 시 최대 2회 재생성 → 남으면 보정. 대화 상태는 LangGraph 체크포인트(SQLite), 상담 기록·되돌리기 목록 보존 | `src/planning/planner.py:1479`, `src/memory/store.py` |
+| 7 | Observability · Trace | 모든 응답에 `trace`(단계·입력·출력), LangSmith 추적(환경 변수로 켜기) | `src/counsel/agent.py`, `.env.example` |
 | 7 | 평가 (RAGAS · LLM-as-Judge) | 규칙 검사 하드 게이트 + Judge(Claude Sonnet 4.6, 생성 모델과 다름) + RAGAS 4지표 | `evaluation/run_eval.py` |
 
 필수 패턴 1·3·11·12를 포함해 9개를 적용했습니다. ReAct(`bind_tools`), MCP, Multi-Agent는 쓰지 않았습니다. 일정 생성은 규칙 검사가 핵심이라 고정 흐름(Plan-Execute)이 더 안정적이었고, Multi-Agent는 기획 단계에서 범위 밖으로 정했습니다.
@@ -31,13 +31,13 @@
 ## 아키텍처
 
 ```
-브라우저(app/static: 상담 화면 · 계획서 · 지도)          외부 클라이언트(LifeGalaxy 등)
+브라우저(src/api/static: 상담 화면 · 계획서 · 지도)      외부 클라이언트(LifeGalaxy 등)
         │  POST /query · /query/async(중지 가능)                │  POST /query
         ▼                                                       ▼
-FastAPI  app/main.py ── 공유·내보내기(/plan/{id}, .ics, .docx, .html), 장소 찾기, 경비·준비물
+FastAPI  src/api/main.py ── 공유·내보내기(/plan/{id}, .ics, .docx, .html), 장소 찾기, 경비·준비물
         │
         ▼
-momo.agent.handle_query  ── LangGraph StateGraph (체크포인트: momo_state.sqlite)
+src.counsel.agent.handle_query  ── LangGraph StateGraph (체크포인트: momo_state.sqlite)
   guard_in ─▶ parse(조건 파싱, 구조화 출력) ─▶ 라우터
      │            ├─ plan / modify : planner.build_plan
      │            │     후보 검색(RAG) → LLM 장소 고르기 → 코드 시각 계산(이동·식사·숙박·이동 중 끼니)
@@ -51,8 +51,24 @@ momo.agent.handle_query  ── LangGraph StateGraph (체크포인트: momo_stat
 데이터: data/tourapi/<지역>/places.json(관광공사 수집 181곳 + 실시간 편입) · data/index/docs.jsonl(BM25) · chroma_db/(벡터, 생성 필요)
 ```
 
-- 에이전트 핵심(`momo/`)은 FastAPI(`app/`)와 분리된 파이썬 패키지라 다른 앱에서 그대로 불러 쓸 수 있습니다.
-- 가이드의 `src/` 구조와의 대응: `src/agent.py` → `momo/agent.py`, `src/tools.py` → `momo/tools.py`(+ `roads.py`·`placesearch.py`), `src/retriever.py` → `momo/retrieve.py`.
+- 소스는 모두 `src/` 아래에 **업무 도메인별 폴더**로 나뉩니다. 각 도메인 폴더에 실행 로직·프롬프트(`prompts.py`)·입출력 스키마(`schemas.py`)가 함께 있고, 여러 도메인이 쓰는 LLM 클라이언트·설정·유틸리티만 `src/shared/`에 둡니다(배치 규칙: `AGENTS.md` 4절).
+- 가이드의 `src/` 구조와의 대응: `src/agent.py` → `src/counsel/agent.py`, `src/tools.py` → `src/places/tools.py`(+ `src/mobility/roads.py`·`src/places/placesearch.py`), `src/retriever.py` → `src/places/retrieve.py`.
+
+```
+src/
+├── counsel/     상담 에이전트 그래프 · 조건 파싱 프롬프트/스키마 · 답변 말투·서식
+├── planning/    일정 생성(LLM 고르기 + 시각 계산 + 규칙 검사) · 운영시간 · 계획서
+├── places/      RAG 검색 · 장소 찾기 · 관광공사 실시간 조회 · ReAct 도구
+├── mobility/    도로 경로·교통 정보 · 기차역·공항 거점
+├── budget/      예상 경비
+├── packing/     날씨·준비물
+├── export/      Word·HTML 내보내기
+├── memory/      확정 계획 저장(SQLite)
+├── guardrails/  개인정보·인젝션 방어
+├── api/         FastAPI + 웹 화면(static/)
+├── ingest/      데이터 수집·요약·보강·색인 (오프라인)
+└── shared/      LLM 클라이언트 · 페르소나 · 설정 · 데이터 로딩 · 공용 유틸
+```
 
 ## 실행 방법
 
@@ -68,11 +84,11 @@ pip install -r requirements.txt
 #    선택: LANGSMITH_TRACING / LANGSMITH_API_KEY / LANGSMITH_PROJECT, VWORLD_API_KEY(지도·장소 검색)
 
 # 3) 벡터 색인 만들기 (chroma_db/는 저장소에 없음 · 수집 데이터는 저장소에 있음)
-python scripts/build_index.py
+python -m src.ingest.build_index
 #    색인 없이도 BM25 검색만으로 동작합니다.
 
 # 4) 서버 실행 → http://127.0.0.1:8000
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
 
 API 예시:
@@ -88,12 +104,12 @@ curl -X POST http://127.0.0.1:8000/query -H "Content-Type: application/json" \
 테스트와 평가:
 
 ```bash
-python -m pytest -q                                  # 회귀 테스트 89건 (LLM 호출 없이)
+python -m pytest -q                                  # 회귀 테스트 152건 (LLM 호출 없이)
 python evaluation/run_eval.py --round 2              # 인-아웃 20건 평가 (Bedrock 호출, 평가 기준일 2026-11-25 고정)
 #   --stage collect|judge|ragas|report|all 로 단계별 실행 가능
 ```
 
-데이터를 새로 모으려면(선택): `scripts/collect_tourapi.py <지역>` → `scripts/summarize_places.py <지역>` → `scripts/enrich_places.py` → `scripts/build_index.py`. 지역 설정은 `data/config/regions.json`이며 코드 수정 없이 추가할 수 있습니다.
+데이터를 새로 모으려면(선택): `python -m src.ingest.collect_tourapi <지역>` → `python -m src.ingest.summarize_places <지역>` → `python -m src.ingest.enrich_places` → `python -m src.ingest.build_index`. 지역 설정은 `data/config/regions.json`이며 코드 수정 없이 추가할 수 있습니다.
 
 ## RAGAS 평가 결과
 
@@ -142,7 +158,7 @@ contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별�
 - **2차 평가 뒤 기능을 많이 바꿨습니다(U1~U25).** 회귀 테스트 89건은 통과하지만, 20건 공식 평가는 아직 다시 돌리지 않았습니다.
 - 이동시간은 추정입니다. 도로 경로는 OSRM과 요일·시간대 혼잡 보정이고, 국가교통정보센터 실시간·예측 정보는 키가 있을 때만 씁니다. 사용자가 운전 시간을 직접 고칠 수 있게 해 두었습니다.
 - 평점·리뷰 수는 없습니다. 카카오·네이버 키가 없고, Google Places는 프로젝트 규칙상 쓰지 않습니다.
-- 지원 지역은 3곳입니다. 지역 추가는 설정과 수집만으로 됩니다(지역당 약 30분, TourAPI 하루 1,000건 한도). 처음 하는 전국 장소 검색은 6~12초 걸립니다.
+- 지원 지역은 7곳입니다(순천/구례·경주·수원·제주·강릉·동해·삼척·전주·완주·군산·통영·거제). 지역 추가는 설정과 수집만으로 됩니다(지역당 약 30분, TourAPI 하루 1,000건 한도). 처음 하는 전국 장소 검색은 6~12초 걸립니다.
 - 해외 가벼운 모드, LifeGalaxy add-on(trip JSON v1 내보내기·사진 매칭), MCP는 미구현입니다.
 
 **LifeGalaxy 통합 메모** (제출 이후)
@@ -151,13 +167,13 @@ contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별�
 
 ## 핵심 코드 위치
 
-- `momo/agent.py:1827` — 메인 에이전트 그래프(`build_graph`: guard_in → parse → plan/modify/info/edit/approve… → guard_out)
-- `momo/agent.py:1865` — `handle_query` (API 진입점) · `:868` `edit_node`(화면 편집) · `:1317` `start_node`(시작 카드)
-- `momo/planner.py:1142` — `build_plan`(Plan-Execute: 후보 → LLM 고르기 → 시각 계산 → 규칙 검사 → 재생성·보정)
-- `momo/planner.py:691` `schedule`(시각·이동·식사·숙박·이동 중 끼니) · `:891` `validate`(규칙 검사) · `:965` `repair`
-- `momo/retrieve.py:51` — RAG 파이프라인(BM25 + Chroma 하이브리드, RRF)
-- `momo/tools.py` — 도메인 도구(운영정보·축제·날씨·지오코딩) · `momo/roads.py`(도로 경로·혼잡 보정) · `momo/placesearch.py`(전국 장소 찾기·지점 고르기)
-- `momo/guardrails.py:43` `mask_pii` · `:92` `detect_injection` · `:106` `check_output` — 가드레일
-- `app/main.py:101` — `POST /query` (표준 규약: answer · contexts · trace) · `:169` `/query/async` · `:197` 요청 중지
-- `momo/brochure.py` — 계획서 데이터(일정·구간·지도·체크리스트) · `momo/costs.py` 예상 경비 · `momo/export.py` Word·HTML 내보내기
-- `evaluation/run_eval.py` — 자체 평가(규칙 게이트 + Judge + RAGAS) · `tests/` 회귀 테스트 89건
+- `src/counsel/agent.py:2251` — 메인 에이전트 그래프(`build_graph`: guard_in → parse → plan/modify/info/edit/approve… → guard_out)
+- `src/counsel/agent.py:2289` — `handle_query` (API 진입점) · `:1024` `edit_node`(화면 편집) · `:1698` `start_node`(시작 카드) · 프롬프트 `src/counsel/prompts.py`
+- `src/planning/planner.py:1479` — `build_plan`(Plan-Execute: 후보 → LLM 고르기 → 시각 계산 → 규칙 검사 → 재생성·보정)
+- `src/planning/planner.py:860` `schedule`(시각·이동·식사·숙박·이동 중 끼니) · `:1125` `validate`(규칙 검사) · `:1235` `repair` · 프롬프트 `src/planning/prompts.py`
+- `src/places/retrieve.py:54` — RAG 파이프라인(BM25 + Chroma 하이브리드, RRF)
+- `src/places/tools.py` — 도메인 도구(운영정보·축제·날씨·지오코딩) · `src/mobility/roads.py`(도로 경로·혼잡 보정) · `src/places/placesearch.py`(전국 장소 찾기·지점 고르기)
+- `src/guardrails/guardrails.py:43` `mask_pii` · `:92` `detect_injection` · `:106` `check_output` — 가드레일
+- `src/api/main.py:105` — `POST /query` (표준 규약: answer · contexts · trace) · `:178` `/query/async` · `:207` 요청 중지
+- `src/planning/brochure.py` — 계획서 데이터(일정·구간·지도·체크리스트) · `src/budget/costs.py` 예상 경비 · `src/export/export.py` Word·HTML 내보내기
+- `evaluation/run_eval.py` — 자체 평가(규칙 게이트 + Judge + RAGAS) · `tests/` 회귀 테스트 152건

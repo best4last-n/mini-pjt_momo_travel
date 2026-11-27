@@ -4,9 +4,13 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from momo import agent, alternatives, data, hubs, planner, roads, store
-from momo.schemas import DayPick, PickItem, PlanPick
+from src.api.main import app
+from src.counsel import agent
+from src.planning import alternatives, planner
+from src.shared import data
+from src.mobility import hubs, roads
+from src.memory import store
+from src.planning.schemas import DayPick, PickItem, PlanPick
 
 c = TestClient(app)
 SAT = date(2026, 12, 12)
@@ -148,7 +152,7 @@ def test_optimizer_groups_nearby_places_across_meal_and_days():
 
 
 def test_replan_guard_and_diff(seeded, monkeypatch):
-    from momo.schemas import ParsedRequest
+    from src.counsel.schemas import ParsedRequest
 
     class _S:
         def invoke(self, *_a, **_k):

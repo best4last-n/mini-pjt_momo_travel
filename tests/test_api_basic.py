@@ -4,8 +4,9 @@ import json
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from momo import guardrails, store
+from src.api.main import app
+from src.guardrails import guardrails
+from src.memory import store
 
 c = TestClient(app)
 

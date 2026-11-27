@@ -794,5 +794,86 @@
    "elder": "14km 드라이브 코스라 차량으로 편하게 감상하실 수 있어요. 중간중간 차를 세우고 사진 촬영이 가능하지만, 절정기에는 주차 공간 확보가 어려울 수 있으니 참고하세요.",
    "child": "차 안에서 벚꽃 터널을 감상할 수 있어 어린 자녀와 함께 부담 없이 즐기기 좋아요. 낙안읍성민속마을까지 이동하면 아이들이 뛰어놀 수 있는 공간도 있답니다."
   }
+ },
+ {
+  "contentid": "129488",
+  "title": "남해 물건리 방조어부림",
+  "kind": "attraction",
+  "contenttypeid": "12",
+  "region": "suncheon_gurye",
+  "sigungu": "",
+  "must_include": false,
+  "addr": "경상남도 남해군 삼동면 물건리 산 12-1",
+  "lat": 34.7971,
+  "lng": 128.0505,
+  "tel": "",
+  "image_url": "https://tong.visitkorea.or.kr/cms/resource_photo/41/3311341_image2_1.jpg",
+  "image_license": "Type1",
+  "overview": "방조림은 바닷물이 넘치는 것을 막고 농지와 마을을 보호하기 위해 인공적으로 만든 숲이며, 어부림은 물고기가 살기에 알맞은 환경을 만들어 물고기 떼를 유인하는 역할을 하는 숲이다. 남해 물건리 방조어부림은 17세기에 만들어졌으며, 방조림과 어부림의 역할을 모두하고 있어 ‘방조어부림’이라고 불린다.\n이 숲의 길이는 750m이며 너비는 40m 내외이고 나무의 높이는 대체로 10~15m이다. 팽나무·푸조나무·참느릅나무·말채나무·상수리나무·느티나무·이팝나무·무환자나무 등의 낙엽활엽수와 상록수인 후박나무가 주를 이루고 있다.\n19세기 말에 숲에 있는 나무 일부를 베어냈다가 그해 폭풍으로 마을이 큰 피해를 입었다. 그래서 이 숲을 해치면 마을이 망한다라는 말이 전해 내려왔고, 마을 사람들은 숲의 나무를 베면 벌금을 내기로 약속하며 숲을 지켜 왔다고 한다. 그 덕분에 1933년 큰 폭풍이 닥쳤을 때 이곳의 피해는 이웃 마을에 비해 아주 적었고, 이후 마을 사람들은 더욱 열심히 숲을 지키게 되었다.\n지금도 마을 사람들은 숲에서 가장 큰 이팝나무를 마을의 수호신으로 모시고, 매년 음력 10월 15일에 제사를 지내 마을의 평안을 빌고 있다.",
+  "homepage": "남해문화관광 https://www.namhae.go.kr/tour",
+  "intro": {
+   "contentid": "129488",
+   "contenttypeid": "12",
+   "heritage1": "0",
+   "heritage2": "0",
+   "heritage3": "0",
+   "infocenter": "남해군청 문화체육과 055-860-8633",
+   "opendate": "",
+   "restdate": "연중무휴",
+   "expguide": "",
+   "expagerange": "",
+   "accomcount": "",
+   "useseason": "",
+   "usetime": "상시 개방",
+   "parking": "가능",
+   "chkbabycarriage": "",
+   "chkpet": "",
+   "chkcreditcard": ""
+  },
+  "event_start": null,
+  "event_end": null,
+  "source": "한국관광공사 TourAPI",
+  "added_by_user": true,
+  "summary": "방조림은 바닷물이 넘치는 것을 막고 농지와 마을을 보호하기 위해 인공적으로 만든 숲이며, 어부림은 물고기가 살기에 알맞은 환경을 만들어 물고기 떼를 유인하는 역할을 하는 숲이다. 남해 물건리 방조어부림은 17세기에 만들어졌으며, 방조림과 어부림의 역할을 모두하고 있어 ‘방조어부림’이라고 불린다. (관광공사 소개 인용)",
+  "images": [
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource_photo/41/3311341_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource_photo/38/3311338_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource_photo/38/3311338_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource_photo/35/3311335_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource_photo/35/3311335_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   },
+   {
+    "url": "https://tong.visitkorea.or.kr/cms/resource_photo/31/3311331_image2_1.jpg",
+    "thumb": "https://tong.visitkorea.or.kr/cms/resource_photo/31/3311331_image2_1.jpg",
+    "source": "tourapi",
+    "license": "Type1",
+    "credit": "한국관광공사"
+   }
+  ],
+  "highlights": [
+   "17세기부터 750m 길이로 이어진 해안 숲으로, 바닷물 막는 방조림과 물고기 유인하는 어부림 역할을 동시에 하는 독특한 숲입니다",
+   "팽나무·푸조나무·후박나무 등 다양한 수종이 10~15m 높이로 자라 바다와 어우러진 산책로를 만들어냅니다",
+   "마을 사람들이 300년 넘게 나무 베면 벌금 내는 약속으로 지켜온 숲으로, 지금도 매년 음력 10월 15일 가장 큰 이팝나무 앞에서 마을 제사를 지냅니다",
+   "1933년 큰 폭풍 때 이 숲 덕분에 이웃 마을보다 피해가 훨씬 적었던 실제 사례가 전해지는 생태 방파제입니다"
+  ],
+  "guide_tips": "750m 숲길을 천천히 걸으면 20~30분 정도 소요되며, 바다 쪽에서 숲을 배경으로 사진 찍으면 나무들이 해안선을 따라 늘어선 모습이 잘 담깁니다. 상시 개방되어 이른 아침이나 해질녘에 방문하면 고즈넉한 분위기 속에서 산책할 수 있고, 주차 공간이 마련되어 있어 차량 이용이 편리합니다.",
+  "companion_notes": {
+   "elder": "750m 평지 산책로이지만 바닷가 모래·자갈길 구간이 있을 수 있으니 편한 신발 착용을 권장하며, 구체적인 경사나 계단 정보는 현장 확인이 필요합니다",
+   "child": "넓은 숲길에서 자연 관찰하며 걷기 좋고 차량 통행이 없어 안전하지만, 유모차 통행 가능 여부나 편의시설은 현장 확인이 필요합니다"
+  }
  }
 ]

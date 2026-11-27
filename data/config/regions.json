@@ -55,6 +55,90 @@
         {"keyword": "수원전통문화관", "type": "attraction"},
         {"keyword": "통닭", "type": "restaurant"}
       ]
+    },
+    "jeju": {
+      "label": "제주",
+      "flight_required": true,
+      "enabled": true,
+      "sigungu": [
+        {"name": "제주시", "regn": "50", "signgu": "110", "share": 0.55},
+        {"name": "서귀포시", "regn": "50", "signgu": "130", "share": 0.45}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "성산일출봉", "type": "attraction"},
+        {"keyword": "함덕해수욕장", "type": "attraction"},
+        {"keyword": "비자림", "type": "attraction"},
+        {"keyword": "만장굴", "type": "attraction"},
+        {"keyword": "섭지코지", "type": "attraction"},
+        {"keyword": "협재해수욕장", "type": "attraction"},
+        {"keyword": "산방산", "type": "attraction"},
+        {"keyword": "카멜리아힐", "type": "attraction"},
+        {"keyword": "주상절리대", "type": "attraction"},
+        {"keyword": "사려니숲길", "type": "attraction"},
+        {"keyword": "고기국수", "type": "restaurant"},
+        {"keyword": "흑돼지", "type": "restaurant"}
+      ]
+    },
+    "gangneung": {
+      "label": "강릉·동해·삼척",
+      "enabled": true,
+      "sigungu": [
+        {"name": "강릉시", "regn": "51", "signgu": "150", "share": 0.5},
+        {"name": "동해시", "regn": "51", "signgu": "170", "share": 0.3},
+        {"name": "삼척시", "regn": "51", "signgu": "230", "share": 0.2}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "경포대", "type": "attraction"},
+        {"keyword": "오죽헌", "type": "attraction"},
+        {"keyword": "정동진", "type": "attraction"},
+        {"keyword": "주문진", "type": "attraction"},
+        {"keyword": "논골담길", "type": "attraction"},
+        {"keyword": "무릉계곡", "type": "attraction"},
+        {"keyword": "환선굴", "type": "attraction"},
+        {"keyword": "순두부", "type": "restaurant"}
+      ]
+    },
+    "jeonju": {
+      "label": "전주·완주·군산",
+      "enabled": true,
+      "sigungu": [
+        {"name": "전주 완산구", "regn": "52", "signgu": "111", "share": 0.3},
+        {"name": "전주 덕진구", "regn": "52", "signgu": "113", "share": 0.2},
+        {"name": "완주군", "regn": "52", "signgu": "710", "share": 0.2},
+        {"name": "군산시", "regn": "52", "signgu": "130", "share": 0.3}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "한옥마을", "type": "attraction"},
+        {"keyword": "경기전", "type": "attraction"},
+        {"keyword": "전동성당", "type": "attraction"},
+        {"keyword": "오목대", "type": "attraction"},
+        {"keyword": "철길마을", "type": "attraction"},
+        {"keyword": "근대역사박물관", "type": "attraction"},
+        {"keyword": "비빔밥", "type": "restaurant"},
+        {"keyword": "이성당", "type": "restaurant"}
+      ]
+    },
+    "tongyeong_geoje": {
+      "label": "통영·거제",
+      "enabled": true,
+      "sigungu": [
+        {"name": "통영시", "regn": "48", "signgu": "220", "share": 0.5},
+        {"name": "거제시", "regn": "48", "signgu": "310", "share": 0.5}
+      ],
+      "quota": {"attraction": 30, "restaurant": 20, "lodging": 10, "festival": 10},
+      "must_include": [
+        {"keyword": "동피랑", "type": "attraction"},
+        {"keyword": "통영케이블카", "type": "attraction"},
+        {"keyword": "이순신공원", "type": "attraction"},
+        {"keyword": "바람의언덕", "type": "attraction"},
+        {"keyword": "외도", "type": "attraction"},
+        {"keyword": "포로수용소", "type": "attraction"},
+        {"keyword": "충무김밥", "type": "restaurant"},
+        {"keyword": "꿀빵", "type": "restaurant"}
+      ]
     }
   }
 }

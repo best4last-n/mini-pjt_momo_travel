@@ -1,9 +1,11 @@
 """개편 기능(LLM 없이): 경비·예산, 진행률, 동선 최적화, 브로셔 plan, 조사 처리."""
 from datetime import date
 
-from momo import brochure, costs, data, planner
-from momo.agent import _josa
-from momo.schemas import DayPick, PickItem, PlanPick
+from src.planning import brochure, planner
+from src.budget import costs
+from src.shared import data
+from src.counsel.agent import _josa
+from src.planning.schemas import DayPick, PickItem, PlanPick
 
 
 def test_budget_and_fee_parsing():
@@ -74,7 +76,7 @@ def test_josa():
 
 
 def test_place_name_variants():
-    from momo import placesearch as P
+    from src.places import placesearch as P
     assert P.name_key("라플라타카페") == P.name_key("라플라타")
     assert P.name_key("1001카페") == P.name_key("일공공일 카페") == P.name_key("1001 cafe") == "1001"
     assert "일공공일" in P.variants("1001카페") and "라플라타" in P.variants("라플라타카페")

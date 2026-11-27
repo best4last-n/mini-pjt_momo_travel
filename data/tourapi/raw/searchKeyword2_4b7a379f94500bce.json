@@ -1,0 +1,1 @@
+{"endpoint": "searchKeyword2", "params": {"keyword": "섭지코지", "lDongRegnCd": "50", "lDongSignguCd": "110", "numOfRows": 5, "pageNo": 1}, "data": {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"}, "body": {"items": "", "numOfRows": 0, "pageNo": 1, "totalCount": 0}}}}

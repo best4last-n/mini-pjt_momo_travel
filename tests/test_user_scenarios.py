@@ -12,9 +12,12 @@ from datetime import date
 import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
-from momo import agent, data, planner, store
-from momo.schemas import DayPick, PickItem, PlanPick
+from src.api.main import app
+from src.counsel import agent
+from src.shared import data
+from src.planning import planner
+from src.memory import store
+from src.planning.schemas import DayPick, PickItem, PlanPick
 
 c = TestClient(app)
 REGION = "suncheon_gurye"
@@ -49,8 +52,8 @@ def _lunch_missing(spec, items):
 
 def test_u1_late_lunch_is_moved_back_to_noon():
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 29), nights=0)
-    row = [PickItem(place_id=_id("사성암"), stay_minutes=150, reason="r"),
-           PickItem(place_id=_id("화엄사"), stay_minutes=150, reason="r"),
+    row = [PickItem(place_id=_id("사성암"), stay_minutes=210, reason="r"),      # 점심 권장 범위(~15:30)를 넘겨 늦어지는 모양
+           PickItem(place_id=_id("화엄사"), stay_minutes=210, reason="r"),
            PickItem(place_id=_id("남촌회관"), stay_minutes=60, role="lunch", reason="r")]
     before = planner.schedule(spec, PlanPick(days=[DayPick(day=1, items=row)]), {})
     assert _lunch_missing(spec, before)                       # 재현: 점심이 14시 넘어 배치
@@ -64,8 +67,8 @@ def test_u1_late_lunch_is_moved_back_to_noon():
 
 def test_u1_edit_path_clears_lunch_violation(db):
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 29), nights=0)
-    _seed("u1", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=150, reason="r"),
-                        PickItem(place_id=_id("화엄사"), stay_minutes=150, reason="r"),
+    _seed("u1", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=210, reason="r"),
+                        PickItem(place_id=_id("화엄사"), stay_minutes=210, reason="r"),
                         PickItem(place_id=_id("남촌회관"), stay_minutes=60, role="lunch", reason="r")]])
     r = agent.handle_query("제목", "u1", "edit", edit={"op": "title", "title": "점심 확인"})
     assert not [v for v in r["violations"] if v["type"] == "식사 누락"]
@@ -136,7 +139,9 @@ def test_u10_triple_dinner_is_flagged_and_cleaned():
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1, waypoint_ids=[_id("남녘들밥상")])
     rows = [_dinner_row(PickItem(place_id=planner.MEAL_ID, role="dinner", stay_minutes=60, reason=""),
                         PickItem(place_id=_id("명지원"), stay_minutes=60, role="dinner", reason="r")), []]
-    assert len(_clash(spec, _sched(spec, rows))) == 2                       # 재현: 18:00·19:20·20:40
+    day1 = [it for it in _sched(spec, rows) if it["date"] == "2026-11-28"]
+    assert len(planner.meal_clashes(spec, day1)) == 2                       # 재현: 18:00·19:20·20:40(자동 정리 대상)
+    assert not _clash(spec, _sched(spec, rows))                              # 규칙 검사는 연달아 3번까지 허용(2026-11-26 변경)
     log = []
     fixed = agent._fill_meals(spec, [list(r) for r in rows], log)
     items = _sched(spec, fixed)
@@ -258,12 +263,14 @@ def test_u13_intensity_gangheng():
     w = planner.windows(spec)[1]
     assert w == (6 * 60 + 30, 23 * 60)
     assert planner.max_places(w, 1, False, "강행군") >= 20
-    from momo import brochure, options
+    from src.planning import brochure
+    from src.counsel import options
     assert "강행군" in brochure.CHECK_OPTIONS["intensity"] and options.INTENSITIES[0]["value"] == "강행군"
 
 
 def test_u13_late_checkin_until_2am_is_ok_and_ics_rolls_over():
-    from momo import hours, store
+    from src.planning import hours
+    from src.memory import store
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1)
     mk = lambda s: [{"seq": 1, "date": "2026-11-28", "type": "stay", "place_id": _id("호텔라움"), "place_name": "호텔라움",
                      "start_time": s, "end_time": s, "travel_minutes_from_prev": 0, "hours_status": "확인됨", "source": "x", "notes": []}]
@@ -276,7 +283,7 @@ def test_u13_late_checkin_until_2am_is_ok_and_ics_rolls_over():
 
 # U14 지점이 여러 곳인 상호(정지영·스타벅스·파스쿠찌 등 프랜차이즈)는 이름으로 넣을 때 지점을 물어본다
 def _fake_branches(q, region, limit=8):
-    from momo import placesearch
+    from src.places import placesearch
     if placesearch.brand_of(q) not in ("정지영", "스타벅스"):
         return []
     mk = lambda nm, ad, km: {"name": nm, "address": ad, "distance_km": km, "source": "브이월드",
@@ -287,13 +294,13 @@ def _fake_branches(q, region, limit=8):
 
 
 def test_u14_brand_aliases():
-    from momo import placesearch as P
+    from src.places import placesearch as P
     assert P.brand_of("파스쿠치") == "파스쿠찌" and P.brand_of("스벅") == "스타벅스" and P.brand_of("정지영 카페") == "정지영"
     assert P.brand_of("불국사") == "불국사"
 
 
 def test_u14_name_add_asks_branch_then_adds_chosen(db, monkeypatch):
-    from momo import placesearch
+    from src.places import placesearch
     monkeypatch.setattr(placesearch, "branches", _fake_branches)
     spec = planner.TripSpec(region="suwon", start=date(2026, 12, 19), nights=0)
     hw = next(pid for pid, p in data.places("suwon").items() if p["title"].startswith("화성행궁"))
@@ -315,7 +322,9 @@ def test_u15_origin_and_return_always_in_itinerary():
     import io
     import re as _re
     from docx import Document
-    from momo import brochure, export, render, richtext
+    from src.planning import brochure
+    from src.export import export
+    from src.counsel import render, richtext
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=0, departure="경기", origin_label="판교동")
     items = _sched(spec, [[PickItem(place_id=_id("순천만국가정원"), stay_minutes=90, reason="r")]])
     t = render.itinerary_text(items)
@@ -358,8 +367,8 @@ def test_u16_must_ids_caps_to_trip_capacity():
 def test_u17_cancel_rolls_back_and_check_raises(db, monkeypatch):
     import threading
     import time
-    from app import main
-    from momo import cancel
+    from src.api import main
+    from src.shared import cancel
     ev = threading.Event()
     tok = cancel.CURRENT.set(ev)
     cancel.check()
@@ -447,7 +456,7 @@ def test_u19_route_stop_after_origin_and_before_return(db, monkeypatch):
     road = [it for it in st["itinerary"] if (it.get("notes") or [""])[0] == "가는 길"]
     assert [it["place_name"] for it in road] == ["대전 맛집"]
     # 일정표(브로셔)에서 출발 지점 다음 카드로 보이고, 현지 동선에는 끼지 않음
-    from momo import brochure
+    from src.planning import brochure
     plan = brochure.build(s2, st["itinerary"], [], [], [])
     first = plan["itinerary"][0]["stops"][0]
     assert first["route"] == "out" and first["route_key"] == "osm:N1" and first["place_id"] is None
@@ -528,7 +537,7 @@ def test_u22_user_ordered_day_is_continuous_and_start_time_editable(db):
 
 # U24 첫날 출발 → 도착이 실제보다 너무 길게 잡히고 고칠 수 없음(판교→구례 240분 + 들르는 곳마다 휴게 + 중심 갔다 되돌아오기)
 def test_u24_outbound_time_calibrated_and_editable(db, monkeypatch):
-    from momo import roads
+    from src.mobility import roads
     monkeypatch.setattr(roads, "its_key", lambda: None)
     monkeypatch.setattr(roads, "road_alerts", lambda path, d: {"events": [], "cautions": [], "delay_min": 0})
     monkeypatch.setattr(roads, "osrm", lambda a, b: {"distance_km": 290.0, "duration_min": 220, "path": [list(a), list(b)],
@@ -555,7 +564,7 @@ def test_u24_outbound_time_calibrated_and_editable(db, monkeypatch):
 # U25 출발지에서 들르는 곳도 동선에 포함(이동 줄·번호) + 머무는 시간·순서 바꾸기
 def test_u25_route_stops_are_part_of_route_and_editable(db, monkeypatch):
     _fixed_drive(monkeypatch)
-    from momo import brochure
+    from src.planning import brochure
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=0, departure="경기", origin_label="판교동",
                             origin_coords=[37.39, 127.11], depart_time=8 * 60, breakfast="안 먹음")
     _seed("u25", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r")]])
@@ -577,7 +586,7 @@ def test_u25_route_stops_are_part_of_route_and_editable(db, monkeypatch):
     st = agent.graph().get_state({"configurable": {"thread_id": "u25"}}).values
     assert [x["name"] for x in st["spec"]["depart_stops"]] == ["전주 한옥마을", "청주 상당산성"]
     assert st["spec"]["depart_stops"][1]["stay_min"] == 90
-    road = [it for it in st["itinerary"] if (it.get("notes") or [""])[0] == "가는 길"]
+    road = [it for it in st["itinerary"] if (it.get("notes") or [""])[0] == "가는 길" and it.get("route_key")]   # 들를 곳 사이 끼니는 따로
     assert [it["place_name"] for it in road] == ["전주 한옥마을", "청주 상당산성"]        # 정한 순서 그대로
     hm = planner.hours.parse_hm
     assert hm(road[1]["end_time"]) - hm(road[1]["start_time"]) == 90
@@ -585,7 +594,7 @@ def test_u25_route_stops_are_part_of_route_and_editable(db, monkeypatch):
 
 def test_u25_route_legs_not_counted_as_local_travel(monkeypatch):
     _fixed_drive(monkeypatch)
-    from momo import brochure
+    from src.planning import brochure
     spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=0, departure="경기", origin_label="판교동",
                             origin_coords=[37.39, 127.11], depart_time=8 * 60, breakfast="안 먹음",
                             depart_stops=[{"key": "k", "name": "청주 상당산성", "lat": 36.66, "lng": 127.54, "detour_min": 15, "stay_min": 45, "kind": "관광지"}])
@@ -595,3 +604,106 @@ def test_u25_route_legs_not_counted_as_local_travel(monkeypatch):
     d0 = plan["itinerary"][0]
     assert any(l.get("long") for l in d0["legs"])                                   # 동선에는 보임
     assert d0["day_distance_km"] < 60 and plan["totals"]["local"]["distance_km"] < 60    # 현지 이동 합계엔 안 셈
+
+
+# ---- 2026-11-26 사용자 요청: 식사 자리·식당 고르기 / 식사 연속 3번 허용·분류 바꾸기 / 숙소 번호·여러 번 들르기 / 예약 숙소 일괄 ----
+
+def _state(sid):
+    return agent.graph().get_state({"configurable": {"thread_id": sid}}).values
+
+
+def _edit(sid, edit):
+    return c.post("/query", json={"question": "편집", "session_id": sid, "action": "edit", "edit": edit}).json()
+
+
+def test_u26_meal_runs_allow_three_and_cafe_override():
+    spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1)
+    rest = [pid for pid, p in data.places(REGION).items() if p.get("kind") == "restaurant"
+            and not planner.CAFE_RE.search(p["title"]) and pid != _id("카페 어그원")][:3]
+    meal = lambda pid: PickItem(place_id=pid, stay_minutes=30, role="place", reason="r")
+    head = [PickItem(place_id=_id("순천 드라마촬영장"), stay_minutes=90, reason="r")]
+    assert not _clash(spec, _sched(spec, [head + [meal(x) for x in rest], []]))      # 연달아 3번까지는 허용
+    cafe = _id("카페 어그원")
+    four = head + [meal(x) for x in rest] + [meal(cafe)]
+    spec.kind_override = {cafe: "식사"}                                    # 카페를 '식사'로 바꾸면 4번째 → 위반
+    assert _clash(spec, _sched(spec, [four, []]))
+    spec.kind_override = {cafe: "카페"}                                    # 다시 카페로 → 허용
+    assert not _clash(spec, _sched(spec, [four, []]))
+
+
+def test_u27_day1_breakfast_slot_and_pick_restaurant():
+    spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1, intensity="빡빡")    # 08:00부터 현지 일정
+    items = _sched(spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r")], []])
+    d1 = [it for it in items if it["date"] == "2026-11-28"]
+    assert d1[0]["type"] == "meal" and "아침" in d1[0]["place_name"] and d1[0]["start_time"] == "08:00"
+    spec.intensity = "보통"                                                 # 09:00 시작이면 아침 자리 없음
+    items = _sched(spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r")], []])
+    assert not any("아침" in it["place_name"] for it in items if it["date"] == "2026-11-28")
+    # 식사 자리에서 '식당 고르기' → 그 끼니 자리표시자가 고른 식당으로
+    spec.intensity = "빡빡"
+    _seed("u27", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r"),
+                         PickItem(place_id=planner.MEAL_ID, role="lunch", stay_minutes=60, reason=""),
+                         PickItem(place_id=_id("호텔라움"), stay_minutes=0, role="stay", reason="r")],
+                        [PickItem(place_id=_id("화엄사"), stay_minutes=60, reason="r")]])
+    _edit("u27", {"op": "add", "place_id": _id("명지원"), "meal_day": 1, "meal_role": "lunch"})
+    d1 = [it for it in _state("u27")["itinerary"] if it["date"] == "2026-11-28" and it["type"] == "meal"]
+    assert any(it["place_name"].startswith("명지원") for it in d1) and not any("점심 식사" in it["place_name"] for it in d1)
+    _edit("u27", {"op": "add", "place_id": _id("남녘들밥상"), "meal_day": 2, "meal_role": "breakfast"})
+    d2 = [it for it in _state("u27")["itinerary"] if it["date"] == "2026-11-29" and it["type"] != "move"]
+    assert d2[0]["place_name"].startswith("남녘들밥상")                     # 그날 맨 앞(문 여는 시각 이후)
+    assert not any("숙소 근처 아침" in it["place_name"] for it in d2)       # 고른 식당이 아침 자리를 대신
+
+
+def test_u28_lodging_visit_multiple_times_and_numbered():
+    from src.planning import brochure
+    spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1)
+    hotel = _id("호텔라움")
+    _seed("u28", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r"),
+                         PickItem(place_id=_id("화엄사"), stay_minutes=60, reason="r"),
+                         PickItem(place_id=hotel, stay_minutes=0, role="stay", reason="r")], []])
+    _edit("u28", {"op": "lodge_visit", "day": 1, "after": _id("사성암")})
+    _edit("u28", {"op": "add", "place_id": hotel, "day": 1})                # 같은 숙소를 또 넣어도 '들르기'로
+    st = _state("u28")
+    vis = [it for it in st["itinerary"] if (it.get("place_id") or "").startswith(planner.VISIT_PREFIX)]
+    assert len(vis) == 2 and len({it["place_id"] for it in vis}) == 2 and all(it["type"] == "place" for it in vis)
+    assert not [v for v in st["violations"] if v["type"] == "없는 장소"]
+    s2 = agent.spec_from_dict(st["spec"])
+    d1 = brochure.build(s2, st["itinerary"], [], [], [])["itinerary"][0]
+    assert [x["order"] for x in d1["stops"]] == list(range(1, len(d1["stops"]) + 1))   # 숙소도 번호로
+    assert sum(1 for x in d1["stops"] if x.get("visit")) == 2
+
+
+def test_u29_booked_stay_all_nights_and_kind_edit():
+    spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=2)
+    _seed("u29", spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r")],
+                        [PickItem(place_id=_id("화엄사"), stay_minutes=60, reason="r")],
+                        [PickItem(place_id=_id("순천 드라마촬영장"), stay_minutes=60, reason="r")]])
+    _edit("u29", {"op": "stay_all", "place_id": _id("호텔라움")})
+    st = _state("u29")
+    stays = [it for it in st["itinerary"] if it["type"] == "stay"]
+    assert [it["date"] for it in stays] == ["2026-11-28", "2026-11-29"] and {it["place_id"] for it in stays} == {_id("호텔라움")}
+    assert st["spec"]["booked_stay"] == _id("호텔라움")
+    _edit("u29", {"op": "kind", "place_id": _id("화엄사"), "kind": "카페"})
+    assert _state("u29")["spec"]["kind_override"] == {_id("화엄사"): "카페"}
+    _edit("u29", {"op": "kind", "place_id": _id("화엄사"), "kind": "자동"})
+    assert _state("u29")["spec"]["kind_override"] == {}
+
+
+def test_u30_area_label_from_address():
+    from src.places.placesearch import area_of
+    assert area_of("전라남도 구례군 마산면 화엄사로 539") == "전남 구례군 마산면"
+    assert area_of("경상남도 하동군 화개면 쌍계로 1") == "경남 하동군 화개면"
+    assert area_of("서울특별시 강남구 테헤란로 1") == "서울 강남구"
+    assert area_of("") == ""
+
+
+def test_u31_placeholder_meals_stay_at_meal_time_on_user_ordered_day():
+    # 순서를 직접 정한 날에도 '주변에서 저녁 식사' 자리는 18시에(14:30으로 당겨져 점심과 겹치고 점심이 빠지던 문제)
+    spec = planner.TripSpec(region=REGION, start=date(2026, 11, 28), nights=1, user_ordered_days=[1])
+    items = _sched(spec, [[PickItem(place_id=_id("사성암"), stay_minutes=60, reason="r"),
+                           PickItem(place_id=planner.MEAL_ID, role="lunch", stay_minutes=60, reason=""),
+                           PickItem(place_id=_id("화엄사"), stay_minutes=60, reason="r"),
+                           PickItem(place_id=planner.MEAL_ID, role="dinner", stay_minutes=60, reason=""),
+                           PickItem(place_id=_id("호텔라움"), stay_minutes=0, role="stay", reason="r")], []])
+    m = {it["place_name"]: it["start_time"] for it in items if it["date"] == "2026-11-28" and it["type"] == "meal"}
+    assert m["주변에서 점심 식사"] >= "12:00" and m["주변에서 저녁 식사"] >= "18:00"

@@ -1,0 +1,1 @@
+{"endpoint": "searchFestival2", "params": {"eventStartDate": "20261201", "eventEndDate": "20270228", "lDongRegnCd": "52", "lDongSignguCd": "113", "numOfRows": 50, "pageNo": 1}, "data": {"response": {"header": {"resultCode": "0000", "resultMsg": "OK"}, "body": {"items": "", "numOfRows": 0, "pageNo": 1, "totalCount": 0}}}}

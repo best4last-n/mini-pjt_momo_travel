@@ -70,7 +70,7 @@ def save(p: Path, obj) -> None:
 
 def git_commit() -> str:
     c = subprocess.run(["git", "rev-parse", "--short", "HEAD"], cwd=ROOT, capture_output=True, text=True).stdout.strip()
-    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "momo", "app", "evaluation/run_eval.py",
+    dirty = bool(subprocess.run(["git", "status", "--porcelain", "--", "src", "evaluation/run_eval.py",
                                  "evaluation/test_queries.csv"], cwd=ROOT, capture_output=True, text=True).stdout.strip())
     return c + ("+dirty" if dirty else "")
 
@@ -80,8 +80,8 @@ def collect(rnd: int) -> None:
     meta.setdefault("responses_commit", git_commit())
     save(path(rnd, "meta"), meta)
     from fastapi.testclient import TestClient
-    from app.main import app
-    from momo import store
+    from src.api.main import app
+    from src.memory import store
 
     c = TestClient(app, raise_server_exceptions=False)   # 서버 오류는 응답(500)으로 받고 수집을 멈춤
     out = load(path(rnd, "responses"), {})
@@ -134,7 +134,8 @@ def collect(rnd: int) -> None:
 # ---------------- 2) 규칙 검사(채점용) ----------------
 
 def rule_check(cid: str, run: dict) -> list[str]:
-    from momo import data, hours
+    from src.shared import data
+    from src.planning import hours
 
     v = []
     items = run.get("itinerary") or []
@@ -316,7 +317,7 @@ def _f(x):
 def data_line(rnd: int) -> str:
     if rnd == 1:     # 1차 응답 수집 시점(c4472f5)의 데이터
         return "경주 60곳 + 순천/구례 60곳 (수원은 1차 후 보강)"
-    from momo import data
+    from src.shared import data
     return " + ".join(f"{data.region_label(r)} {len(data.places(r))}곳" for r in data.available_regions())
 
 
