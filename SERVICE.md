@@ -291,7 +291,7 @@
 4. ✅ README.md 최종: 지역 7곳·433곳 반영, `src/` 구조·실행 명령·`run.sh`, 2차 결과 표·개선폭 갱신(평가 후)
 5. ⏳ (제출 후 보완) 시연 캡처(시작 카드 → 계획 → 편집 → 확정 → 내보내기·정산·준비물 + 장소 카드) — evaluation/screenshots
 6. ✅ round2_report.md 해석(회차 비교·실패 분석), SERVICE.md 5절 결과 갱신
-7. ⏳ 제출: GitHub public push(https://github.com/best4last-n/mini-pjt_momo_travel, 이력의 실명 제거 후) + 백업 zip → Google Form(시연 캡처 포함)
+7. ✅ 제출: GitHub public push(https://github.com/best4last-n/mini-pjt_momo_travel, 이력의 실명 제거 후 2026-11-27 push 완료, zip 제출은 하지 않음) → Google Form 제출 완료(2026-11-27)
 10. ✅ 상태 DB 정리(483MB → 35MB)·체크포인트 자동 정리(`store.prune_checkpoints`), 회귀 테스트 160건
 8. ✅ 소스 구조 `src/` 도메인별 재구성(3-9), 폴더명 `mini-pjt_momo_travel`
 9. ⚠ 트레이스: LangSmith 무료 월 한도 초과(11-27 확인) → 기존 LangSmith 기록 캡처 + API 응답 `trace` 필드(평가 응답 파일에 케이스별 trace)로 증빙
