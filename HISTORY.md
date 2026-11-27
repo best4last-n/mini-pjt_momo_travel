@@ -743,3 +743,8 @@
 - **사용자 요청**: 폴더 이름을 직접 `mini-pjt_momo_travel`로 바꿈 / 과제 제출·채점 완벽 준비 — 다음 진행할 부분 요약 후 단계별 진행.
 - **Claude 작업**: Claude 메모리의 폴더명 갱신, 새 폴더에서 config.ROOT·DB 경로 확인, 서버 재기동(/·/options·static 200, 가드레일 거절 확인), pytest 156 통과. 가이드 3-3~3-6·체크리스트와 현재 산출물을 대조해 제출 단계 정리: ① 실행 환경 재현 점검 ② 2차 평가 공식 재실행 ③ 트레이스(LangSmith 월 한도 초과) ④ README·SERVICE·리포트 최종 ⑤ git·GitHub public push ⑥ 시연 캡처·Google Form(15:00).
 - **다음 할 일**: 사용자 결정(평가 재실행·LangSmith·저장소) 후 ①부터 진행.
+
+### [2026-11-27 10:45] 제출 준비 ①②④ 진행 — 로컬 커밋 · 2차 평가 재실행 시작
+- **사용자 요청**: 결정 — 2차 평가 다시 실행, 트레이스는 기존 LangSmith 기록 + 응답 trace로 증빙, 제출은 GitHub push와 zip 둘 다.
+- **Claude 작업**: 폴더에 복원된 .git(마지막 커밋 21949b7) 확인. 커밋 전 점검 — .env·sqlite·chroma_db·guide 미추적, 20MB 넘는 파일 없음, .env의 실제 키 값이 작업 트리 어디에도 없음. 11-26 2차 결과를 `evaluation/round2_precheck_report.md`·`evaluation/reports/round2_precheck_20261126/`로 보존(캐시 재사용 방지), run_eval.py의 변경 감지 경로 momo·app → src. 로컬 커밋 `3ac78a9`(push 안 함). 백그라운드: 2차 평가 `run_eval.py --round 2`(LangSmith 추적 끔), 빈 가상환경에 requirements 설치 후 pytest. 문서: README 지역 7곳·433곳, `run.sh`(serve·test·eval·index) 추가·README 안내, SERVICE.md 3-7을 제출 직전 기준으로 재작성.
+- **다음 할 일**: 평가·설치 점검 결과 확인 → round2 리포트 해석·README 점수·SERVICE 5절 → 시연 캡처(평가 끝난 뒤, Bedrock 동시 호출 방지) → LangSmith 기존 기록 캡처(사용자) → GitHub 저장소 생성(사용자) → push(확인 후)·zip.

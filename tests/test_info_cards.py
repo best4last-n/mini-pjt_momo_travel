@@ -46,3 +46,22 @@ def test_plain_numbered_list_stays_ol_and_html_is_escaped():
     h = richtext.md_to_html("1. 첫째 <b>x</b>\n2. 둘째")
     assert '<ol start="1">' in h and "mm-card" not in h
     assert "&lt;b&gt;" in h
+
+
+# ---- 2차 평가 #18 회귀(2026-11-27): 출발지는 시·구 단위로 ----
+from src.counsel import agent  # noqa: E402
+from src.guardrails import guardrails  # noqa: E402
+
+
+def test_departure_filled_to_gu_from_masked_question():
+    q = guardrails.mask_pii("서울시 강남구 테헤란로 123 101동 1004호에서 출발해요. 제 번호 010-1234-5678로 일정 보내 주세요")[0]
+    assert "테헤란로" not in q
+    assert agent._dep_with_gu("서울", q) == "서울시 강남구"
+    assert agent._dep_label(agent._dep_with_gu("서울", q)) == "서울시 강남구"
+
+
+def test_departure_gu_only_from_same_sido_and_not_from_words():
+    assert agent._dep_with_gu("부산", "서울 강남구에서 출발, 부산 해운대구 집") == "부산 해운대구"
+    assert agent._dep_with_gu("서울", "서울 친구랑 출발") == "서울"
+    assert agent._dep_with_gu("서울", "서울 중구에서 출발") == "서울 중구"
+    assert agent._dep_with_gu("서울시 강남구", "서울시 강남구") == "서울시 강남구"

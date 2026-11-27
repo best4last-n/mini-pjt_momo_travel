@@ -1,7 +1,7 @@
 # 미니 PJT: 모모의 여행 상담소 (Momo Travel Counselor)
 
 우체부 철새 '모모'가 상담하듯 대화하며, **운영시간·휴무일·축제·날씨·오가는 이동시간까지 반영한 "실제로 갈 수 있는" 국내 여행 일정**을 짜 주는 Agentic RAG 에이전트입니다.
-대상 지역은 경주 · 순천/구례 · 수원이며, 모든 장소는 한국관광공사 TourAPI 데이터를 근거로 합니다.
+대상 지역은 7곳(경주 · 순천/구례 · 수원 · 제주 · 강릉/동해/삼척 · 전주/완주/군산 · 통영/거제, 수집 장소 433곳)이며, 모든 장소는 한국관광공사 TourAPI 데이터를 근거로 합니다. 인-아웃 평가 세트는 경주·순천/구례·수원 기준입니다.
 
 > 상세 기획: [SERVICE.md](SERVICE.md) · 실행 명세(Seed): [seeds/momo.seed.yaml](seeds/momo.seed.yaml) · 작업 이력: [HISTORY.md](HISTORY.md) · 협업 규칙: [AGENTS.md](AGENTS.md)
 
@@ -48,7 +48,7 @@ src.counsel.agent.handle_query  ── LangGraph StateGraph (체크포인트: mo
      │            └─ reject  : 범위 밖·인젝션 거절
      └────────────▶ guard_out(출력 검사·개인정보 가리기) ─▶ {answer, contexts, trace, status, itinerary, plan …}
 
-데이터: data/tourapi/<지역>/places.json(관광공사 수집 181곳 + 실시간 편입) · data/index/docs.jsonl(BM25) · chroma_db/(벡터, 생성 필요)
+데이터: data/tourapi/<지역>/places.json(관광공사 수집 7개 지역 433곳 + 실시간 편입) · data/index/docs.jsonl(BM25) · chroma_db/(벡터, 생성 필요)
 ```
 
 - 소스는 모두 `src/` 아래에 **업무 도메인별 폴더**로 나뉩니다. 각 도메인 폴더에 실행 로직·프롬프트(`prompts.py`)·입출력 스키마(`schemas.py`)가 함께 있고, 여러 도메인이 쓰는 LLM 클라이언트·설정·유틸리티만 `src/shared/`에 둡니다(배치 규칙: `AGENTS.md` 4절).
@@ -90,6 +90,8 @@ python -m src.ingest.build_index
 # 4) 서버 실행 → http://127.0.0.1:8000
 python -m uvicorn src.api.main:app --host 127.0.0.1 --port 8000
 ```
+
+한 번에 실행하려면 `bash run.sh` (가상환경 만들기·설치·서버 실행). `bash run.sh test`·`eval`·`index`로 테스트·평가·색인도 실행할 수 있습니다.
 
 API 예시:
 

@@ -404,13 +404,14 @@ def build(spec, items: list[dict], ranked: list[tuple[str, str]], violations: li
                 key = "outbound" if (it["notes"] and it["notes"][0] == "출발") else "inbound"
                 pl_ = _planner()
                 seg = bool(it.get("route_segmented"))      # 들를 곳이 있으면 이 카드는 한 구간(출발지→첫 들를 곳 / 마지막 들른 곳→복귀 지점)
-                drv = (hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"])) if seg else (
+                drv = (it.get("route_drive_min") or (hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]))) if seg else (
                     pl_.one_way_minutes(spec) if key == "outbound" else pl_._return_base(spec))
-                long[key] = {"mode": spec.long_transport, "label": it["place_name"], "depart": it["start_time"], "segmented": seg,
+                dep_t = it.get("route_leave") or it["start_time"]     # 오는 길 식사가 있으면 귀가 줄은 식사 뒤부터 — 카드는 떠나는 시각
+                long[key] = {"mode": spec.long_transport, "label": it.get("route_label") or it["place_name"], "depart": dep_t, "segmented": seg,
                              "drive_min": drv, "drive_custom": bool((spec.long_override or {}).get("out" if key == "outbound" else "back"))
                              and not (seg and key == "outbound"),
                              "arrive": it["end_time"],
-                             "duration_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(it["start_time"]),
+                             "duration_min": hours.parse_hm(it["end_time"]) - hours.parse_hm(dep_t),
                              "estimated": True}
                 if key == "outbound" and not seg:
                     prev, prev_name = {"lat": center[0], "lng": center[1]}, "도착 지점"

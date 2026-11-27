@@ -235,8 +235,12 @@ def test_return_road_meal_placeholder_is_inside_single_return_journey(monkeypatc
     assert len(ret) == 1                                                       # 귀가 이동은 하나
     meal = [it for it in back if it["notes"][0] == "오는 길"]
     assert meal                                                                # 길 위 저녁 식사 자리가 생기는 모양
-    if meal:
-        assert HM(ret[0]["start_time"]) == HM(local[-1]["end_time"])
-        assert HM(ret[0]["start_time"]) <= HM(meal[0]["start_time"]) and HM(meal[0]["end_time"]) <= HM(ret[0]["end_time"])
-        assert HM(ret[0]["end_time"]) - HM(ret[0]["start_time"]) == 220 + (HM(meal[0]["end_time"]) - HM(meal[0]["start_time"]))
-        assert meal[0]["travel_minutes_from_prev"] == HM(meal[0]["start_time"]) - HM(local[-1]["end_time"])      # 앞 구간은 마지막 장소에서
+    # 2026-11-27(2차 평가 #1): 일정 목록에서는 귀가 줄이 식사와 겹치지 않는다 — 식사 앞 운전은 식사 줄의 travel_minutes_from_prev,
+    # 귀가 줄은 식사가 끝난 시각부터. 계획서 카드용으로 떠나는 시각(route_leave)·원래 이름(route_label)을 함께 둔다.
+    assert HM(ret[0]["start_time"]) == HM(meal[-1]["end_time"])
+    assert ret[0]["route_leave"] == local[-1]["end_time"]                      # 떠나는 시각 = 마지막 장소가 끝난 시각
+    assert meal[0]["travel_minutes_from_prev"] == HM(meal[0]["start_time"]) - HM(local[-1]["end_time"])      # 앞 구간은 마지막 장소에서
+    drive_before = meal[0]["travel_minutes_from_prev"]
+    assert drive_before + (HM(ret[0]["end_time"]) - HM(ret[0]["start_time"])) == 220                         # 운전 합 = 귀가 운전 시간
+    spans = sorted((HM(it["start_time"]), HM(it["end_time"])) for it in last)
+    assert all(a[1] <= b[0] for a, b in zip(spans, spans[1:]))                 # 마지막 날 어떤 줄도 겹치지 않음

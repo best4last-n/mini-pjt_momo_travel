@@ -332,6 +332,7 @@ def parse(state: State) -> State:
     p: ParsedRequest = structured(ParsedRequest).invoke([("system", sys), ("human", f"<data>{q}</data>")])
     if p.intent == "modify" and not has_draft:
         p.intent = "plan"
+    p.departure = _dep_with_gu(p.departure, q)
     pend = state.get("pending") or {}
     if pend and not has_draft and p.intent != "reject":
         merged = p.model_dump()
@@ -2054,6 +2055,21 @@ def set_node(state: State) -> State:
     out = _reschedule(state, spec, _day_picks(spec, state["itinerary"]), [change], "set", repair=True)
     out["changes"] = [*out["changes"], *errors][:3]
     return out
+
+
+_SIDO_GU = re.compile(r"([가-힣]{2,8}?(?:특별자치시|특별자치도|특별시|광역시|시|도)?)\s*([가-힣]{1,6}(?:구|군))"
+                      r"(?=$|[^가-힣]|에서|에|으로|로|부터|쪽|근처|집|이|은|는|의)")
+
+
+def _dep_with_gu(dep: str | None, q: str) -> str | None:
+    """LLM이 출발지를 시·도까지만 뽑았는데('서울') 질문에 같은 시·도의 구·군이 있으면('서울시 강남구') 구까지 채운다.
+    출발지는 시·군·구 단위로만 쓴다(SERVICE.md 4절) — 2차 평가 #18 회귀(2026-11-27)."""
+    if not dep or re.search(r"(구|군)$", dep.strip()) or not data.norm_sido(dep):
+        return dep
+    for m in _SIDO_GU.finditer(q or ""):
+        if data.norm_sido(m.group(1)) == data.norm_sido(dep):
+            return f"{m.group(1)} {m.group(2)}"
+    return dep
 
 
 def _dep_label(text: str | None) -> str:

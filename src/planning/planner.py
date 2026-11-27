@@ -1024,10 +1024,22 @@ def schedule(spec: TripSpec, plan: PlanPick, cands: dict[str, dict]) -> list[dic
             last_xy = _coords(prev) if prev is not None and _coords(prev) and None not in _coords(prev) else None
             lp = leg_plan(spec, "back", back, last_xy, meals_b)
             items += _route_items(spec, d, lp)
+            # 마지막 운전 구간에 오는 길 식사가 있으면 귀가 줄은 식사 뒤부터(식사 전 운전은 식사 줄의 '앞 지점에서 운전 N분')
+            # — 귀가 줄이 식사와 시간이 겹쳐 보이던 문제(2차 평가 #1·#5·#20, 2026-11-27)
+            road_meal = [e for e in lp["events"] if e["kind"] == "meal" and e["start"] >= lp["last_start"]]
+            # 계획서 귀가 카드는 예전 그대로(떠나는 시각·이름·운전 시간) — route_leave·route_label·route_drive_min으로 넘김(U48)
             if lp["segmented"]:       # 마지막 들른 곳 → 복귀 지점
                 lastn = [e for e in lp["events"] if e["kind"] == "stop"][-1]["name"]
-                mv = _move(d, f"{lastn} → {dest}", lp["last_start"], lp["end"], "귀가")
+                if road_meal:
+                    mv = _move(d, f"오는 길 {road_meal[-1]['meal']} 식당 → {dest}", road_meal[-1]["end"], lp["end"], "귀가")
+                    mv.update(route_leave=hours.fmt(lp["last_start"]), route_label=f"{lastn} → {dest}", route_drive_min=lp["last_min"])
+                else:
+                    mv = _move(d, f"{lastn} → {dest}", lp["last_start"], lp["end"], "귀가")
                 mv["route_segmented"] = True
+                items.append(mv)
+            elif road_meal:
+                mv = _move(d, f"오는 길 {road_meal[-1]['meal']} 식당 → {dest}", road_meal[-1]["end"], lp["end"], "귀가")
+                mv.update(route_leave=hours.fmt(back), route_label=f"{data.region_label(spec.region)} → {dest}")
                 items.append(mv)
             else:
                 items.append(_move(d, f"{data.region_label(spec.region)} → {dest}", back, lp["end"], "귀가"))
