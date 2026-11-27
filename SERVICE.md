@@ -289,7 +289,7 @@
 2. ✅ **2차 평가 공식 재실행** — 1회차(`2a5df46`) 15/20 → #1·#18 수정 → 최종(`ab433fe`) **15/20 · guardrail 3/3**을 공식 값으로 확정(5절). 11-26 사전 점검 17/20은 `evaluation/round2_precheck_report.md`로 보존·병기
 3. ✅ 회귀 테스트 160건(사용자 실사용 회귀·확장 가드레일 18건(4-1)·새 API·장소 카드 포함, LLM 호출 없음)
 4. ✅ README.md 최종: 지역 7곳·433곳 반영, `src/` 구조·실행 명령·`run.sh`, 2차 결과 표·개선폭 갱신(평가 후)
-5. ⏳ (제출 후 보완) 시연 캡처(시작 카드 → 계획 → 편집 → 확정 → 내보내기·정산·준비물 + 장소 카드) — evaluation/screenshots
+5. ✅ 시연 캡처(README 시연 화면 절, evaluation/screenshots/demo_*)(시작 카드 → 계획 → 편집 → 확정 → 내보내기·정산·준비물 + 장소 카드) — evaluation/screenshots
 6. ✅ round2_report.md 해석(회차 비교·실패 분석), SERVICE.md 5절 결과 갱신
 7. ✅ 제출: GitHub public push(https://github.com/best4last-n/mini-pjt_momo_travel, 이력의 실명 제거 후 2026-11-27 push 완료, zip 제출은 하지 않음) → Google Form 제출 완료(2026-11-27)
 10. ✅ 상태 DB 정리(483MB → 35MB)·체크포인트 자동 정리(`store.prune_checkpoints`), 회귀 테스트 160건

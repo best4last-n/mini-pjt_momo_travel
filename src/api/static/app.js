@@ -38,7 +38,7 @@
   const TYPE_LABEL = { place: "관광", meal: "식사", stay: "숙박", move: "이동" };
   const COST_CATS = ["장거리 교통", "현지 교통", "유류비", "통행료", "주차비", "렌터카", "식비", "카페·디저트", "간식·음료", "입장료", "체험", "기념품", "숙박", "기타"];
   const PLACEHOLDER_CONDS = [
-    { key: "region", label: "여행 지역", input: "select", options: ["경주", "순천/구례", "수원"], hint: "지금은 경주 · 순천/구례 · 수원을 꼼꼼히 검증해요." },
+    { key: "region", label: "여행 지역", input: "select", options: ["경주", "순천/구례", "수원", "제주", "강릉·동해·삼척", "전주·완주·군산", "통영·거제"], hint: "지금은 7개 지역을 꼼꼼히 검증해요." },
     { key: "start_date", label: "출발일", input: "date", options: [], hint: "날짜에 따라 휴무일·운영시간이 달라져요." },
     { key: "length", label: "여행 길이", input: "select", options: ["당일치기", "1박 2일"], hint: "당일~1박 2일까지 꼼꼼히 검증해요." },
     { key: "origin", label: "출발지", input: "text", options: ["서울", "경기 수원", "대전", "광주", "부산", "대구"], hint: "시·군·구까지만 알려 주세요. 오가는 시간을 계산해요." },

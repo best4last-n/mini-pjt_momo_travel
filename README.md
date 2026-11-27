@@ -114,6 +114,23 @@ python evaluation/run_eval.py --round 2              # 인-아웃 20건 평가 (
 
 데이터를 새로 모으려면(선택): `python -m src.ingest.collect_tourapi <지역>` → `python -m src.ingest.summarize_places <지역>` → `python -m src.ingest.enrich_places` → `python -m src.ingest.build_index`. 지역 설정은 `data/config/regions.json`이며 코드 수정 없이 추가할 수 있습니다.
 
+## 시연 화면
+
+요청 한 줄 → 계획서 → 편집 → 승인·확정 → 공유·정산·리포트까지 실제 서버를 브라우저로 조작해 캡처했습니다(2026-11-27, 경주 1박 2일 · 서울 강남구 출발 · 부모님 동반 4명, 계획 생성 약 40~80초).
+
+| 1. 시작 — 정한 것부터 고르기 | 2. 계획서(승인 대기) — 조건 신호등·예상 경비·지도 |
+|---|---|
+| ![시작 화면](evaluation/screenshots/demo_01_start.png) | ![계획서](evaluation/screenshots/demo_02_plan.png) |
+| **3. 편집 모드 — 바꾸기·옮기기·빼기·빈 시간 채우기** | **4. 확정 — 승인 후 공유·내보내기 안내** |
+| ![편집 모드](evaluation/screenshots/demo_04_edit_mode.png) | ![확정](evaluation/screenshots/demo_05_confirmed.png) |
+| **5. 공유 페이지(읽기 전용)** | **6. 실제 지출 정산 — 계획 대비 실제** |
+| ![공유 페이지](evaluation/screenshots/demo_06_share.png) | ![지출 정산](evaluation/screenshots/demo_07_expenses.png) |
+| **7. 여행 결과 리포트** | **8. 정보 질문(ReAct) — 맛집 10곳 카드** |
+| ![결과 리포트](evaluation/screenshots/demo_08_report.png) | ![장소 카드](evaluation/screenshots/info_cards_1280.png) |
+
+- 모바일(390px): [공유 페이지](evaluation/screenshots/demo_09_share_mobile.png) · [장소 카드](evaluation/screenshots/info_cards_390.png)
+- 트레이스: [LangSmith 목록](evaluation/screenshots/langsmith_trace_list.png) · [LangSmith 상세](evaluation/screenshots/langsmith_trace_detail.png)
+
 ## RAGAS 평가 결과
 
 contexts가 있는 케이스의 평균이며, 케이스 통과 판정과는 별도 지표입니다. 기준치는 프로젝트 자체 기준입니다. **2차는 최종 실행(제출 코드)을 공식 결과로 씁니다.**
