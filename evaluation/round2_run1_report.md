@@ -1,7 +1,7 @@
-# Round 2 1회차 리포트 (2026-11-27 10:45 실행, 코드 3ac78a9 · 최종 2차는 round2_report.md)
+# Round 2 1회차 리포트 (2026-11-27 10:45 실행, 코드 2a5df46 · 최종 2차는 round2_report.md)
 
 - 실행: `python evaluation/run_eval.py --round 2` · 평가 기준일 2026-11-25(MOMO_TODAY) · 채점 모델 us.anthropic.claude-sonnet-4-6(temperature 0)
-- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `3ac78a9` · 채점 실행 커밋 `3ac78a9`
+- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `2a5df46` · 채점 실행 커밋 `2a5df46`
 - 수집 데이터: 순천/구례 70곳 + 경주 60곳 + 수원 62곳 + 제주 60곳 + 강릉·동해·삼척 61곳 + 전주·완주·군산 60곳 + 통영·거제 60곳
 
 ## 결과 요약

@@ -770,3 +770,8 @@
 - **2차 재실행 결과(커밋 f3a71f6)**: 15/20, guardrail 3/3, 규칙 위반 2건(#15). #1·#18은 수정대로 통과. 새 실패 #8(Judge 이유는 '위반 없음'이라고 쓰고 금지 검출로 판정 — Judge 불일치), #15(아침·점심 '주변 식당' 자리표시자 사이 이동 0분 — 채점 규칙 게이트). RAGAS faithfulness 0.525 · answer_relevancy 0.562 · context_precision 0.508 · context_recall 0.439.
 - **정정**: 바로 앞 두 기록의 시각 '11:15'·'11:30'은 실제보다 늦게 적은 것으로, 실제 작업은 10:55~11:00 사이(이후 시각은 date로 확인해 적음).
 - **다음 할 일**: 2차 결과 처리 방향 결정(사용자) → 리포트·README·SERVICE 5절 수치 맞춤 → git 이력 실명·이메일 정리(noreply 주소 필요) → 시연 캡처 → push·zip.
+
+### [2026-11-27 11:30] git 이력 실명 정리 · 원격 저장소 연결 · 상위 저장소 분리 확인
+- **사용자 요청**: 커밋 작성자 이메일은 그대로 공개, 저장소 주소 https://github.com/best4last-n/mini-pjt_momo_travel / 기존 상위 저장소와 분리가 필요한지 확인.
+- **Claude 작업**: 작업분 커밋 후 프로젝트 밖에 이력 백업(`..\mini-pjt_momo_travel_git_backup_20261127.bundle`). git-filter-repo `--replace-text`로 커밋 48개 전체에서 옛 폴더명(실명 포함)을 `mini-pjt_momo_travel`로 치환 → 이력 내 실명 13건 → 0건. 커밋 번호가 바뀌어 평가 리포트·reports JSON·SERVICE.md의 '채점 장치 고정 증거' 커밋 번호를 새 번호로 갱신(25곳, 모두 존재 확인) — 대응: 1차 수집 f73a401·채점 accbc93, 사전 점검 수집 14fee65·채점 ed53ff6, 2차 1회차 2a5df46(옛 3ac78a9), 2차 최종 ab433fe(옛 f3a71f6). 이 HISTORY의 이전 항목에 적힌 커밋 번호는 옛 번호(위 대응으로 읽음). 상위 폴더 sds-ax-practice는 git 저장소가 아니고 서브모듈도 없으며, 이 저장소 이력에는 프로젝트 파일만 있어 분리 불필요(옆 폴더 sds-ax-training은 별개 저장소). 원격 origin 추가(빈 저장소 확인), push는 아직 안 함.
+- **다음 할 일**: 2차 결과 마무리 방식(A 확정 / B #15 수정 후 1회) 결정 → 리포트·README·SERVICE 5절 → 시연 캡처 → push(확인 후)·zip.

@@ -1,7 +1,7 @@
 # Round 1 자체 평가 리포트
 
 - 실행: `python evaluation/run_eval.py --round 1` · 평가 기준일 2026-11-25(MOMO_TODAY) · 채점 모델 us.anthropic.claude-sonnet-4-6(temperature 0)
-- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `c4472f5` · 채점 실행 커밋 `1c19186`
+- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `f73a401` · 채점 실행 커밋 `accbc93`
 - 비고: 채점 장치 버그(RAGAS 출력 파싱 실패로 #12·#15·#17 faithfulness 누락) 수정 후 같은 장치로 1차 응답을 재채점함 — SERVICE.md 5절 규칙. 케이스 통과 판정(규칙 게이트·Judge)은 변경 없음
 - 수집 데이터: 경주 60곳 + 순천/구례 60곳 (수원은 2차 전 보강 예정)
 

@@ -1,7 +1,7 @@
 # Round 2 사전 점검 리포트 (2026-11-26 실행 · 최종 2차는 round2_report.md)
 
 - 실행: `python evaluation/run_eval.py --round 2` · 평가 기준일 2026-11-25(MOMO_TODAY) · 채점 모델 us.anthropic.claude-sonnet-4-6(temperature 0)
-- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `555c891` · 채점 실행 커밋 `2c9b768`
+- 채점 장치 고정 증거: test_queries.csv SHA-256 `1b4c351c0221e4a988151b347517de276d6901db19583627c425612a79424ab4` · 응답 수집 커밋 `14fee65` · 채점 실행 커밋 `ed53ff6`
 - 수집 데이터: 순천/구례 60곳 + 경주 60곳 + 수원 61곳
 
 ## 결과 요약
