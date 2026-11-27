@@ -6,6 +6,7 @@ SERVICE.md 3-4b·3-4c·3-4e·5절 규칙 검사(하드 게이트):
 """
 from __future__ import annotations
 
+import copy
 import math
 import re
 from dataclasses import dataclass, field
@@ -1488,6 +1489,11 @@ def _role_of(it: dict) -> str:
 
 # ---------- 전체 루프 ----------
 
+def _n_places(items: list[dict]) -> int:
+    """일정 속 관광지(type=place) 수 — 재생성 결과 비교용."""
+    return sum(1 for it in items if it.get("type") == "place")
+
+
 def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, trace: list | None = None,
                locked: dict | None = None, prefix: dict | None = None, indoor: bool = False) -> dict:
     """locked: {일차: [PickItem]} — 수정 대상이 아닌 날은 기존 선택 그대로 고정.
@@ -1507,6 +1513,7 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
     allowed = set(cands)
     trace.append({"step": "retrieve", "input": request[:200], "output": f"후보 {len(cands)}곳: " + ", ".join(p["title"] for p in list(cands.values())[:15])})
     feedback, items, viol, regen, last_ranked = None, [], [], 0, []
+    attempts: list[tuple[list[dict], list[dict]]] = []
     from src.shared.cancel import check as _cancel_check
     for attempt in range(MAX_REGEN + 1):
         _cancel_check()
@@ -1557,16 +1564,28 @@ def build_plan(spec: TripSpec, request: str, base: list[dict] | None = None, tra
                       "input": f"시도 {attempt + 1}" + (f" · 위반 {len(feedback.splitlines())}건 반영" if feedback else ""),
                       "output": " / ".join(f"{it['date'][5:]} {it['start_time']} {it['place_name']}" for it in items)[:600]})
         trace.append({"step": "validate", "input": f"항목 {len(items)}개", "output": feedback_text(viol) or "위반 0건"})
+        attempts.append((items, viol))
         if not viol:
             break
         regen = attempt + 1 if attempt < MAX_REGEN else regen
-        feedback = feedback_text(viol)
+        # 재생성이 관광지 0곳으로 무너지면(LLM 빈 선택) 그 시도의 '식사·숙박 누락'이 아니라 앞선 시도의 위반을 다시 알려 준다
+        if _n_places(items) or not any(_n_places(a) for a, _ in attempts):
+            feedback = feedback_text(viol)
     repaired = False
     if viol:
-        items = repair(spec, items, viol, allowed, cands)
-        viol = validate(spec, items, allowed)
+        # 마지막 시도가 아니라 '보정 뒤 위반이 가장 적고 관광지가 가장 많이 남는' 시도를 쓴다 —
+        # 재생성이 빈 선택으로 무너져 관광지 0곳 일정이 나가던 문제(2차 평가 #15, 2026-11-27)
+        best = None
+        for k, (a_items, a_viol) in enumerate(attempts):
+            fixed_items = repair(spec, copy.deepcopy(a_items), a_viol, allowed, cands)
+            fixed_viol = validate(spec, fixed_items, allowed)
+            score = (len(fixed_viol), -_n_places(fixed_items), -k)
+            if best is None or score < best[0]:
+                best = (score, k, fixed_items, fixed_viol)
+        _, k, items, viol = best
         repaired = True
-        trace.append({"step": "validate", "input": "재생성 2회 후 위반 항목 제거·식사 안내로 보정", "output": feedback_text(viol) or "위반 0건"})
+        trace.append({"step": "validate", "input": f"재생성 {MAX_REGEN}회 후 위반 항목 제거·식사 안내로 보정(시도 {k + 1} 사용)",
+                      "output": feedback_text(viol) or "위반 0건"})
     for it in items:
         if it["type"] != "move":
             trace.append({"step": "tool:estimate_travel", "input": it["place_name"],
