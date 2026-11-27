@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "440a8822-7269-4243-aab6-f789ebc05cb7",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\workflow.json",
+  "output": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\momo-workflow.html",
+  "specification": {
+    "sha256": "f05bc5e70391c6d8b670e18393c723bb30cd5623e55f37790dd30ad2428911ed",
+    "bytes": 9685
+  },
+  "artifact": {
+    "sha256": "2063576e3be32f25df6b10fac54d87dfd3b89e92ab8f52a5dca3187b706f0c27",
+    "bytes": 952616
+  }
+}

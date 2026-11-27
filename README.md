@@ -52,6 +52,7 @@ src.counsel.agent.handle_query  ── LangGraph StateGraph (체크포인트: mo
 데이터: data/tourapi/<지역>/places.json(관광공사 수집 7개 지역 433곳 + 실시간 편입) · data/index/docs.jsonl(BM25) · chroma_db/(벡터, 생성 필요)
 ```
 
+- 구조 다이어그램(코드 근거 링크 포함, archify): [앱 구조](.archify/momo-app-20261127-124708/momo-architecture.html) · [업무 흐름: 상담 → 계획 → 편집·확정 → 여행 후](.archify/momo-app-20261127-124708/momo-workflow.html) · [요청 흐름: /query/async → 계획서 → 확정](.archify/momo-app-20261127-124708/momo-plan-request.html) — 저장소를 내려받아 브라우저로 여세요.
 - 소스는 모두 `src/` 아래에 **업무 도메인별 폴더**로 나뉩니다. 각 도메인 폴더에 실행 로직·프롬프트(`prompts.py`)·입출력 스키마(`schemas.py`)가 함께 있고, 여러 도메인이 쓰는 LLM 클라이언트·설정·유틸리티만 `src/shared/`에 둡니다(배치 규칙: `AGENTS.md` 4절).
 - 가이드의 `src/` 구조와의 대응: `src/agent.py` → `src/counsel/agent.py`, `src/tools.py` → `src/places/tools.py`(+ `src/mobility/roads.py`·`src/places/placesearch.py`), `src/retriever.py` → `src/places/retrieve.py`.
 

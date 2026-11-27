@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "e5659f66-b799-4b0d-a098-ca089034d33f",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\sequence.json",
+  "output": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\momo-plan-request.html",
+  "specification": {
+    "sha256": "51113f72cb4ff7799455ea364868406f222175c7f0be2b6260dd9e1fa114af51",
+    "bytes": 9540
+  },
+  "artifact": {
+    "sha256": "d23d6da202251ae8d688595dacc2d1dfa88adbb82fe01b559c1edc36d19bacec",
+    "bytes": 952977
+  }
+}

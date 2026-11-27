@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "dcda1334-9ff0-40f0-9065-4dca91b00de8",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\architecture.json",
+  "output": "C:\\Users\\SDS\\Desktop\\sds-ax-practice\\mini-pjt_momo_travel\\.archify\\momo-app-20261127-124708\\momo-architecture.html",
+  "specification": {
+    "sha256": "38f79622d9153e0de32743185250b9a0435264edbafb7e35a8f48029fcce4676",
+    "bytes": 12775
+  },
+  "artifact": {
+    "sha256": "34f0fa21af773faef841ed3edf47073a6263f0291e3b75eeca4a625e31a334eb",
+    "bytes": 977662
+  }
+}

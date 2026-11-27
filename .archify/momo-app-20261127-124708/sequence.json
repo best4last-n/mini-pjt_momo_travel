@@ -1,0 +1,440 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "계획 요청 한 번의 흐름 · /query/async → 계획서 → 확정",
+    "locale": "ko",
+    "output": ".archify/momo-app-20261127-124708/momo-plan-request.html",
+    "quality_profile": "showcase",
+    "parentHref": "momo-architecture.html",
+    "repository": {
+      "url": "https://github.com/best4last-n/mini-pjt_momo_travel.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9640dd2b2b9bf4dad97457fb2ed64fcf2c5f56e6"
+    }
+  },
+  "participants": [
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "웹 화면",
+      "sublabel": "app.js",
+      "sources": [
+        {
+          "path": "src/api/static/app.js",
+          "line": 300,
+          "end_line": 340
+        }
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "작업 스레드",
+      "sources": [
+        {
+          "path": "src/api/main.py",
+          "line": 178,
+          "end_line": 204
+        },
+        {
+          "path": "src/api/main.py",
+          "line": 83,
+          "end_line": 90
+        }
+      ]
+    },
+    {
+      "id": "agent",
+      "type": "backend",
+      "label": "상담 에이전트",
+      "sublabel": "LangGraph",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2306,
+          "end_line": 2330
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 491,
+          "end_line": 557
+        }
+      ]
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "가드레일",
+      "sublabel": "PII·인젝션·출력",
+      "sources": [
+        {
+          "path": "src/guardrails/guardrails.py",
+          "line": 43,
+          "end_line": 58
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2254,
+          "end_line": 2263
+        }
+      ]
+    },
+    {
+      "id": "planner",
+      "type": "backend",
+      "label": "일정 엔진",
+      "sublabel": "build_plan",
+      "sources": [
+        {
+          "path": "src/planning/planner.py",
+          "line": 1497,
+          "end_line": 1600
+        }
+      ]
+    },
+    {
+      "id": "rag",
+      "type": "database",
+      "label": "장소 검색",
+      "sublabel": "BM25+Chroma",
+      "sources": [
+        {
+          "path": "src/places/retrieve.py",
+          "line": 54,
+          "end_line": 70
+        },
+        {
+          "path": "src/planning/planner.py",
+          "line": 478,
+          "end_line": 495
+        }
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "Bedrock",
+      "sublabel": "Claude Sonnet 4.5",
+      "sources": [
+        {
+          "path": "src/shared/llm.py",
+          "line": 8,
+          "end_line": 22
+        }
+      ]
+    },
+    {
+      "id": "db",
+      "type": "database",
+      "label": "상태 DB",
+      "sublabel": "SQLite",
+      "sources": [
+        {
+          "path": "src/memory/store.py",
+          "line": 18,
+          "end_line": 60
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2298,
+          "end_line": 2303
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 150,
+      "to": 230,
+      "label": "요청 접수"
+    },
+    {
+      "from": 240,
+      "to": 420,
+      "label": "조건 정리"
+    },
+    {
+      "from": 430,
+      "to": 640,
+      "label": "계획 만들기"
+    },
+    {
+      "from": 650,
+      "to": 790,
+      "label": "응답"
+    },
+    {
+      "from": 800,
+      "to": 960,
+      "label": "확정"
+    }
+  ],
+  "messages": [
+    {
+      "id": "m-post",
+      "from": "web",
+      "to": "api",
+      "y": 165,
+      "label": "POST /query/async",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-job",
+      "from": "api",
+      "to": "web",
+      "y": 195,
+      "label": "job_id",
+      "variant": "return",
+      "note": "화면은 GET /jobs/{id}로 진행률을 묻고, 중지 버튼은 /cancel"
+    },
+    {
+      "id": "m-handle",
+      "from": "api",
+      "to": "agent",
+      "y": 255,
+      "label": "handle_query",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-guard-in",
+      "from": "agent",
+      "to": "guard",
+      "y": 285,
+      "label": "mask_pii · 인젝션 검사",
+      "variant": "security"
+    },
+    {
+      "id": "m-guard-ok",
+      "from": "guard",
+      "to": "agent",
+      "y": 315,
+      "label": "통과(가린 질문)",
+      "variant": "return"
+    },
+    {
+      "id": "m-parse",
+      "from": "agent",
+      "to": "llm",
+      "y": 345,
+      "label": "조건 구조화",
+      "variant": "default"
+    },
+    {
+      "id": "m-parsed",
+      "from": "llm",
+      "to": "agent",
+      "y": 375,
+      "label": "ParsedRequest",
+      "variant": "return",
+      "note": "빠진 필수 조건이 있으면 여기서 되묻기로 끝"
+    },
+    {
+      "id": "m-build",
+      "from": "agent",
+      "to": "planner",
+      "y": 445,
+      "label": "build_plan(TripSpec)",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-cands",
+      "from": "planner",
+      "to": "rag",
+      "y": 475,
+      "label": "후보 검색",
+      "variant": "default"
+    },
+    {
+      "id": "m-cands-r",
+      "from": "rag",
+      "to": "planner",
+      "y": 505,
+      "label": "후보 30~40곳",
+      "variant": "return"
+    },
+    {
+      "id": "m-pick",
+      "from": "planner",
+      "to": "llm",
+      "y": 535,
+      "label": "장소 고르기",
+      "variant": "default"
+    },
+    {
+      "id": "m-pick-r",
+      "from": "llm",
+      "to": "planner",
+      "y": 565,
+      "label": "PlanPick",
+      "variant": "return",
+      "note": "코드가 시각 계산·규칙 검사, 위반이면 재생성 ≤2회, 남으면 보정"
+    },
+    {
+      "id": "m-plan-r",
+      "from": "planner",
+      "to": "agent",
+      "y": 625,
+      "label": "itinerary · 위반 0건",
+      "variant": "return"
+    },
+    {
+      "id": "m-ckpt",
+      "from": "agent",
+      "to": "db",
+      "y": 665,
+      "label": "체크포인트·대화 기록",
+      "variant": "dashed"
+    },
+    {
+      "id": "m-guard-out",
+      "from": "agent",
+      "to": "guard",
+      "y": 695,
+      "label": "출력 검사 · 가리기",
+      "variant": "security"
+    },
+    {
+      "id": "m-guard-out-r",
+      "from": "guard",
+      "to": "agent",
+      "y": 725,
+      "label": "통과",
+      "variant": "return"
+    },
+    {
+      "id": "m-resp",
+      "from": "agent",
+      "to": "api",
+      "y": 755,
+      "label": "answer·contexts·trace·plan",
+      "variant": "return"
+    },
+    {
+      "id": "m-done",
+      "from": "api",
+      "to": "web",
+      "y": 780,
+      "label": "작업 완료 → 계획서",
+      "variant": "return"
+    },
+    {
+      "id": "m-approve",
+      "from": "web",
+      "to": "api",
+      "y": 815,
+      "label": "POST /query action=approve",
+      "variant": "security"
+    },
+    {
+      "id": "m-approve-g",
+      "from": "api",
+      "to": "agent",
+      "y": 845,
+      "label": "approve_node",
+      "variant": "security"
+    },
+    {
+      "id": "m-save",
+      "from": "agent",
+      "to": "db",
+      "y": 875,
+      "label": "save_plan",
+      "variant": "emphasis"
+    },
+    {
+      "id": "m-pid",
+      "from": "agent",
+      "to": "api",
+      "y": 905,
+      "label": "plan_id",
+      "variant": "return"
+    },
+    {
+      "id": "m-share",
+      "from": "api",
+      "to": "web",
+      "y": 945,
+      "label": "공유 링크 · .ics",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "api",
+      "from": 165,
+      "to": 945,
+      "type": "backend"
+    },
+    {
+      "participant": "agent",
+      "from": 255,
+      "to": 905,
+      "type": "backend"
+    },
+    {
+      "participant": "guard",
+      "from": 285,
+      "to": 315,
+      "type": "security"
+    },
+    {
+      "participant": "llm",
+      "from": 345,
+      "to": 375,
+      "type": "cloud"
+    },
+    {
+      "participant": "planner",
+      "from": 445,
+      "to": 625,
+      "type": "backend"
+    },
+    {
+      "participant": "rag",
+      "from": 475,
+      "to": 505,
+      "type": "database"
+    },
+    {
+      "participant": "llm",
+      "from": 535,
+      "to": 565,
+      "type": "cloud"
+    },
+    {
+      "participant": "guard",
+      "from": 695,
+      "to": 725,
+      "type": "security"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "비동기 처리",
+      "items": [
+        "/query/async는 job_id를 바로 돌려주고 스레드에서 실행",
+        "같은 세션에 진행 중인 작업이 있으면 409"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "확정 게이트",
+      "items": [
+        "저장은 action=approve 요청의 approve_node만 수행",
+        "draft_version이 최신이 아니면 거절"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "LLM이 하는 일",
+      "items": [
+        "조건 구조화와 장소·순서·이유 고르기 두 번",
+        "시각·이동·규칙 검사는 코드"
+      ]
+    }
+  ]
+}

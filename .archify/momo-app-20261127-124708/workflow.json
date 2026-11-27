@@ -1,0 +1,421 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "모모 업무 흐름 · 상담에서 여행 후 정산까지",
+    "locale": "ko",
+    "output": ".archify/momo-app-20261127-124708/momo-workflow.html",
+    "quality_profile": "showcase",
+    "parentHref": "momo-architecture.html",
+    "repository": {
+      "url": "https://github.com/best4last-n/mini-pjt_momo_travel.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9640dd2b2b9bf4dad97457fb2ed64fcf2c5f56e6"
+    },
+    "legend": {
+      "entries": {
+        "external": {
+          "label": "사용자 행동"
+        },
+        "frontend": {
+          "label": "화면"
+        },
+        "backend": {
+          "label": "에이전트·일정 엔진"
+        },
+        "security": {
+          "label": "가드·승인 게이트"
+        },
+        "database": {
+          "label": "저장"
+        },
+        "cloud": {
+          "label": "LLM 호출"
+        }
+      }
+    }
+  },
+  "lanes": [
+    {
+      "id": "consult",
+      "label": "1 상담"
+    },
+    {
+      "id": "stop",
+      "label": "거절·되묻기",
+      "variant": "exception"
+    },
+    {
+      "id": "plan",
+      "label": "2 계획 만들기"
+    },
+    {
+      "id": "confirm",
+      "label": "3 편집·확정"
+    },
+    {
+      "id": "after",
+      "label": "4 여행 후"
+    }
+  ],
+  "mainPath": [
+    "ask",
+    "guardin",
+    "conditions",
+    "pick",
+    "check",
+    "brochure"
+  ],
+  "nodes": [
+    {
+      "id": "ask",
+      "lane": "consult",
+      "col": 0,
+      "type": "external",
+      "label": "여행 요청",
+      "sublabel": "채팅 또는 시작 카드"
+    },
+    {
+      "id": "guardin",
+      "lane": "consult",
+      "col": 1,
+      "type": "security",
+      "label": "입력 가드",
+      "sublabel": "개인정보 가리기·인젝션 차단",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 316,
+          "end_line": 326
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2313,
+          "end_line": 2313
+        }
+      ]
+    },
+    {
+      "id": "reject",
+      "lane": "stop",
+      "col": 1,
+      "type": "security",
+      "label": "거절",
+      "sublabel": "범위 밖·비밀 요구",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2285,
+          "end_line": 2286
+        }
+      ]
+    },
+    {
+      "id": "conditions",
+      "lane": "consult",
+      "col": 2,
+      "type": "cloud",
+      "label": "조건 정리",
+      "sublabel": "LLM 구조화 · 시작 카드는 그대로",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 328,
+          "end_line": 351
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 1699,
+          "end_line": 1720
+        }
+      ]
+    },
+    {
+      "id": "askback",
+      "lane": "stop",
+      "col": 2,
+      "type": "frontend",
+      "label": "되묻기",
+      "sublabel": "지역·날짜 등 빠진 조건",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 360,
+          "end_line": 385
+        }
+      ]
+    },
+    {
+      "id": "pick",
+      "lane": "plan",
+      "col": 3,
+      "type": "cloud",
+      "label": "장소 고르기",
+      "sublabel": "RAG 후보 → LLM PlanPick",
+      "sources": [
+        {
+          "path": "src/planning/planner.py",
+          "line": 478,
+          "end_line": 495
+        },
+        {
+          "path": "src/planning/planner.py",
+          "line": 540,
+          "end_line": 600
+        }
+      ]
+    },
+    {
+      "id": "check",
+      "lane": "plan",
+      "col": 4,
+      "type": "backend",
+      "label": "시각 계산·규칙 검사",
+      "sublabel": "위반이면 재생성 ≤2회",
+      "tag": "위반 0건",
+      "sources": [
+        {
+          "path": "src/planning/planner.py",
+          "line": 861,
+          "end_line": 870
+        },
+        {
+          "path": "src/planning/planner.py",
+          "line": 1138,
+          "end_line": 1150
+        },
+        {
+          "path": "src/planning/planner.py",
+          "line": 1497,
+          "end_line": 1600
+        }
+      ]
+    },
+    {
+      "id": "brochure",
+      "lane": "plan",
+      "col": 5,
+      "type": "frontend",
+      "label": "계획서",
+      "sublabel": "승인 대기 · 지도·경비·준비물",
+      "sources": [
+        {
+          "path": "src/planning/brochure.py",
+          "line": 325,
+          "end_line": 340
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 491,
+          "end_line": 557
+        }
+      ]
+    },
+    {
+      "id": "edit",
+      "lane": "confirm",
+      "col": 5,
+      "type": "frontend",
+      "label": "편집·조건 변경",
+      "sublabel": "바꾸기·옮기기·빼기·되돌리기",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 1025,
+          "end_line": 1040
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 1986,
+          "end_line": 1995
+        }
+      ]
+    },
+    {
+      "id": "approve",
+      "lane": "confirm",
+      "col": 4,
+      "type": "security",
+      "label": "확정 승인",
+      "sublabel": "버튼(action=approve)만",
+      "tag": "HITL",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2210,
+          "end_line": 2252
+        }
+      ]
+    },
+    {
+      "id": "save",
+      "lane": "confirm",
+      "col": 3,
+      "type": "database",
+      "label": "확정 저장",
+      "sublabel": "plan_id·공유 링크·.ics",
+      "sources": [
+        {
+          "path": "src/memory/store.py",
+          "line": 50,
+          "end_line": 60
+        }
+      ]
+    },
+    {
+      "id": "spend",
+      "lane": "after",
+      "col": 3,
+      "type": "external",
+      "label": "실제 지출 적기",
+      "sublabel": "공유 페이지 정산"
+    },
+    {
+      "id": "report",
+      "lane": "after",
+      "col": 4,
+      "type": "database",
+      "label": "결과 리포트",
+      "sublabel": "계획 대비 실제",
+      "sources": [
+        {
+          "path": "src/api/main.py",
+          "line": 553,
+          "end_line": 571
+        },
+        {
+          "path": "src/export/export.py",
+          "line": 167,
+          "end_line": 180
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "e-ask",
+      "from": "ask",
+      "to": "guardin",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-reject",
+      "from": "guardin",
+      "to": "reject",
+      "label": "인젝션·비밀",
+      "variant": "security",
+      "role": "error"
+    },
+    {
+      "id": "e-cond",
+      "from": "guardin",
+      "to": "conditions",
+      "label": "통과",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-askback",
+      "from": "conditions",
+      "to": "askback",
+      "label": "필수 조건 빠짐",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "id": "e-pick",
+      "from": "conditions",
+      "to": "pick",
+      "label": "TripSpec",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-check",
+      "from": "pick",
+      "to": "check",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-regen",
+      "from": "check",
+      "to": "pick",
+      "label": "위반 → 재생성",
+      "role": "return",
+      "variant": "dashed"
+    },
+    {
+      "id": "e-brochure",
+      "from": "check",
+      "to": "brochure",
+      "label": "계획서",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-edit",
+      "from": "brochure",
+      "to": "edit",
+      "variant": "default"
+    },
+    {
+      "id": "e-recalc",
+      "from": "edit",
+      "to": "check",
+      "label": "LLM 없이 재계산",
+      "role": "return",
+      "variant": "dashed"
+    },
+    {
+      "id": "e-approve",
+      "from": "edit",
+      "to": "approve",
+      "label": "확정하기",
+      "variant": "security"
+    },
+    {
+      "id": "e-save",
+      "from": "approve",
+      "to": "save",
+      "variant": "emphasis"
+    },
+    {
+      "id": "e-spend",
+      "from": "save",
+      "to": "spend",
+      "label": "여행 중·후",
+      "variant": "dashed"
+    },
+    {
+      "id": "e-report",
+      "from": "spend",
+      "to": "report",
+      "variant": "emphasis"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "주 흐름",
+      "items": [
+        "요청 → 입력 가드 → 조건 정리 → 장소 고르기 → 규칙 검사 → 계획서",
+        "편집은 LLM 없이 다시 계산하고 규칙 검사를 다시 통과",
+        "확정은 승인 버튼으로만, 저장 뒤 공유 링크·.ics·Word·HTML"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "멈추는 곳",
+      "items": [
+        "인젝션·비밀 요구는 그래프 첫 단계에서 거절",
+        "지역·날짜 같은 필수 조건이 빠지면 되묻기",
+        "채팅으로 '확정해'라고 해도 저장하지 않음(approve_chat)"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "보정",
+      "items": [
+        "재생성 2회 뒤에도 위반이 남으면 시도별로 보정해 위반 최소·관광지 최다 시도를 사용"
+      ]
+    }
+  ]
+}

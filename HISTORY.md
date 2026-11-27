@@ -813,3 +813,8 @@
 - **사용자 요청**: (앞서) .env 키가 모두 쓰이는지 점검·필요 없으면 삭제 / 현재 기준 기능별 버그 점검과 관련 문서에 현재 상태 기록.
 - **Claude 작업**: .env 키 9개 모두 사용 중 — AWS 3개(boto3·langchain_aws가 환경변수로 읽음, ~/.aws 없음), LangSmith 3개(langsmith SDK가 읽음), TOURAPI·VWORLD·ITS(코드에서 직접) → 삭제할 키 없음. 점검 중 버그 발견·수정: ① `tourlive._client`·`_enrich`가 옛 `scripts/` 파일 경로로 수집 모듈을 불러와 관광공사 실시간 조회(장소 찾기·대안·귀가길 들를 곳·사진 보강)가 조용히 실패 → `src.ingest` import, 실제 TourAPI 조회 확인 ② 시작 카드 요청마다 `__import__("momo.options")`로 `No module named 'momo'` → STYLE_PRESETS 직접 import. 실패 재현 테스트 먼저(test_tourlive_loader.py·test_start_flow.py — 수정 전 실패 확인). 실서버 기능별 점검 스크립트(네트워크·LLM 포함) 31/31 정상 + 지출 삭제 별도 확인. 평가 영향: 평가 경로상 #3·#7·#9만 관련, #9 통과 → 수치 유지·기록. 전체 테스트 165 통과. 문서: SERVICE.md 3-10(버그 3건·평가 영향·점검 31항목), 머리말·3-7 수치, README(테스트 수·평가 이후 버그 문단), round2_report(평가 이후 발견 버그), AGENTS.md 4절 규칙 7(문자열 경로로 모듈 불러오기 금지), user_scenarios.csv U58~U60.
 - **다음 할 일**: archify로 앱 구조·업무 흐름 분석(사용자 요청), push(확인 후).
+
+### [2026-11-27 12:55] archify 앱 구조 분석(구조·업무 흐름·요청 흐름)
+- **사용자 요청**: archify로 현재 앱 구조 분석 — 특히 업무 흐름, 다이어그램과 흐름.
+- **Claude 작업**: 코드 근거(커밋 9640dd2, 파일·줄 범위)를 모아 archify 다이어그램 3개 작성 — `.archify/momo-app-20261127-124708/`: ① momo-architecture.html(구성 요소 15개·연결 18개, FastAPI 서버 프로세스 경계, 근거 33곳 검증) — 자동 배치에서 선 교차 8곳 권고 → 노드 위치만 한 번 조정해 교차 0곳 ② momo-workflow.html(상담 → 계획 만들기 → 편집·확정 → 여행 후, 거절·되묻기 예외 레인, 재생성·재계산 되돌림, 근거 19곳) — 열 0~5 제한·주 경로 전진 규칙에 맞춰 단계 레인으로 재배치 ③ momo-plan-request.html(/query/async → 가드 → 조건 구조화 → build_plan(RAG·LLM·규칙 검사) → 출력 검사 → 확정 save_plan, 근거 13곳) — 라벨 간격 1회 수정. 세 개 모두 finalize(검증·전달·엄격 검사·브라우저 검사) 통과, 화면 캡처로 직접 확인. 개요 노드에서 업무 흐름·요청 흐름으로 이동 링크. README 아키텍처 절에 링크.
+- **다음 할 일**: push(사용자 확인 후). archify 3.3.2 업데이트 있음(설치 안 함).

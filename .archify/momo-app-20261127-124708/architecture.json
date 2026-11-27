@@ -1,0 +1,534 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "모모의 여행 상담소 · 앱 구조",
+    "locale": "ko",
+    "output": ".archify/momo-app-20261127-124708/momo-architecture.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/best4last-n/mini-pjt_momo_travel.git",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "9640dd2b2b9bf4dad97457fb2ed64fcf2c5f56e6"
+    }
+  },
+  "layout": {
+    "mode": "auto"
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "사용자",
+      "sublabel": "브라우저·모바일",
+      "pos": [
+        40,
+        200
+      ]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "웹 화면",
+      "sublabel": "상담·계획서·공유 페이지",
+      "sources": [
+        {
+          "path": "src/api/static/app.js",
+          "line": 1,
+          "end_line": 60
+        },
+        {
+          "path": "src/api/static/share.html",
+          "line": 1,
+          "end_line": 69
+        }
+      ],
+      "pos": [
+        260,
+        200
+      ]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "src/api · /query /query/async",
+      "explanation": "POST /query는 바로 실행하고, /query/async는 작업 번호를 먼저 돌려준 뒤 스레드에서 실행합니다(GET /jobs/{id}로 진행률·결과, /cancel로 중지). 공유·내보내기·지출·장소 찾기 API도 여기 있습니다.",
+      "sources": [
+        {
+          "path": "src/api/main.py",
+          "line": 105,
+          "end_line": 108
+        },
+        {
+          "path": "src/api/main.py",
+          "line": 178,
+          "end_line": 204
+        },
+        {
+          "path": "src/api/main.py",
+          "line": 646,
+          "end_line": 651
+        }
+      ],
+      "pos": [
+        600,
+        200
+      ]
+    },
+    {
+      "id": "counsel",
+      "type": "backend",
+      "label": "상담 에이전트",
+      "sublabel": "src/counsel · LangGraph",
+      "tag": "C안 하이브리드",
+      "href": "momo-workflow.html",
+      "explanation": "guard_in → (버튼 동작은 edit·set·start·cost·pack·approve로 바로) 또는 parse(조건 구조화) → plan·modify·info·approve_chat·reject → guard_out. 정보 질문(info)은 도구 4개를 묶은 ReAct, 일정은 고정 Plan-Execute.",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2268,
+          "end_line": 2292
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2306,
+          "end_line": 2318
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2121,
+          "end_line": 2170
+        }
+      ],
+      "pos": [
+        900,
+        200
+      ]
+    },
+    {
+      "id": "guard",
+      "type": "security",
+      "label": "가드레일",
+      "sublabel": "src/guardrails",
+      "tag": "PII·인젝션·출력 검사",
+      "sources": [
+        {
+          "path": "src/guardrails/guardrails.py",
+          "line": 43,
+          "end_line": 58
+        },
+        {
+          "path": "src/guardrails/guardrails.py",
+          "line": 92,
+          "end_line": 110
+        },
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2254,
+          "end_line": 2263
+        }
+      ],
+      "pos": [
+        600,
+        360
+      ]
+    },
+    {
+      "id": "planning",
+      "type": "backend",
+      "label": "일정 엔진",
+      "sublabel": "src/planning · Plan-Execute",
+      "tag": "규칙 위반 0건",
+      "href": "momo-plan-request.html",
+      "explanation": "후보 검색 → LLM 장소 고르기(PlanPick) → 코드 시각 계산 → 규칙 검사(휴무·운영시간·겹침·없는 장소·식사·숙박) → 위반이면 재생성 최대 2회 → 남으면 가장 나은 시도를 보정. 결과로 계획서(brochure) 데이터를 만듭니다.",
+      "sources": [
+        {
+          "path": "src/planning/planner.py",
+          "line": 1497,
+          "end_line": 1600
+        },
+        {
+          "path": "src/planning/planner.py",
+          "line": 1138,
+          "end_line": 1150
+        },
+        {
+          "path": "src/planning/brochure.py",
+          "line": 325,
+          "end_line": 340
+        }
+      ],
+      "pos": [
+        900,
+        360
+      ]
+    },
+    {
+      "id": "places",
+      "type": "backend",
+      "label": "장소 검색·RAG",
+      "sublabel": "src/places · BM25+Chroma",
+      "sources": [
+        {
+          "path": "src/places/retrieve.py",
+          "line": 37,
+          "end_line": 60
+        },
+        {
+          "path": "src/places/placesearch.py",
+          "line": 183,
+          "end_line": 190
+        },
+        {
+          "path": "src/places/tourlive.py",
+          "line": 22,
+          "end_line": 33
+        }
+      ],
+      "pos": [
+        900,
+        520
+      ]
+    },
+    {
+      "id": "mobility",
+      "type": "backend",
+      "label": "이동·교통",
+      "sublabel": "src/mobility · 도로 경로·거점",
+      "sources": [
+        {
+          "path": "src/mobility/roads.py",
+          "line": 64,
+          "end_line": 70
+        },
+        {
+          "path": "src/mobility/roads.py",
+          "line": 325,
+          "end_line": 335
+        }
+      ],
+      "pos": [
+        1200,
+        520
+      ]
+    },
+    {
+      "id": "extras",
+      "type": "backend",
+      "label": "경비·준비물·내보내기",
+      "sublabel": "budget · packing · export",
+      "sources": [
+        {
+          "path": "src/budget/costs.py",
+          "line": 96,
+          "end_line": 100
+        },
+        {
+          "path": "src/packing/packing.py",
+          "line": 34,
+          "end_line": 40
+        },
+        {
+          "path": "src/export/export.py",
+          "line": 42,
+          "end_line": 50
+        }
+      ],
+      "pos": [
+        1200,
+        200
+      ]
+    },
+    {
+      "id": "llm",
+      "type": "cloud",
+      "label": "AWS Bedrock",
+      "sublabel": "Claude Sonnet 4.5 · Titan v2",
+      "sources": [
+        {
+          "path": "src/shared/llm.py",
+          "line": 8,
+          "end_line": 22
+        },
+        {
+          "path": "src/shared/config.py",
+          "line": 18,
+          "end_line": 20
+        }
+      ],
+      "pos": [
+        1500,
+        360
+      ]
+    },
+    {
+      "id": "state",
+      "type": "database",
+      "label": "상태 DB",
+      "sublabel": "momo_state.sqlite",
+      "explanation": "LangGraph 체크포인트(세션별 최근 2개만 유지), 대화 기록, 확정 계획(plan_id), 실제 지출, 되돌리기 스냅숏.",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2298,
+          "end_line": 2303
+        },
+        {
+          "path": "src/memory/store.py",
+          "line": 18,
+          "end_line": 60
+        }
+      ],
+      "pos": [
+        600,
+        40
+      ]
+    },
+    {
+      "id": "corpus",
+      "type": "database",
+      "label": "수집 데이터·색인",
+      "sublabel": "data/tourapi · chroma_db",
+      "sources": [
+        {
+          "path": "src/shared/data.py",
+          "line": 1,
+          "end_line": 30
+        },
+        {
+          "path": "src/places/retrieve.py",
+          "line": 45,
+          "end_line": 52
+        }
+      ],
+      "pos": [
+        900,
+        680
+      ]
+    },
+    {
+      "id": "public",
+      "type": "external",
+      "label": "공공·지도 API",
+      "sublabel": "관광공사·브이월드·OSM·OSRM·ITS·Open-Meteo",
+      "sources": [
+        {
+          "path": "src/ingest/collect_tourapi.py",
+          "line": 39,
+          "end_line": 58
+        },
+        {
+          "path": "src/places/tools.py",
+          "line": 87,
+          "end_line": 108
+        }
+      ],
+      "pos": [
+        1200,
+        680
+      ]
+    },
+    {
+      "id": "ingest",
+      "type": "messagebus",
+      "label": "데이터 파이프라인",
+      "sublabel": "src/ingest · 오프라인",
+      "tag": "수집→요약→보강→색인",
+      "sources": [
+        {
+          "path": "src/ingest/collect_tourapi.py",
+          "line": 78,
+          "end_line": 90
+        },
+        {
+          "path": "src/ingest/build_index.py",
+          "line": 60,
+          "end_line": 96
+        }
+      ],
+      "pos": [
+        900,
+        840
+      ]
+    },
+    {
+      "id": "trace",
+      "type": "cloud",
+      "label": "LangSmith",
+      "sublabel": "트레이스(선택)",
+      "sources": [
+        {
+          "path": "src/counsel/agent.py",
+          "line": 2314,
+          "end_line": 2314
+        }
+      ],
+      "pos": [
+        1200,
+        40
+      ]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "region",
+      "label": "FastAPI 서버 프로세스 (src/)",
+      "wraps": [
+        "api",
+        "counsel",
+        "guard",
+        "planning",
+        "places",
+        "mobility",
+        "extras"
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "id": "use-ui",
+      "from": "user",
+      "to": "web",
+      "label": "질문·버튼",
+      "variant": "emphasis"
+    },
+    {
+      "id": "ui-api",
+      "from": "web",
+      "to": "api",
+      "label": "POST /query·/query/async",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-graph",
+      "from": "api",
+      "to": "counsel",
+      "label": "handle_query",
+      "variant": "emphasis"
+    },
+    {
+      "id": "graph-guard",
+      "from": "counsel",
+      "to": "guard",
+      "label": "입력·출력 검사",
+      "variant": "security"
+    },
+    {
+      "id": "graph-plan",
+      "from": "counsel",
+      "to": "planning",
+      "label": "plan·start·edit",
+      "variant": "emphasis"
+    },
+    {
+      "id": "graph-llm",
+      "from": "counsel",
+      "to": "llm",
+      "label": "조건 파싱·ReAct"
+    },
+    {
+      "id": "plan-places",
+      "from": "planning",
+      "to": "places",
+      "label": "후보 검색"
+    },
+    {
+      "id": "plan-llm",
+      "from": "planning",
+      "to": "llm",
+      "label": "장소 고르기"
+    },
+    {
+      "id": "plan-mobility",
+      "from": "planning",
+      "to": "mobility",
+      "label": "이동시간"
+    },
+    {
+      "id": "graph-extras",
+      "from": "counsel",
+      "to": "extras",
+      "label": "경비·준비물"
+    },
+    {
+      "id": "places-corpus",
+      "from": "places",
+      "to": "corpus",
+      "label": "BM25·벡터"
+    },
+    {
+      "id": "places-public",
+      "from": "places",
+      "to": "public",
+      "label": "실시간 조회"
+    },
+    {
+      "id": "mobility-public",
+      "from": "mobility",
+      "to": "public",
+      "label": "OSRM·ITS"
+    },
+    {
+      "id": "graph-state",
+      "from": "counsel",
+      "to": "state",
+      "label": "체크포인트·확정"
+    },
+    {
+      "id": "api-state",
+      "from": "api",
+      "to": "state",
+      "label": "공유·지출"
+    },
+    {
+      "id": "graph-trace",
+      "from": "counsel",
+      "to": "trace",
+      "label": "trace",
+      "variant": "dashed"
+    },
+    {
+      "id": "ingest-public",
+      "from": "ingest",
+      "to": "public",
+      "label": "수집",
+      "variant": "dashed"
+    },
+    {
+      "id": "ingest-corpus",
+      "from": "ingest",
+      "to": "corpus",
+      "label": "places·색인",
+      "variant": "dashed"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "요청 경로",
+      "items": [
+        "화면 → FastAPI → 상담 에이전트(LangGraph)",
+        "느린 계획은 /query/async 작업으로 돌리고 진행률·중지 제공",
+        "확정은 승인 버튼(action=approve)으로만"
+      ]
+    },
+    {
+      "dot": "cyan",
+      "title": "근거와 규칙",
+      "items": [
+        "장소는 관광공사 수집 데이터(7개 지역 433곳) + 실시간 편입",
+        "LLM은 장소·순서·이유만, 시각·규칙 검사는 코드"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "보호",
+      "items": [
+        "입력 직후·출력 직전·trace 기록 전 개인정보 가리기",
+        "인젝션·키 요구는 그래프 첫 노드에서 거절"
+      ]
+    }
+  ]
+}
